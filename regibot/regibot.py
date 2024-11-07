@@ -15,6 +15,7 @@ vk_session=vk_api.VkApi(token=token)
 vk = vk_session.get_api()
 longpoll=VkBotLongPoll(vk_session, 217494619)
 isu=[];nickname=[];password=[];uidvk=[];idvk=[]
+ignore=[]
 
 with open("passwords.txt",'r') as f:
     for x in f.readlines():
@@ -25,7 +26,7 @@ with open("passwords.txt",'r') as f:
         password.append(x[2])
         uidvk.append(x[3])
        
-koeff=470
+koeff=480
 i=0
 for x in uidvk[koeff:]:
     i+=1
@@ -41,26 +42,40 @@ for x in uidvk[koeff:]:
     except: idvk.append("-1")
 with open("passwords.txt", 'w+') as f:
     for i in range(len(uidvk)-koeff):
-        if uidvk[i+koeff]!=idvk[i]:
+        if str(uidvk[i+koeff])!=str(idvk[i]):
+            #print(uidvk[i+koeff],idvk[i])
             uidvk[i+koeff]=str(idvk[i])
-            print("обновлено:",isu[i], nickname[i], password[i], uidvk[i])
+            print("обновлено:",isu[i+koeff], nickname[i+koeff], password[i+koeff], uidvk[i+koeff])
         
     for i in range(len(uidvk)):
         f.write(isu[i] +" " +nickname[i] +" "+ password[i] + " "+str(uidvk[i])+"\n")
 print("работай")
-for event in longpoll.listen():
-    if event.type==VkBotEventType.MESSAGE_NEW:
-        id=event.message.from_id
-        idp=id
-        peer_id=2000000000+id
-        flag=1
-        msg=event.object.message['text']
-        msgs=msg.split()
-        print(msgs, idp)
-        ix=uidvk.index(str(idp))
-        l_isu=isu[ix]
-        l_nickname=nickname[ix]
-        l_password=password[ix]
-        tts="Добро пожаловать на спартакиаду ИТМО по майнкрафту! Записывай данные для входа на сервер:\n\nip:\n135.181.241.201:10105\n\n ИСУ:\n"+l_isu+"\n\nНик:\n"+l_nickname+"\n\nПароль:\n"+l_password+"\n\nОбязательно проверь все данные, в случае несоответствий напиши в ответ \"АДМИН\""
-        lsend(idp,tts)
-        
+while True:
+    try:
+        for event in longpoll.listen():
+            if event.type==VkBotEventType.MESSAGE_NEW:
+                id=event.message.from_id
+                idp=id
+                peer_id=2000000000+id
+                msg=event.object.message['text'].lower()
+                msgs=msg.split()
+                if idp in ignore:
+                    continue
+                if "админ" in msg:
+                    tts="Принято, сейчас позову!"
+                    lsend(admin,"vk.com/id"+str(idp) + " вызывает")
+                    ignore.append(idp)
+                else:
+                    try:
+                        ix=uidvk.index(str(idp))
+                        #print(msgs, idp, ix)
+                        l_isu=isu[ix]
+                        l_nickname=nickname[ix]
+                        l_password=password[ix]
+                        tts="Добро пожаловать на спартакиаду ИТМО по майнкрафту! Записывай данные для входа на сервер:\n\nip:\n135.181.241.201:10105\n\nИСУ:\n"+l_isu+"\n\nНик:\n"+l_nickname+"\n\nПароль:\n"+l_password+"\n\nОбязательно проверь все данные, в случае несоответствий напиши в ответ \"АДМИН\""
+                    except:
+                        tts="Не могу найти твою страницу VK в списке. Возможно, ты не регистрировался на спартакиаду, но если ты просто ввёл неправильный вк при регистрации, позови админа командой \"АДМИН\""
+                lsend(idp,tts)
+    except Exception as exc:
+        print("error lol:\n"+str(exc))
+            
