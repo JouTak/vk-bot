@@ -26,7 +26,7 @@ with open("passwords.txt",'r') as f:
         password.append(x[2])
         uidvk.append(x[3])
        
-koeff=480
+koeff=530
 i=0
 for x in uidvk[koeff:]:
     i+=1
@@ -61,6 +61,8 @@ while True:
                 msgs=msg.split()
                 if idp in ignore:
                     continue
+                if idp==admin and msgs[0]=="stop":
+                    exit()
                 if "админ" in msg:
                     tts="Принято, сейчас позову!"
                     lsend(admin,"vk.com/id"+str(idp) + " вызывает")
