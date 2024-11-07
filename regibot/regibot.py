@@ -25,7 +25,7 @@ with open("passwords.txt",'r') as f:
         password.append(x[2])
         uidvk.append(x[3])
        
-koeff=0
+koeff=470
 i=0
 for x in uidvk[koeff:]:
     i+=1
