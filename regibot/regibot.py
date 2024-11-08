@@ -60,8 +60,7 @@ while True:
                 peer_id=2000000000+id
                 msg=event.object.message['text'].lower()
                 msgs=msg.split()
-                if idp in ignore:
-                    continue
+                
                 if idp==admin and msgs[0]=="stop":
                     exit()
                 if "админ" in msg:
@@ -70,6 +69,8 @@ while True:
                     if idp in ignore:
                         ignore.pop(idp)
                     else: ignore.append(idp)
+                if idp in ignore:
+                    continue
                 else:
                     #print(vk.method.groups.isMember(groupid, idp))
                     if vk_session.method('groups.isMember', {'group_id': groupid, 'user_id': idp})==0:
