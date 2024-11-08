@@ -13,7 +13,8 @@ with open ("token.txt",'r') as f:
 admin=297002785
 vk_session=vk_api.VkApi(token=token)
 vk = vk_session.get_api()
-longpoll=VkBotLongPoll(vk_session, 217494619)
+groupid=217494619
+longpoll=VkBotLongPoll(vk_session, groupid)
 isu=[];nickname=[];password=[];uidvk=[];idvk=[]
 ignore=[]
 
@@ -26,7 +27,7 @@ with open("passwords.txt",'r') as f:
         password.append(x[2])
         uidvk.append(x[3])
        
-koeff=530
+koeff=540
 i=0
 for x in uidvk[koeff:]:
     i+=1
@@ -68,15 +69,19 @@ while True:
                     lsend(admin,"vk.com/id"+str(idp) + " вызывает")
                     ignore.append(idp)
                 else:
-                    try:
-                        ix=uidvk.index(str(idp))
-                        #print(msgs, idp, ix)
-                        l_isu=isu[ix]
-                        l_nickname=nickname[ix]
-                        l_password=password[ix]
-                        tts="Добро пожаловать на спартакиаду ИТМО по майнкрафту! Записывай данные для входа на сервер:\n\nip:\n135.181.241.201:10105\n\nИСУ:\n"+l_isu+"\n\nНик:\n"+l_nickname+"\n\nПароль:\n"+l_password+"\n\nОбязательно проверь все данные, в случае несоответствий напиши в ответ \"АДМИН\""
-                    except:
-                        tts="Не могу найти твою страницу VK в списке. Возможно, ты не регистрировался на спартакиаду, но если ты просто ввёл неправильный вк при регистрации, позови админа командой \"АДМИН\""
+                    #print(vk.method.groups.isMember(groupid, idp))
+                    if vk_session.method('groups.isMember', {'group_id': groupid, 'user_id': idp})==0:
+                        tts="Для проверки своего ИСУ, ника, а также получения пароля с айпи подпишитесь:\n[https://vk.com/widget_community.php?act=a_subscribe_box&oid=-217494619&state=1|ITMOcraft. Подписаться]\n\nв случае возникновения проблем пиши \"АДМИН\""
+                    else:
+                        try:
+                            ix=uidvk.index(str(idp))
+                            #print(msgs, idp, ix)
+                            l_isu=isu[ix]
+                            l_nickname=nickname[ix]
+                            l_password=password[ix]
+                            tts="Добро пожаловать на спартакиаду ИТМО по майнкрафту! Записывай данные для входа на сервер:\n\nip:\n135.181.241.201:10105\n\nИСУ:\n"+l_isu+"\n\nНик:\n"+l_nickname+"\n\nПароль:\n"+l_password+"\n\nОбязательно проверь все данные, в случае несоответствий напиши в ответ \"АДМИН\""
+                        except:
+                            tts="Не могу найти твою страницу VK в списке. Возможно, ты не регистрировался на спартакиаду, но если ты просто ввёл неправильный вк при регистрации, позови админа командой \"АДМИН\""
                 lsend(idp,tts)
     except Exception as exc:
         print("error lol:\n"+str(exc))
