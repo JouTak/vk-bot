@@ -64,11 +64,16 @@ while True:
                 if idp==admin and msgs[0]=="stop":
                     exit()
                 if "админ" in msg:
-                    tts="Принято, сейчас позову!"
-                    lsend(admin,"vk.com/id"+str(idp) + " вызывает")
+                    
                     if idp in ignore:
                         ignore.remove(idp)
-                    else: ignore.append(idp)
+                        tts="Надеюсь, вопрос снят!"
+                        lsend(admin,"vk.com/id"+str(idp) + " не вызывает")
+                    else: 
+                        ignore.append(idp)
+                        tts="Принято, сейчас позову!"
+                        lsend(admin,"vk.com/id"+str(idp) + " вызывает")
+                    lsend(idp,tts)
                 if idp in ignore:
                     continue
                 else:
