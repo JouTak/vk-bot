@@ -67,7 +67,9 @@ while True:
                 if "админ" in msg:
                     tts="Принято, сейчас позову!"
                     lsend(admin,"vk.com/id"+str(idp) + " вызывает")
-                    ignore.append(idp)
+                    if idp in ignore:
+                        ignore.pop(idp)
+                    else: ignore.append(idp)
                 else:
                     #print(vk.method.groups.isMember(groupid, idp))
                     if vk_session.method('groups.isMember', {'group_id': groupid, 'user_id': idp})==0:
