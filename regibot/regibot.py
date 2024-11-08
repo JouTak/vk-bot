@@ -67,7 +67,7 @@ while True:
                     tts="Принято, сейчас позову!"
                     lsend(admin,"vk.com/id"+str(idp) + " вызывает")
                     if idp in ignore:
-                        ignore.pop(idp)
+                        ignore.remove(idp)
                     else: ignore.append(idp)
                 if idp in ignore:
                     continue
