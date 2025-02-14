@@ -16,7 +16,7 @@ jobs:
           USER: ${{ secrets.SSH_USER }}
           PORT: ${{ secrets.PORT }}
           PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
-          command: |
+          CMD: |
             cd /srv/bots/vk-itmocraft/app;
             git pull;
             cd /srv/bots;
