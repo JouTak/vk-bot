@@ -1,1 +1,1 @@
-# spartakiada
+# ITMOcraftBOT
