@@ -1,0 +1,22 @@
+name: Deploy on Push
+
+on:
+  push:
+    branches: [ "master" ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Execute SSH Commands
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            cd /srv/bots/vk-itmocraft/app
+            git pull
+            cd /srv/bots
+            podman-compose up -d --build --force-recreate
