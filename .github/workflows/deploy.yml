@@ -10,13 +10,14 @@ jobs:
 
     steps:
       - name: Execute SSH Commands
-        uses: appleboy/ssh-action@v1
+        uses: GPTED/SSH-My-Action@0.1
         with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          script: |
-            cd /srv/bots/vk-itmocraft/app
-            git pull
-            cd /srv/bots
-            podman-compose up -d --build --force-recreate
+          HOST: ${{ secrets.SSH_HOST }}
+          USER: ${{ secrets.SSH_USER }}
+          PORT: ${{ secrets.PORT }}
+          PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          command: |
+            cd /srv/bots/vk-itmocraft/app;
+            git pull;
+            cd /srv/bots;
+            podman-compose up -d --build --force-recreate;
