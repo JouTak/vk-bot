@@ -1,2 +1,2 @@
 # ITMOcraftBOT
-VK
+VK bot
