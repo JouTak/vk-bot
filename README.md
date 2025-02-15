@@ -1,4 +1,2 @@
 # ITMOcraftBOT
 VK
-test
-aboba
