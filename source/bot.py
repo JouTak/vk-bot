@@ -35,7 +35,7 @@ def sender(sender_type):
                             f.write(str(int(subscribers_spartakiada[i]))+"\n")
             except: pass
                 
-token = os.getEnv()
+token = os.getenv("BOT_TOKEN")
 admin=[297002785, 275052029]
 vk_session=vk_api.VkApi(token=token)
 vk = vk_session.get_api()
