@@ -34,8 +34,7 @@ def sender(sender_type):
                             f.write(str(int(subscribers_spartakiada[i]))+"\n")
             except: pass
                 
-with open ("token.txt",'r') as f:
-    token=f.readline()
+token = os.getEnv()
 admin=[297002785, 275052029]
 vk_session=vk_api.VkApi(token=token)
 vk = vk_session.get_api()
