@@ -18,6 +18,7 @@ jobs:
           PRIVATE_KEY: ${{ secrets.BOT_DEV_SSH_PRIVATE_KEY }}
           CMD: |
             cd /srv/bots/vk-itmocraft/app;
+            git reset --hard HEAD;
             git pull;
             cd /srv/bots;
             podman-compose up -d --build --force-recreate;
