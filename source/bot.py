@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import os
 import vk_api
 from random import randint as rd
 from vk_api import VkApi
