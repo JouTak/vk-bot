@@ -20,5 +20,5 @@ jobs:
             cd /srv/bots/vk-itmocraft/app;
             git reset --hard HEAD;
             git pull;
-            cd /srv/bots;
+            cd /srv/bots/vk-itmocraft;
             podman-compose up -d --build --force-recreate;
