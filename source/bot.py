@@ -109,7 +109,7 @@ while True:
                             lsend(admin[i],"vk.com/id"+str(idp) + " не вызывает")
                     else: 
                         ignore.append(idp)
-                        tts="Принято, сейчас позову! Напиши свою проблему следующим сообщением"
+                        tts="Принято, сейчас позову! Напиши свою проблему следующим сообщением, а затем ещё раз напиши АДМИН, чтобы закрыть вопрос."
                         for i in range(len(admin)):
                             lsend(admin[i],"vk.com/id"+str(idp) + " вызывает")
                     lsend(idp,tts)
