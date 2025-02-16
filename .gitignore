@@ -1,3 +1,4 @@
-regibot/passwords.txt
-regibot/token.txt
-regibot/subscribers/spartakiada24.txt
+source/passwords.txt
+source/token.txt
+source/subscribers/spartakiada24.txt
+entrypoint.sh
