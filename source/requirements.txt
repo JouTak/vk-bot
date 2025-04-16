@@ -1,1 +1,5 @@
 vk_api
+requests>=2.32.3
+pyyaml
+vk-api
+loguru>=0.7.3
