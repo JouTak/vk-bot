@@ -37,7 +37,7 @@ admin=[297002785, 275052029]
 
 isu=[];nickname=[];password=[];uidvk=[];idvk=[];tens=[];wins1=[];wins2=[];wins3=[]
 ignore=[529015396, 403426536, 454638783, 475294527, 178196074, 214648360]
-groupid = 228288169
+groupid = 217494619
 subscribers_spartakiada=[]
 
 # with open("passwords.txt",'r') as f:
