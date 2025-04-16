@@ -84,6 +84,7 @@ def process_message_event(event, vk_helper):
     pl = event.object.get('payload')
     #user_list = UserList() #TODO: userlist
     tts=""
+    sender = int(pl['sender'])
     if pl: pass
     else: return
     return [{
@@ -162,7 +163,7 @@ def process_message_new(event, vk_helper, ignored):
         if msgs[0]=="stop":
             exit()
         elif msgs[0]=="sender":
-            sender(msgs[1])
+            #sender(msgs[1])
             tts="готово"
     if vk_helper.vk_session.method('groups.isMember', {'group_id': groupid, 'user_id': uid})==0:
         tts="Привет! Для получение информации о серверах ИТМОкрафта подпишитесь:\n[https://vk.com/widget_community.php?act=a_subscribe_box&oid=-217494619&state=1|ITMOcraft. Подписаться]\n\nПосле подписки отправь ещё одно сообщение. Только в случае возникновения проблем пиши \"АДМИН\""
