@@ -221,13 +221,15 @@ def sender(self, sender_type: str) -> list[dict]:
     vk_helper = self.VK
     result = []
     # TODO: Не знаю, как назвать, сам реши
-    if sender_type == 'in25notin24':
+    if sender_type == 'in24notin25':
+        users = self.users
         copy = spartakiada24_subs.copy()
         for isu in users.keys():
-            if isu in copy:
-                copy.remove(isu)
+            if int(users.get(isu)[VK_UID]) in copy:
+                copy.remove(int(users.get(isu)[VK_UID]))
+        result.extend([{'peer_id': uid, 'message': 'Вроде работает'} for uid in admin])
         for uid in copy:
-            vk_helper.send_message(2000000000 + uid, 'Привет! Ты участвовал в прошлой спартакиаде:')
+            result.append({'peer_id': uid, 'message': 'Привет! Ты участвовал в прошлой спартакиаде:'})
     elif sender_type == 'spartakiada2025':
         for isu in users.keys():
             user = users.get(isu)
@@ -247,6 +249,7 @@ def sender(self, sender_type: str) -> list[dict]:
                     file.write(user[VK_UID] + '\n')
             except OSError as e:
                 warn(f'Warning: can not write id {user[VK_UID]} in spartakiada DB because of: {e}')
+    print(*result, sep='\n')
     return result
 
 
@@ -269,14 +272,12 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
     tts = ''
     users = self.users
     uid = event.message.from_id
-    peer_id = 2000000000 + uid
 
     user_get = vk_helper.vk.users.get(user_ids=uid)
     user_get = user_get[0]
     uname = user_get['first_name']
     username = user_get['last_name']
 
-    msgraw = event.message.text
     msg = event.message.text.lower()
     msgs = msg.split()
 
@@ -322,19 +323,27 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
                         'message': Ctts,
                         'keyboard': link_keyboard,
                         'attachment': None
-                    } for uid in admin]
+                    } for uid in admin
+                ]
             ]
 
     if uid in admin:
         if msgs[0] == 'stop':
             exit()
         elif msgs[0] == 'sender':
-            sender(msgs[1], vk_helper)
-            tts = 'готово'
+            if len(msgs) > 1:
+                self.handle_actions(sender(self, msgs[1]))
+                tts = 'Готово'
+            else:
+                tts = 'Нет аргумента'
+            return [{
+                'peer_id': uid,
+                'message': tts
+            }]
     if vk_helper.vk_session.method('groups.isMember', {'group_id': groupid, 'user_id': uid}) == 0:
         tts = info_message
     else:
-        if uid in self.uid_to_isu:
+        if uid in users.uid_to_isu:
             isu = users.uid_to_isu[uid]
             user = users.get(isu)
             tts = welcome_message.format(isu, user[NICKNAME])
