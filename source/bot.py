@@ -146,8 +146,8 @@ class UserList:
                     incorrect_uids.add(int(s[1]))
                     changes = True
                 # весь ли ФОИ заполнен
-                if len(s[6].split()) != 3:  # fio
-                    warn(f'something wrong with fio (isu = {s[1]}) in {n}-th line in DB:', s[6])
+                if len(s[5].split()) != 3:  # fio
+                    warn(f'something wrong with fio (isu = {s[1]}) in {n}-th line in DB:', s[5])
                     # but okay, it's his or her problem
                 # DB   | timestamp isu vk_uid nick    group   fio first_time
                 # Dict | isu: (timestamp, vk_uid, nick, group, fio, first_time)
