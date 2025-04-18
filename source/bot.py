@@ -10,8 +10,7 @@ admin = [297002785, 275052029, 229488682]
 
 TIMESTAMP = 0
 VK_UID = TIMESTAMP + 1
-VK_LINK = VK_UID + 1
-NICKNAME = VK_LINK + 1
+NICKNAME = VK_UID + 1
 GROUP_ID = NICKNAME + 1
 FIO = GROUP_ID + 1
 FIRST_TIME = FIO + 1
@@ -122,7 +121,7 @@ class UserList:
         if is_file_accessible(self.path) is False:
             return False
         changes = False
-        incorrect_uids = []
+        incorrect_uids = set()
         incorrect_isu = 100000
         with open(self.path, 'r', encoding='UTF-8') as file:
             for n, line in enumerate(file):
@@ -136,41 +135,41 @@ class UserList:
                     warn(f'isu id is NaN in {n}-th line in DB: {s[1]}')
                     s[1] = str(incorrect_isu)
                     incorrect_isu += 1
-                # vk_uid не определён, потом определим
                 if s[2] == '0':  # vk_uid
-                    incorrect_uids.append(int(s[1]))
-                # из цифр ли vk_uid
-                elif not all(d.isdigit() for d in s[2]):  # vk_uid
                     warn(f'vk id is NaN (isu = {s[1]}) in {n}-th line in DB:', s[2])
+                # vk_uid не определён, потом определим
+                elif not all(d.isdigit() for d in s[2]):  # vk_uid
+                    incorrect_uids.add(int(s[1]))
+                    changes = True
                 # весь ли ФОИ заполнен
                 if len(s[6].split()) != 3:  # fio
                     warn(f'something wrong with fio (isu = {s[1]}) in {n}-th line in DB:', s[6])
                     # but okay, it's his or her problem
-                # DB   | timestamp isu vk_uid  vk_link nick    group   fio first_time
-                # Dict | isu: (timestamp, vk_uid, vk_link, nick, group, fio, first_time)
-                self.db[int(s[1])] = s[0], s[2], s[3], s[4], s[5], s[6], s[7]
+                # DB   | timestamp isu vk_uid nick    group   fio first_time
+                # Dict | isu: (timestamp, vk_uid, nick, group, fio, first_time)
+                self.db[int(s[1])] = s[0], s[2], s[3], s[4], s[5], s[6]
         # достаём все vk_uid через vk_link
+        incorrect_uids = sorted(incorrect_uids)
         for i in range(0, len(incorrect_uids), 25):
             part = incorrect_uids[i:min(i + 25, len(incorrect_uids))]
             links = []
             for isu in part:
-                start = self.db[isu][VK_LINK].rfind('/')  # vk_link
+                start = self.db[isu][VK_UID].rfind('/') + 1
                 if start == -1:
-                    start = s[3].find('@')  # vk_link
+                    start = self.db[isu][VK_UID].find('@') + 1
                 if start == -1:
                     start = 0
-                links.append(self.db[isu][VK_LINK][start:])
+                links.append(self.db[isu][VK_UID][start:])
             response = self.vk_helper.links_to_uids(links)
             for isu, uid in zip(part, response):
                 user = list(self.db[isu])
-                user[VK_UID] = uid
+                user[VK_UID] = str(uid)
                 self.db[isu] = tuple(user)
         # делаем штуку для быстрого доступа к пользователю через uid
         for isu in self.db.keys():
             user = self.db[isu]
             if user[VK_UID] != '0':
                 self.uid_to_isu[int(user[VK_UID])] = isu
-                print(user[VK_UID], isu)
         if changes is True:
             return self.save()
         return True
@@ -181,7 +180,7 @@ class UserList:
         to_save = []
         for key in self.db.keys():
             v = self.db[key]
-            to_save.append((str2ts(v[0]), '\t'.join((v[0], str(key), v[1], v[2], v[3], v[4], v[5], v[6]))))
+            to_save.append((str2ts(v[0]), '\t'.join((v[0], str(key), v[1], v[2], v[3], v[4], v[5]))))
         to_save.sort()
         with open(users_path, 'w', encoding='UTF-8') as file:
             file.write('\n'.join(i[1] for i in to_save))
