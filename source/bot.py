@@ -122,6 +122,8 @@ class UserList:
         if is_file_accessible(self.path) is False:
             return False
         changes = False
+        incorrect_uids = []
+        incorrect_isu = 100000
         with open(self.path, 'r', encoding='UTF-8') as file:
             for n, line in enumerate(file):
                 s: list[str] = line.strip().split('\t')
@@ -132,25 +134,11 @@ class UserList:
                 # isu id не из цифр
                 if not all(d.isdigit() for d in s[1]):  # isu
                     warn(f'isu id is NaN in {n}-th line in DB: {s[1]}')
-                # vk_uid не определён, пытаемся определить
+                    s[1] = str(incorrect_isu)
+                    incorrect_isu += 1
+                # vk_uid не определён, потом определим
                 if s[2] == '0':  # vk_uid
-                    # достаём его через vk_link
-                    start = s[3].rfind('/')  # vk_link
-                    if start == -1:
-                        start = s[3].find('@')  # vk_link
-                    if start == -1:
-                        warn(f'vk uid is 0 and error occurred while parsing vk link in {n}-th line in DB: {s[3]}')
-                    try:
-                        uid = s[3][start + 1:]  # vk_link
-                        if all(d.isdigit() for d in uid):
-                            uid = 'id' + uid
-                        print(f'{n}. Trying to get {s[6]}\'s vk uid with {s[3]}', end=' ')
-                        s[3] = str(self.vk_helper.vk.resolveScreenName(screen_name=uid)['object_id'])
-                        print('[✓]')
-                        changes = True
-                    except Exception as e:
-                        print('[X]')
-                        warn(f'something went wrong while getting vk id (isu = {s[1]}) in {n}-th line in DB: {e}')
+                    incorrect_uids.append(int(s[1]))
                 # из цифр ли vk_uid
                 elif not all(d.isdigit() for d in s[2]):  # vk_uid
                     warn(f'vk id is NaN (isu = {s[1]}) in {n}-th line in DB:', s[2])
@@ -161,6 +149,22 @@ class UserList:
                 # DB   | timestamp isu vk_uid  vk_link nick    group   fio first_time
                 # Dict | isu: (timestamp, vk_uid, vk_link, nick, group, fio, first_time)
                 self.db[int(s[1])] = s[0], s[2], s[3], s[4], s[5], s[6], s[7]
+        # достаём все vk_uid через vk_link
+        for i in range(0, len(incorrect_uids), 25):
+            part = incorrect_uids[i:min(i + 25, len(incorrect_uids))]
+            links = []
+            for isu in part:
+                start = self.db[isu][VK_LINK].rfind('/')  # vk_link
+                if start == -1:
+                    start = s[3].find('@')  # vk_link
+                if start == -1:
+                    start = 0
+                links.append(self.db[isu][VK_LINK][start:])
+            response = self.vk_helper.links_to_uids(links)
+            for isu, uid in zip(part, response):
+                user = list(self.db[isu])
+                user[VK_UID] = uid
+                self.db[isu] = tuple(user)
         for isu in self.db.keys():
             user = self.db[isu]
             if user[VK_UID] != '0':
@@ -177,7 +181,7 @@ class UserList:
             v = self.db[key]
             to_save.append((str2ts(v[0]), '\t'.join((v[0], str(key), v[1], v[2], v[3], v[4], v[5], v[6]))))
         to_save.sort()
-        with open('./users.txt', 'w', encoding='UTF-8') as file:
+        with open(users_path, 'w', encoding='UTF-8') as file:
             file.write('\n'.join(i[1] for i in to_save))
         return True
 
@@ -193,10 +197,10 @@ def init_spartakiada24_subs() -> set[int]:
     spartakiada24_subs = set[int]()
     with open(spartakiada24_subs_path, 'r', encoding='UTF-8') as file:
         for n, uid in enumerate(file):
-            if not all(d.isdigit() for d in uid):
+            if not all(d.isdigit() for d in uid.strip()):
                 warn(f'something wrong with id in {n}-th line in spartakiada subs DB')
                 continue
-            spartakiada24_subs.add(int(uid))
+            spartakiada24_subs.add(int(uid.strip()))
     return spartakiada24_subs
 
 
@@ -211,7 +215,9 @@ def save_spartakiada24_subs() -> bool:
 spartakiada24_subs = init_spartakiada24_subs()
 
 
-def sender(sender_type: str, users: UserList) -> list[dict]:
+def sender(self, sender_type: str) -> list[dict]:
+    users: UserList = self.users
+    vk_helper = self.VK
     result = []
     # TODO: Не знаю, как назвать, сам реши
     if sender_type == 'in25notin24':
@@ -219,8 +225,8 @@ def sender(sender_type: str, users: UserList) -> list[dict]:
         for isu in users.keys():
             if isu in copy:
                 copy.remove(isu)
-        for i in copy:
-            pass
+        for uid in copy:
+            vk_helper.send_message(2000000000 + uid, )
     elif sender_type == 'spartakiada2025':
         for isu in users.keys():
             user = users.get(isu)
@@ -310,24 +316,13 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
                     'keyboard': keyboard,
                     'attachment': None
                 },
-                {
-                    'peer_id': admin[0],
-                    'message': Ctts,
-                    'keyboard': link_keyboard,
-                    'attachment': None
-                },
-                {
-                    'peer_id': admin[1],
-                    'message': Ctts,
-                    'keyboard': link_keyboard,
-                    'attachment': None
-                },
-                {
-                    'peer_id': admin[2],
-                    'message': Ctts,
-                    'keyboard': link_keyboard,
-                    'attachment': None
-                }
+                *[
+                    {
+                        'peer_id': uid,
+                        'message': Ctts,
+                        'keyboard': link_keyboard,
+                        'attachment': None
+                    } for uid in admin]
             ]
 
     if uid in admin:
