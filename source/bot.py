@@ -346,5 +346,5 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
         }]
     if uid not in spartakiada24_subs:
         spartakiada24_subs.add(uid)
-        with open('subscribers/spartakiada25.txt', 'a') as file:
+        with open(spartakiada25_subs_path, 'a') as file:
             file.write(str(uid) + '\n')
