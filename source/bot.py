@@ -353,10 +353,10 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
             tts = welcome_message.format(isu, user[NICKNAME])
         else:
             tts = 'Привет, добро пожаловать в бота клуба ITMOcraft! Сейчас у нас проходит спартакиада, но, кажется, у нас нет твоих данных. Если считаешь, что произошла ошибка — позови админа командой АДМИН. Если хочешь зарегистрироваться — скорее делай это на сайте https://joutak.ru/minigames'
-        return [{
-            'peer_id': uid,
-            'message': tts
-        }]
+    return [{
+        'peer_id': uid,
+        'message': tts
+    }]
     if uid not in spartakiada24_subs:
         spartakiada24_subs.add(uid)
         with open(spartakiada25_subs_path, 'a') as file:
