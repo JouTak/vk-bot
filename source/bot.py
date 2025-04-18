@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import os.path
 from datetime import datetime
+from utils.VKHelper import *
 
 spartakiada24_subs_path = './subscribers/spartakiada24.txt'
 spartakiada25_subs_path = './subscribers/spartakiada25.txt'
