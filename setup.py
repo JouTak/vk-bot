@@ -12,15 +12,16 @@ required_files = [
 ]
 
 def create():
-    for directory in required_dirs:
-        if not os.path.exists(directory):
-            os.makedirs(directory)
-            print(f"Создана папка: {directory}")
-    for file in required_files:
-        path = Path(file)
-        if not path.exists():
-            path.touch()
-            print(f"Создан файл: {file}")
+    pass
+    # for directory in required_dirs:
+    #     if not os.path.exists(directory):
+    #         os.makedirs(directory)
+    #         print(f"Создана папка: {directory}")
+    # for file in required_files:
+    #     path = Path(file)
+    #     if not path.exists():
+    #         path.touch()
+    #         print(f"Создан файл: {file}")
     """
     if not os.path.exists('token.txt'):
         token=getpass.getpass("введи токен приложения VK:\n")
