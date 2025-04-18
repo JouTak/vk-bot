@@ -111,7 +111,7 @@ class UserList:
     def __init__(self, path: str, vk_helper) -> None:
         # isu: (timestamp, vk_uid, vk_link, nick, group, fio, first_time)
         self.db = dict[int: tuple[str, str, str, str, str, str, str]]()
-        self.by_uid = dict[int, tuple[int, str, str, str, str, str]]()
+        self.uid_to_isu = dict[int, int]()
         self.path = path
         self.vk_helper = vk_helper
         if self.load() is False:
@@ -165,10 +165,12 @@ class UserList:
                 user = list(self.db[isu])
                 user[VK_UID] = uid
                 self.db[isu] = tuple(user)
+        # делаем штуку для быстрого доступа к пользователю через uid
         for isu in self.db.keys():
             user = self.db[isu]
             if user[VK_UID] != '0':
-                self.by_uid[VK_UID] = (isu, user[2], user[3], user[4], user[5], user[6])
+                self.uid_to_isu[int(user[VK_UID])] = isu
+                print(user[VK_UID], isu)
         if changes is True:
             return self.save()
         return True
@@ -226,7 +228,7 @@ def sender(self, sender_type: str) -> list[dict]:
             if isu in copy:
                 copy.remove(isu)
         for uid in copy:
-            vk_helper.send_message(2000000000 + uid, )
+            vk_helper.send_message(2000000000 + uid, 'Привет! Ты участвовал в прошлой спартакиаде:')
     elif sender_type == 'spartakiada2025':
         for isu in users.keys():
             user = users.get(isu)
@@ -268,7 +270,8 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
     tts = ''
     users = self.users
     uid = event.message.from_id
-    user = users.by_uid[uid]
+    isu = users.uid_to_isu[uid]
+    user = users.get(isu)
     peer_id = 2000000000 + uid
 
     user_get = vk_helper.vk.users.get(user_ids=uid)
@@ -334,7 +337,7 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
     if vk_helper.vk_session.method('groups.isMember', {'group_id': groupid, 'user_id': uid}) == 0:
         tts = info_message
     else:
-        tts = welcome_message.format(user[0], user[3])
+        tts = welcome_message.format(isu, user[NICKNAME])
         return [{
             'peer_id': uid,
             'message': tts
