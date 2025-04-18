@@ -4,7 +4,7 @@ import os
 
 
 def initialize():
-    # with open("token.txt", 'r') as f:
+    # with open('token.txt', 'r') as f:
     #     token = f.readline()
-    token = os.getenv("BOT_TOKEN")
+    token = os.getenv('BOT_TOKEN')
     return token
