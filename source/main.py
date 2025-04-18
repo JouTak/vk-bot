@@ -10,16 +10,19 @@ from bot import *
 class Main:
     def __init__(self):
         self.token = initialize()
-        self.group_id = 217494619
+        self.group_id = 230160029 # 217494619
 
         self.vk_session = vk_api.VkApi(token=self.token)
         self.VK = VKHelper(self.vk_session)
+
+        self.users = UserList('./users.txt', self.VK)
+        print('\n'.join(warnings))
 
         self.info, self.error = log()
         self.longpoll = VkBotLongPoll(self.vk_session, self.group_id)
         self.ignored = IgnoredList()
         self.info(self.ignored.load_from_file())
-        self.info("готов!\n")
+        self.info('готов!\n')
 
     def run(self):
         while True:
@@ -29,7 +32,6 @@ class Main:
             except Exception as e:
                 self.error(e)
                 traceback.print_exc()
-
 
     def process_event(self, event):
         if event.type == VkBotEventType.MESSAGE_NEW:
@@ -45,23 +47,23 @@ class Main:
         result = process_message_event(event, self.VK)
         self.handle_actions(result)
 
-    def handle_actions(self, actions):
+    def handle_actions(self, actions: list[dict]):
         if not actions:
             return
         print(actions)
         for action in actions:
-            peer_id = action.get("peer_id")
-            message = action.get("message", "")
-            keyboard = action.get("keyboard")
-            attachment = action.get("attachment")
+            peer_id = action.get('peer_id')
+            message = action.get('message', '')
+            keyboard = action.get('keyboard')
+            attachment = action.get('attachment')
             # message_sync = {
-            #     "user_message": {"peer_id": None, "conversation_message_id": None},
-            #     "manager_message": {"peer_id": None, "conversation_message_id": None}
+            #     'user_message': {'peer_id': None, 'conversation_message_id': None},
+            #     'manager_message': {'peer_id': None, 'conversation_message_id': None}
             # }
             try:
                 self.VK.send_message(peer_id, message, keyboard, attachment)
             except Exception as e:
-                self.error(f"Ошибка обработки действия: {e}")
+                self.error(f'Ошибка обработки действия: {e}')
 
 
 if __name__ == '__main__':
