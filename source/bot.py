@@ -17,7 +17,7 @@ FIO = GROUP_ID + 1
 FIRST_TIME = FIO + 1
 # isu: (timestamp, vk_uid, link, nick, group, fio, first_time)
 
-groupid = 230160029  # 217494619
+groupid = 217494619 #230160029  
 joutek_ip = 'craft.joutak.ru'
 joutek_link = 'https://joutak.ru'
 form_link = 'https://forms.yandex.ru/u/6501f64f43f74f18a8da28de/'
