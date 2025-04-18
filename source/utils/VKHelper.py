@@ -45,40 +45,40 @@ class VKHelper:
         return [i['object_id'] if isinstance(i, dict) and 'object_id' in i.keys() else '0' for i in response]
 
 
-    def create_keyboard(buttons):
-        keyboard = VkKeyboard(inline=True)
-        for button in buttons:
-            if button.get('newline'):
-                keyboard.add_line()
-            keyboard.add_callback_button(
-                label=button['label'],
-                payload=button['payload'],
-                color=getattr(VkKeyboardColor, button['color'].upper())
-            )
-        return keyboard.get_keyboard() if buttons else None
+def create_keyboard(buttons):
+    keyboard = VkKeyboard(inline=True)
+    for button in buttons:
+        if button.get('newline'):
+            keyboard.add_line()
+        keyboard.add_callback_button(
+            label=button['label'],
+            payload=button['payload'],
+            color=getattr(VkKeyboardColor, button['color'].upper())
+        )
+    return keyboard.get_keyboard() if buttons else None
 
 
-    def create_standart_keyboard(buttons):
-        keyboard = VkKeyboard(inline=False)
-        for button in buttons:
-            if button.get('newline'):
-                keyboard.add_line()
-            keyboard.add_button(
-                label=button['label'],
-                payload=button['payload'],
-                color=getattr(VkKeyboardColor, button['color'].upper())
-            )
-        return keyboard.get_keyboard()
+def create_standart_keyboard(buttons):
+    keyboard = VkKeyboard(inline=False)
+    for button in buttons:
+        if button.get('newline'):
+            keyboard.add_line()
+        keyboard.add_button(
+            label=button['label'],
+            payload=button['payload'],
+            color=getattr(VkKeyboardColor, button['color'].upper())
+        )
+    return keyboard.get_keyboard()
 
 
-    def create_link_keyboard(buttons):
-        keyboard = VkKeyboard(inline=True)
-        for button in buttons:
-            if button.get('newline'):
-                keyboard.add_line()
-            keyboard.add_openlink_button(
-                label=button['label'],
-                payload=button['payload'],
-                link=button['link']
-            )
-        return keyboard.get_keyboard()
+def create_link_keyboard(buttons):
+    keyboard = VkKeyboard(inline=True)
+    for button in buttons:
+        if button.get('newline'):
+            keyboard.add_line()
+        keyboard.add_openlink_button(
+            label=button['label'],
+            payload=button['payload'],
+            link=button['link']
+        )
+    return keyboard.get_keyboard()
