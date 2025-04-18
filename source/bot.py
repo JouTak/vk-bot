@@ -2,21 +2,11 @@
 import os.path
 from datetime import datetime
 
-admin = [297002785, 275052029, 229488682]
+spartakiada24_subs_path = './subscribers/spartakiada24.txt'
+spartakiada25_subs_path = './subscribers/spartakiada25.txt'
+users_path = './users.txt'
 
-# TODO: поменять формат
-# isu = []
-# nickname = []
-# password = []
-# uidvk = []
-# idvk = []
-# tens = []
-# wins1 = []
-# wins2 = []
-# wins3 = []
-# ignore = [529015396, 403426536, 454638783, 475294527, 178196074, 214648360]
-# groupid = 230160029  # 217494619
-# subscribers_spartakiada = []
+admin = [297002785, 275052029, 229488682]
 
 TIMESTAMP = 0
 VK_UID = TIMESTAMP + 1
@@ -27,7 +17,8 @@ FIO = GROUP_ID + 1
 FIRST_TIME = FIO + 1
 # isu: (timestamp, vk_uid, link, nick, group, fio, first_time)
 
-joutek_ip = 'craft.joutak.r'
+groupid = 230160029  # 217494619
+joutek_ip = 'craft.joutak.ru'
 joutek_link = 'https://joutak.ru'
 form_link = 'https://forms.yandex.ru/u/6501f64f43f74f18a8da28de/'
 telegram_link = 't.me/itmocraft'
@@ -60,45 +51,34 @@ info_message = \
     f'[{vk_link}. Подписаться]\n\n' \
     'После подписки отправь ещё одно сообщение. Только в случае возникновения проблем пиши "АДМИН"'
 
-welcome_message = \
-    'Привет! Добро пожаловать в бота клуба любителей игры «Майнкрафт» ITMOcraft. ' \
-    'Думаю, самое время познакомиться!\n\n' \
-    'Наш клуб — комьюнити итмошников, которым нравится играть в майнкрафт. ' \
-    'Выживание, моды, мини-игры: если во что-то можно играть, мы создаём для этого условия. ' \
-    'Недавно мы получили от университета ещё большие мощности, ' \
-    f'поэтому с этой спартакиады мини-игры будут играться на постоянной основе! IP: {joutek_ip}. ' \
-    'Наша альма-матер — SMP JouTak. Это сервер с шестилетней историей ' \
-    '(без вайпов, без приватов, без случайных людей), ' \
-    'в итмошном районе которого мы вместе уже построили Кронву, Вязьму и даже Ленсовета, ' \
-    'а игроки возводят свои проекты, болтают в войсчате и просто отдыхают. ' \
-    'Более того, мы регулярно проводим там ивенты, самое время залететь на сервер👻 ' \
-    '(+30дней, если у тебя лицензия)\n\n' \
-    'Как это сделать?\n' \
-    f'1) Почитай информацию о том, что мы делаем, на нашем сайте: {joutek_link}\n' \
-    f'2) Заполняй анкету, чтобы мы с тобой связались: {form_link}\n' \
-    f'3) Следи за новостями в нашем телеграм канале: {telegram_link}. ' \
-    'Помогая нашему продвижению, ты делаешь ивенты масштабнее, а сервера круче!\n' \
-    'P.S.: Плашку в ису "Член клуба ITMOcraft" тоже можно получить после заполнения этой анкеты, по желанию. ' \
-    'Если есть вопросы, пиши "АДМИН"!'
+welcome_message = '''
+Добро пожаловать на спартакиаду ИТМО по майнкрафту! Записывай данные для входа на сервер:
 
+ИСУ:
+{}
 
-def sender(sender_type):
-    if sender_type == 'spartakiada2025':
-        for user in users.keys():
-            day_reward = 0
-            # TODO: сделайте условие
-            # if users[user][?]:
-            # day_reward = ?
-            message = hi_message.format(day_reward)
-            try:
-                # lsend(uidvk[i],message)
-                if user[VK_UID] in spartakiada_subs:
-                    continue
-                spartakiada_subs.add(user[VK_UID])
-                with open('./subscribers/spartakiada.txt', 'a', encoding='UTF-8') as file:
-                    file.write(str(user[VK_UID]) + '\n')
-            except OSError as e:
-                print(f'Warning: can not write id {user[VK_UID]} in spartakiada DB because of:\n{e}')
+Ник:
+{}
+
+Обязательно проверь все данные, только в случае несоответствий или важных вопросов напиши в ответ "АДМИН"
+'''.strip()
+#    'Наш клуб — комьюнити итмошников, которым нравится играть в майнкрафт. ' \
+#    'Выживание, моды, мини-игры: если во что-то можно играть, мы создаём для этого условия. ' \
+#    'Недавно мы получили от университета ещё большие мощности, ' \
+#    f'поэтому с этой спартакиады мини-игры будут играться на постоянной основе! IP: {joutek_ip}. ' \
+#    'Наша альма-матер — SMP JouTak. Это сервер с шестилетней историей ' \
+#    '(без вайпов, без приватов, без случайных людей), ' \
+#    'в итмошном районе которого мы вместе уже построили Кронву, Вязьму и даже Ленсовета, ' \
+#    'а игроки возводят свои проекты, болтают в войсчате и просто отдыхают. ' \
+#    'Более того, мы регулярно проводим там ивенты, самое время залететь на сервер👻 ' \
+#    '(+30дней, если у тебя лицензия)\n\n' \
+#    'Как это сделать?\n' \
+#    f'1) Почитай информацию о том, что мы делаем, на нашем сайте: {joutek_link}\n' \
+#    f'2) Заполняй анкету, чтобы мы с тобой связались: {form_link}\n' \
+#    f'3) Следи за новостями в нашем телеграм канале: {telegram_link}. ' \
+#    'Помогая нашему продвижению, ты делаешь ивенты масштабнее, а сервера круче!\n' \
+#    'P.S.: Плашку в ису "Член клуба ITMOcraft" тоже можно получить после заполнения этой анкеты, по желанию. ' \
+#    'Если есть вопросы, пиши "АДМИН"!'
 
 
 def is_file_accessible(filepath: str) -> bool:
@@ -131,6 +111,7 @@ class UserList:
     def __init__(self, path: str, vk_helper) -> None:
         # isu: (timestamp, vk_uid, vk_link, nick, group, fio, first_time)
         self.db = dict[int: tuple[str, str, str, str, str, str, str]]()
+        self.by_uid = dict[int, tuple[int, str, str, str, str, str]]()
         self.path = path
         self.vk_helper = vk_helper
         if self.load() is False:
@@ -180,6 +161,10 @@ class UserList:
                 # DB   | timestamp isu vk_uid  vk_link nick    group   fio first_time
                 # Dict | isu: (timestamp, vk_uid, vk_link, nick, group, fio, first_time)
                 self.db[int(s[1])] = s[0], s[2], s[3], s[4], s[5], s[6], s[7]
+        for isu in self.db.keys():
+            user = self.db[isu]
+            if user[VK_UID] != '0':
+                self.by_uid[VK_UID] = (isu, user[2], user[3], user[4], user[5], user[6])
         if changes is True:
             return self.save()
         return True
@@ -199,21 +184,67 @@ class UserList:
     def get(self, isu: int) -> tuple[str, str, str, str, str, str, str] | None:
         return self.db[isu] if isu in self.db.keys() else None
 
+    def keys(self):
+        return self.db.keys()
 
-def init_spartakiada_subs() -> set[int]:
+
+def init_spartakiada24_subs() -> set[int]:
     # DB   | timestamp isu vk_uid  vk_link nick    group   fio first_time
-    spartakiada_subs = set[int]()
-    with open('./subscribers/spartakiada.txt', 'r', encoding='UTF-8') as file:
+    spartakiada24_subs = set[int]()
+    with open(spartakiada24_subs_path, 'r', encoding='UTF-8') as file:
         for n, uid in enumerate(file):
             if not all(d.isdigit() for d in uid):
                 warn(f'something wrong with id in {n}-th line in spartakiada subs DB')
                 continue
-            spartakiada_subs.add(int(uid))
-    return spartakiada_subs
+            spartakiada24_subs.add(int(uid))
+    return spartakiada24_subs
+
+
+def save_spartakiada24_subs() -> bool:
+    if is_file_accessible(spartakiada24_subs_path) is False:
+        return False
+    with open(spartakiada24_subs_path, 'w', encoding='UTF-8') as file:
+        file.writelines(map(str, sorted(spartakiada24_subs)))
+    return True
+
+
+spartakiada24_subs = init_spartakiada24_subs()
+
+
+def sender(sender_type: str, users: UserList) -> list[dict]:
+    result = []
+    # TODO: Не знаю, как назвать, сам реши
+    if sender_type == 'in25notin24':
+        copy = spartakiada24_subs.copy()
+        for isu in users.keys():
+            if isu in copy:
+                copy.remove(isu)
+        for i in copy:
+            pass
+    elif sender_type == 'spartakiada2025':
+        for isu in users.keys():
+            user = users.get(isu)
+            day_reward = 0
+            # TODO: сделайте условие
+            # if users[user][?]:
+            #     day_reward = ?
+            message = hi_message.format(day_reward)
+            try:
+                # lsend(uidvk[i],message)
+                if user[VK_UID] == '0':
+                    continue
+                if int(user[VK_UID]) in spartakiada24_subs:
+                    continue
+                spartakiada24_subs.add(int(user[VK_UID]))
+                with open('./subscribers/spartakiada24.txt', 'a', encoding='UTF-8') as file:
+                    file.write(user[VK_UID] + '\n')
+            except OSError as e:
+                warn(f'Warning: can not write id {user[VK_UID]} in spartakiada DB because of: {e}')
+    return result
 
 
 # Чёт с кнопкой связано
-def process_message_event(event, vk_helper) -> list[dict] | None:
+def process_message_event(self, event, vk_helper) -> list[dict] | None:
     pl = event.object.get('payload')
     # user_list = UserList() # TODO: userlist
     tts = ''
@@ -227,11 +258,11 @@ def process_message_event(event, vk_helper) -> list[dict] | None:
 
 
 # Чёт без кнопки
-def process_message_new(event, vk_helper, ignored) -> list[dict] | None:
+def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
     tts = ''
-    # user_list = UserList()
-    # user_list.load_from_file()
+    users = self.users
     uid = event.message.from_id
+    user = users.by_uid[uid]
     peer_id = 2000000000 + uid
 
     user_get = vk_helper.vk.users.get(user_ids=uid)
@@ -303,18 +334,17 @@ def process_message_new(event, vk_helper, ignored) -> list[dict] | None:
         if msgs[0] == 'stop':
             exit()
         elif msgs[0] == 'sender':
-            # sender(msgs[1])
+            sender(msgs[1], vk_helper)
             tts = 'готово'
     if vk_helper.vk_session.method('groups.isMember', {'group_id': groupid, 'user_id': uid}) == 0:
         tts = info_message
     else:
-        tts = welcome_message
+        tts = welcome_message.format(user[0], user[3])
         return [{
             'peer_id': uid,
             'message': tts
         }]
-    if str(uid) not in subscribers_spartakiada:
-        subscribers_spartakiada.append(str(uid))
-        with open('subscribers/spartakiada.txt', 'w') as f:
-            for i in range(len(subscribers_spartakiada)):
-                f.write(str(int(subscribers_spartakiada[i])) + '\n')
+    if uid not in spartakiada24_subs:
+        spartakiada24_subs.add(uid)
+        with open(spartakiada25_subs_path, 'a') as file:
+            file.write(str(uid) + '\n')

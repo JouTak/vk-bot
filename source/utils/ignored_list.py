@@ -21,7 +21,7 @@ class IgnoredList:
 
     def clear(self):
         self.ignored.clear()
-        self.info('Список игнорируемых пользователей очищен.')
+        # self.info('Список игнорируемых пользователей очищен.')
 
     def save_to_file(self):
         try:
