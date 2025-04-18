@@ -15,7 +15,7 @@ class Main:
         self.vk_session = vk_api.VkApi(token=self.token)
         self.VK = VKHelper(self.vk_session)
 
-        self.users = UserList('./users.txt', self.VK)
+        self.users = UserList(users_path, self.VK)
         print('\n'.join(warnings))
 
         self.info, self.error = log()
@@ -40,11 +40,11 @@ class Main:
             self.handle_message_event(event)
 
     def handle_message_new(self, event):
-        result = process_message_new(event, self.VK, self.ignored)
+        result = process_message_new(self, event, self.VK, self.ignored)
         self.handle_actions(result)
 
     def handle_message_event(self, event):
-        result = process_message_event(event, self.VK)
+        result = process_message_event(self, event, self.VK)
         self.handle_actions(result)
 
     def handle_actions(self, actions: list[dict]):
