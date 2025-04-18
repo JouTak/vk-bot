@@ -36,13 +36,13 @@ class VKHelper:
         except vk_api.exceptions.ApiError as e:
             raise Exception(f'Ошибка отправки сообщения: {e}')
 
-    def links_to_uids(self, links: list[str]) -> list[str]:
+    def links_to_uids(self, links: list[str]) -> list[int]:
         parts = []
         for i in range(len(links)):
             parts.append(f'API.utils.resolveScreenName({{"screen_name": "{links[i]}"}})')
         code = f'return [{",".join(parts)}];'
         response = self.vk_session.method("execute", {"code": code})
-        return [i['object_id'] if isinstance(i, dict) and 'object_id' else '0' in i for i in response]
+        return [int(i['object_id']) if isinstance(i, dict) and 'object_id' in i.keys() else 0 for i in response]
 
 
 def create_keyboard(buttons):
