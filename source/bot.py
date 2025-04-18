@@ -269,8 +269,6 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
     tts = ''
     users = self.users
     uid = event.message.from_id
-    isu = users.uid_to_isu[uid]
-    user = users.get(isu)
     peer_id = 2000000000 + uid
 
     user_get = vk_helper.vk.users.get(user_ids=uid)
@@ -336,7 +334,12 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
     if vk_helper.vk_session.method('groups.isMember', {'group_id': groupid, 'user_id': uid}) == 0:
         tts = info_message
     else:
-        tts = welcome_message.format(isu, user[NICKNAME])
+        if uid in self.uid_to_isu:
+            isu = users.uid_to_isu[uid]
+            user = users.get(isu)
+            tts = welcome_message.format(isu, user[NICKNAME])
+        else:
+            tts = 'Кажется, у нас нет твоих данных. Позови админа'
         return [{
             'peer_id': uid,
             'message': tts
