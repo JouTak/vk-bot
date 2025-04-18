@@ -42,7 +42,7 @@ class VKHelper:
             parts.append(f'API.utils.resolveScreenName({{"screen_name": "{links[i]}"}})')
         code = f'return [{",".join(parts)}];'
         response = self.vk_session.method("execute", {"code": code})
-        return [int(i['object_id']) if isinstance(i, dict) and 'object_id' in i.keys() else 0 for i in response]
+        return [int(i['object_id']) if isinstance(i, dict) and 'object_id' in i.keys() else '0' for i in response]
 
 
 def create_keyboard(buttons):
