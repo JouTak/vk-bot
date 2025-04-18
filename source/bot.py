@@ -297,14 +297,14 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
         if 'админ' in msg:
             link = f'https://vk.com/gim{groupid}?sel={uid}'
             buttons = [{'label': 'прямая ссылка', 'payload': {'type': 'userlink'}, 'link': link}]
-            link_keyboard = self.vk_helper.create_link_keyboard(buttons)
+            link_keyboard = create_link_keyboard(buttons)
             if ignored.is_ignored(uid):
                 ignored.remove(uid)
                 ignored.save_to_file()
                 tts = 'Надеюсь, вопрос снят!'
                 Ctts = f'{uname} {username} больше не вызывает!'
                 buttons = [{'label': 'ПОЗВАТЬ АДМИНА', 'payload': {'type': 'callmanager'}, 'color': 'positive'}]
-                keyboard = self.vk_helper.create_standart_keyboard(buttons)
+                keyboard = create_standart_keyboard(buttons)
 
             else:
                 ignored.add(uid)
@@ -313,7 +313,7 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
                       'Когда вопрос будет решён, ещё раз напиши команду или нажми на кнопку.'
                 Ctts = f'{uname} {username} вызывает!'
                 buttons = [{'label': 'СПАСИБО АДМИН', 'payload': {'type': 'uncallmanager'}, 'color': 'negative'}]
-                keyboard = self.vk_helper.create_standart_keyboard(buttons)
+                keyboard = create_standart_keyboard(buttons)
             return [
                 {
                     'peer_id': uid,
