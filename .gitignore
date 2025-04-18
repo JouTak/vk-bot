@@ -1,6 +1,8 @@
 source/passwords.txt
 source/token.txt
 source/subscribers/spartakiada24.txt
+source/subscribers/spartakiada25.txt
 source/ignored.txt
 source/users.txt
 entrypoint.sh
+py.log
