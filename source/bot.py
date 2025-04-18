@@ -231,7 +231,7 @@ def sender(self, sender_type: str) -> list[dict]:
         for isu in users.keys():
             if int(users.get(isu)[VK_UID]) in copy:
                 copy.remove(int(users.get(isu)[VK_UID]))
-        result.extend([{'peer_id': uid, 'message': 'Вроде работает'} for uid in admin])
+        result.extend([{'peer_id': uid, 'message': 'Рассылка пошла'} for uid in admin])
         for uid in copy:
             result.append({'peer_id': uid, 'message': 'Привет! Ты участвовал в нашей осенней спартакиаде по майнкрафту. По моим данным ты ещё не зарегистрировался на весенню спартакиаду! Новые, крутые режимы ждут тебя: BlockParty, AceRace, Survival Games.\nРегистрация почти завершена, не упусти возможности снова получить 10 баллов за майнкрафт — вся информация на https://joutak.ru/minigames. P.S. если считаешь, что произошла ошибка и ты зарегистрирован в 2025 году, напиши АДМИН'})
     elif sender_type == 'spartakiada2025':
