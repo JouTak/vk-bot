@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import os.path
 from datetime import datetime
+from utils.VKHelper import *
 
 spartakiada_subs_path = './subscribers/spartakiada{}.txt'
 users_path = './users.txt'
@@ -18,7 +19,7 @@ LOSE_ROUND_1 = ROUND_1 + 1
 RECORD_ROUND_1 = LOSE_ROUND_1 + 1
 # isu: (timestamp, vk_uid, link, nick, group, fio, first_time)
 
-groupid = 230160029  # 217494619
+groupid = 217494619 #230160029  
 joutek_ip = 'craft.joutak.ru'
 joutek_link = 'https://joutak.ru'
 form_link = 'https://forms.yandex.ru/u/6501f64f43f74f18a8da28de/'
@@ -48,12 +49,13 @@ hi_message = \
     'по желанию. Если есть вопросы, пиши!'
 
 info_message = \
-    'Привет! Для получение информации о серверах ИТМОкрафта подпишитесь:\n' \
+    'Привет! Для получения информации о серверах ИТМОкрафта подпишитесь:\n' \
     f'[{vk_link}. Подписаться]\n\n' \
     'После подписки отправь ещё одно сообщение. Только в случае возникновения проблем пиши "АДМИН"'
 
 welcome_message = '''
 Добро пожаловать на спартакиаду ИТМО по майнкрафту! Записывай данные для входа на сервер:
+IP: craft.itmo.ru
 
 ИСУ:
 {}
@@ -61,7 +63,11 @@ welcome_message = '''
 Ник:
 {}
 
+Участвуешь ли ты в первом этапе (BlockParty):
+Да.
+
 Обязательно проверь все данные, только в случае несоответствий или важных вопросов напиши в ответ "АДМИН"
+Читай о нас подробнее на сайте https://joutak.ru/minigames и других разделах
 '''.strip()
 #    'Наш клуб — комьюнити итмошников, которым нравится играть в майнкрафт. ' \
 #    'Выживание, моды, мини-игры: если во что-то можно играть, мы создаём для этого условия. ' \
@@ -143,7 +149,6 @@ class UserList:
                 elif not all(d.isdigit() for d in s[2]):  # vk_uid
                     incorrect_uids.add(int(s[1]))
                     changes = True
-                # весь ли ФИО заполнен
                 if len(s[5].split()) != 3:  # fio
                     warn(f'something wrong with fio (isu = {s[1]}) in {n}-th line in DB:', s[5])
                     # but okay, it's his or her problem
@@ -234,8 +239,9 @@ def sender(self, sender_type: str) -> list[dict]:
             if int(users.get(isu)[VK_UID]) in copy:
                 copy.remove(int(users.get(isu)[VK_UID]))
         result.extend([{'peer_id': uid, 'message': 'in24notin25 sending...'} for uid in admin])
+        result.extend([{'peer_id': uid, 'message': 'Рассылка пошла'} for uid in admin])
         for uid in copy:
-            result.append({'peer_id': uid, 'message': 'Привет! Ты участвовал в прошлой спартакиаде:'})
+            result.append({'peer_id': uid, 'message': 'Привет! Ты участвовал в нашей осенней спартакиаде по майнкрафту. По моим данным ты ещё не зарегистрировался на весенню спартакиаду! Новые, крутые режимы ждут тебя: BlockParty, AceRace, Survival Games.\nРегистрация почти завершена, не упусти возможности снова получить 10 баллов за майнкрафт — вся информация на https://joutak.ru/minigames. P.S. если считаешь, что произошла ошибка и ты зарегистрирован в 2025 году, напиши АДМИН'})
     elif sender_type == 'spartakiada2025':
         for isu in users.keys():
             user = users.get(isu)
@@ -299,14 +305,14 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
         if 'админ' in msg:
             link = f'https://vk.com/gim{groupid}?sel={uid}'
             buttons = [{'label': 'прямая ссылка', 'payload': {'type': 'userlink'}, 'link': link}]
-            link_keyboard = vk_helper.create_link_keyboard(buttons)
+            link_keyboard = create_link_keyboard(buttons)
             if ignored.is_ignored(uid):
                 ignored.remove(uid)
                 ignored.save_to_file()
                 tts = 'Надеюсь, вопрос снят!'
                 Ctts = f'{uname} {username} больше не вызывает!'
                 buttons = [{'label': 'ПОЗВАТЬ АДМИНА', 'payload': {'type': 'callmanager'}, 'color': 'positive'}]
-                keyboard = vk_helper.create_standart_keyboard(buttons)
+                keyboard = create_standart_keyboard(buttons)
 
             else:
                 ignored.add(uid)
@@ -315,7 +321,7 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
                       'Когда вопрос будет решён, ещё раз напиши команду или нажми на кнопку.'
                 Ctts = f'{uname} {username} вызывает!'
                 buttons = [{'label': 'СПАСИБО АДМИН', 'payload': {'type': 'uncallmanager'}, 'color': 'negative'}]
-                keyboard = vk_helper.create_standart_keyboard(buttons)
+                keyboard = create_standart_keyboard(buttons)
             return [
                 {
                     'peer_id': uid,
@@ -361,5 +367,13 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
         }]
     if uid not in spartakiada25_subs:
         spartakiada25_subs.add(uid)
+        with open(spartakiada_subs_path.format(25), 'a') as file:
+            tts = 'Привет, добро пожаловать в бота клуба ITMOcraft! Сейчас у нас проходит спартакиада, но, кажется, у нас нет твоих данных. Если считаешь, что произошла ошибка — позови админа командой АДМИН. Если хочешь зарегистрироваться — скорее делай это на сайте https://joutak.ru/minigames'
+        return [{
+            'peer_id': uid,
+            'message': tts
+        }]
+    if uid not in spartakiada24_subs:
+        spartakiada24_subs.add(uid)
         with open(spartakiada_subs_path.format(25), 'a') as file:
             file.write(str(uid) + '\n')
