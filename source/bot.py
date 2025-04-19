@@ -14,8 +14,8 @@ NICKNAME = VK_UID + 1
 GROUP_ID = NICKNAME + 1
 FIO = GROUP_ID + 1
 FIRST_TIME = FIO + 1
-ROUND_1 = FIRST_TIME + 1
-LOSE_ROUND_1 = ROUND_1 + 1
+WIN_ROUND_1 = FIRST_TIME + 1
+LOSE_ROUND_1 = WIN_ROUND_1 + 1
 RECORD_ROUND_1 = LOSE_ROUND_1 + 1
 # isu: (timestamp, vk_uid, link, nick, group, fio, first_time)
 
@@ -65,6 +65,15 @@ IP: craft.itmo.ru
 
 Участвуешь ли ты в первом этапе (BlockParty):
 Да.
+
+Переходишь ли в следующий этап:
+{}
+
+Поставят ли 10 баллов:
+{}
+
+Рекорд раундов в блокпати:
+{}
 
 Обязательно проверь все данные, только в случае несоответствий или важных вопросов напиши в ответ "АДМИН"
 Читай о нас подробнее на сайте https://joutak.ru/minigames и других разделах
@@ -358,7 +367,9 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
         if uid in users.uid_to_isu:
             isu = users.uid_to_isu[uid]
             user = users.get(isu)
-            tts = welcome_message.format(isu, user[NICKNAME])
+            tts = welcome_message.format(
+                isu, user[NICKNAME],
+                ['Нет', 'Да'][user[WIN_ROUND_1]], ['Да', 'Нет'][user[LOSE_ROUND_1]], user[RECORD_ROUND_1])
         else:
             tts = 'Кажется, у нас нет твоих данных. Позови админа'
         return [{
@@ -368,7 +379,10 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
     if uid not in spartakiada25_subs:
         spartakiada25_subs.add(uid)
         with open(spartakiada_subs_path.format(25), 'a') as file:
-            tts = 'Привет, добро пожаловать в бота клуба ITMOcraft! Сейчас у нас проходит спартакиада, но, кажется, у нас нет твоих данных. Если считаешь, что произошла ошибка — позови админа командой АДМИН. Если хочешь зарегистрироваться — скорее делай это на сайте https://joutak.ru/minigames'
+            file.write(uid)
+            tts = 'Привет, добро пожаловать в бота клуба ITMOcraft! Сейчас у нас проходит спартакиада, но, кажется, ' \
+                  'у нас нет твоих данных. Если считаешь, что произошла ошибка — позови админа командой АДМИН. ' \
+                  'Если хочешь зарегистрироваться — скорее делай это на сайте https://joutak.ru/minigames'
         return [{
             'peer_id': uid,
             'message': tts
