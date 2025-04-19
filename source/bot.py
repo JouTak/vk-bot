@@ -2,8 +2,7 @@
 import os.path
 from datetime import datetime
 
-spartakiada24_subs_path = './subscribers/spartakiada24.txt'
-spartakiada25_subs_path = './subscribers/spartakiada25.txt'
+spartakiada_subs_path = './subscribers/spartakiada{}.txt'
 users_path = './users.txt'
 
 admin = [297002785, 275052029, 229488682]
@@ -14,6 +13,9 @@ NICKNAME = VK_UID + 1
 GROUP_ID = NICKNAME + 1
 FIO = GROUP_ID + 1
 FIRST_TIME = FIO + 1
+ROUND_1 = FIRST_TIME + 1
+LOSE_ROUND_1 = ROUND_1 + 1
+RECORD_ROUND_1 = LOSE_ROUND_1 + 1
 # isu: (timestamp, vk_uid, link, nick, group, fio, first_time)
 
 groupid = 230160029  # 217494619
@@ -109,7 +111,7 @@ def ts2str(timestamp: int) -> str:
 class UserList:
     def __init__(self, path: str, vk_helper) -> None:
         # isu: (timestamp, vk_uid, vk_link, nick, group, fio, first_time)
-        self.db = dict[int: tuple[str, str, str, str, str, str, str]]()
+        self.db = dict[int: tuple[str, str, str, str, str, str, str, bool, bool, int]]()
         self.uid_to_isu = dict[int, int]()
         self.path = path
         self.vk_helper = vk_helper
@@ -141,13 +143,13 @@ class UserList:
                 elif not all(d.isdigit() for d in s[2]):  # vk_uid
                     incorrect_uids.add(int(s[1]))
                     changes = True
-                # весь ли ФОИ заполнен
-                if len(s[6].split()) != 3:  # fio
+                # весь ли ФИО заполнен
+                if len(s[5].split()) != 3:  # fio
                     warn(f'something wrong with fio (isu = {s[1]}) in {n}-th line in DB:', s[6])
                     # but okay, it's his or her problem
                 # DB   | timestamp isu vk_uid nick    group   fio first_time
                 # Dict | isu: (timestamp, vk_uid, nick, group, fio, first_time)
-                self.db[int(s[1])] = s[0], s[2], s[3], s[4], s[5], s[6]
+                self.db[int(s[1])] = s[0], s[2], s[3], s[4], s[5], s[6], s[7] == '1', s[8] == '1', int(s[9])
         # достаём все vk_uid через vk_link
         incorrect_uids = sorted(incorrect_uids)
         for i in range(0, len(incorrect_uids), 25):
@@ -180,7 +182,7 @@ class UserList:
         to_save = []
         for key in self.db.keys():
             v = self.db[key]
-            to_save.append((str2ts(v[0]), '\t'.join((v[0], str(key), v[1], v[2], v[3], v[4], v[5]))))
+            to_save.append((str2ts(v[0]), '\t'.join((v[0], str(key), *v[1:-3], '01'[v[-3]], '01'[v[-2]], str(v[-1])))))
         to_save.sort()
         with open(users_path, 'w', encoding='UTF-8') as file:
             file.write('\n'.join(i[1] for i in to_save))
@@ -193,27 +195,28 @@ class UserList:
         return self.db.keys()
 
 
-def init_spartakiada24_subs() -> set[int]:
+def init_spartakiada_subs(year: int) -> set[int]:
     # DB   | timestamp isu vk_uid  vk_link nick    group   fio first_time
-    spartakiada24_subs = set[int]()
-    with open(spartakiada24_subs_path, 'r', encoding='UTF-8') as file:
+    spartakiada_subs = set[int]()
+    with open(spartakiada_subs_path.format(year), 'r', encoding='UTF-8') as file:
         for n, uid in enumerate(file):
             if not all(d.isdigit() for d in uid.strip()):
                 warn(f'something wrong with id in {n}-th line in spartakiada subs DB')
                 continue
-            spartakiada24_subs.add(int(uid.strip()))
-    return spartakiada24_subs
+            spartakiada_subs.add(int(uid.strip()))
+    return spartakiada_subs
 
 
-def save_spartakiada24_subs() -> bool:
-    if is_file_accessible(spartakiada24_subs_path) is False:
+def save_spartakiada_subs(uids: set[int], year: int) -> bool:
+    if is_file_accessible(spartakiada_subs_path.format(year)) is False:
         return False
-    with open(spartakiada24_subs_path, 'w', encoding='UTF-8') as file:
-        file.writelines(map(str, sorted(spartakiada24_subs)))
+    with open(spartakiada_subs_path.format(year), 'w', encoding='UTF-8') as file:
+        file.writelines(map(str, sorted(uids)))
     return True
 
 
-spartakiada24_subs = init_spartakiada24_subs()
+spartakiada24_subs = init_spartakiada_subs(24)
+spartakiada25_subs = init_spartakiada_subs(25)
 
 
 def sender(self, sender_type: str) -> list[dict]:
@@ -227,7 +230,7 @@ def sender(self, sender_type: str) -> list[dict]:
         for isu in users.keys():
             if int(users.get(isu)[VK_UID]) in copy:
                 copy.remove(int(users.get(isu)[VK_UID]))
-        result.extend([{'peer_id': uid, 'message': 'Вроде работает'} for uid in admin])
+        result.extend([{'peer_id': uid, 'message': 'in24notin25 sending...'} for uid in admin])
         for uid in copy:
             result.append({'peer_id': uid, 'message': 'Привет! Ты участвовал в прошлой спартакиаде:'})
     elif sender_type == 'spartakiada2025':
@@ -242,9 +245,9 @@ def sender(self, sender_type: str) -> list[dict]:
                 # lsend(uidvk[i],message)
                 if user[VK_UID] == '0':
                     continue
-                if int(user[VK_UID]) in spartakiada24_subs:
+                if int(user[VK_UID]) in spartakiada25_subs:
                     continue
-                spartakiada24_subs.add(int(user[VK_UID]))
+                spartakiada25_subs.add(int(user[VK_UID]))
                 with open('./subscribers/spartakiada24.txt', 'a', encoding='UTF-8') as file:
                     file.write(user[VK_UID] + '\n')
             except OSError as e:
@@ -353,7 +356,7 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
             'peer_id': uid,
             'message': tts
         }]
-    if uid not in spartakiada24_subs:
-        spartakiada24_subs.add(uid)
-        with open(spartakiada25_subs_path, 'a') as file:
+    if uid not in spartakiada25_subs:
+        spartakiada25_subs.add(uid)
+        with open(spartakiada_subs_path.format(25), 'a') as file:
             file.write(str(uid) + '\n')
