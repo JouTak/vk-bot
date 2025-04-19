@@ -12,7 +12,11 @@ class Main:
         self.token = initialize()
         # ITMO 217494619
         # TEST 230160029
+<<<<<<< HEAD
         self.group_id = 230160029
+=======
+        # self.group_id = 230160029
+>>>>>>> 5aa7951ac770cca64ca107e02bdadac31a90b662
         self.group_id = 217494619
 
         self.vk_session = vk_api.VkApi(token=self.token)
