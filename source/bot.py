@@ -15,8 +15,8 @@ GROUP_ID = NICKNAME + 1
 FIO = GROUP_ID + 1
 FIRST_TIME = FIO + 1
 WIN_ROUND_1 = FIRST_TIME + 1
-LOSE_ROUND_1 = WIN_ROUND_1 + 1
-RECORD_ROUND_1 = LOSE_ROUND_1 + 1
+HAS_10_BALLS = WIN_ROUND_1 + 1
+RECORD_ROUND_1 = HAS_10_BALLS + 1
 # isu: (timestamp, vk_uid, link, nick, group, fio, first_time)
 
 groupid = 217494619  # 230160029
@@ -240,54 +240,64 @@ def save_spartakiada_subs(uids: set[int], year: int) -> bool:
 spartakiada24_subs = init_spartakiada_subs(24)
 spartakiada25_subs = init_spartakiada_subs(25)
 
+tokens = [
+    ['|', '&'],
+    ['->', '!>'],
+    ['==', '!='],
+    ['tsp', 'uid', 'nck', 'grp', 'fio', 'fst', 'wr1', 'h10', 'rr1'],
+    ['s24', 's25']
+]
 
-def sender(self, sender_type: str) -> list[dict]:
+
+def check_condition(cond: str) -> bool:
+    for token in tokens[0]:
+        if token in cond:
+            return all(check_condition(i) for i in cond.split(token))
+    for token in tokens[1]:
+        if token in cond:
+            c = cond.split(token)
+            return len(c) == 2 and c[0] in tokens[3] and c[1] in tokens[4]
+    for token in tokens[2]:
+        if token in cond:
+            c = cond.split(token)
+            return len(c) == 2 and c[0] in tokens[3]
+    return False
+
+
+def eval_condition(user: tuple, cond: str) -> bool:
+    if '|' in cond:
+        return any(eval_condition(user, i) for i in cond.split('|'))
+    if '&' in cond:
+        return all(eval_condition(user, i) for i in cond.split('&'))
+    if '->' in cond:
+        c = cond.split('->')
+        return user[tokens[3].index(c[0])] in [spartakiada24_subs, spartakiada25_subs][tokens[4].index(c[1])]
+    if '!>' in cond:
+        c = cond.split('!>')
+        return user[tokens[3].index(c[0])] not in [spartakiada24_subs, spartakiada25_subs][tokens[4].index(c[1])]
+    if '==' in cond:
+        c = cond.split('==')
+        print([str(user[tokens[3].index(c[0])]), c[1]])
+        return str(user[tokens[3].index(c[0])]) == c[1]
+    if '!=' in cond:
+        c = cond.split('!=')
+        return str(user[tokens[3].index(c[0])]) != c[1]
+    return False
+        
+
+def sender(self, condition: str, msg: str) -> list[dict]:
+    if check_condition(condition) is False:
+        return [{'peer_id': uid, 'message': 'Condition issue'} for uid in admin]
     users: UserList = self.users
-    vk_helper = self.VK
     result = []
-    # TODO: Не знаю, как назвать, сам реши
-    if sender_type == 'in24notin25':
-        users = self.users
-        copy = spartakiada24_subs.copy()
-        for isu in users.keys():
-            if int(users.get(isu)[VK_UID]) in copy:
-                copy.remove(int(users.get(isu)[VK_UID]))
-        result.extend([{'peer_id': uid, 'message': 'in24notin25 sending...'} for uid in admin])
-        result.extend([{'peer_id': uid, 'message': 'Рассылка пошла'} for uid in admin])
-        for uid in copy:
-            result.append({'peer_id': uid, 'message': 'Привет! Ты участвовал в нашей осенней спартакиаде по майнкрафту. По моим данным ты ещё не зарегистрировался на весенню спартакиаду! Новые, крутые режимы ждут тебя: BlockParty, AceRace, Survival Games.\nРегистрация почти завершена, не упусти возможности снова получить 10 баллов за майнкрафт — вся информация на https://joutak.ru/minigames. P.S. если считаешь, что произошла ошибка и ты зарегистрирован в 2025 году, напиши АДМИН'})
-    elif sender_type == 'spartakiada2025':
-        for isu in users.keys():
-            user = users.get(isu)
-            day_reward = 0
-            # TODO: сделайте условие
-            # if users[user][?]:
-            #     day_reward = ?
-            message = hi_message.format(day_reward)
-            try:
-                # lsend(uidvk[i],message)
-                if user[VK_UID] == '0':
-                    continue
-                if int(user[VK_UID]) in spartakiada25_subs:
-                    continue
-                spartakiada25_subs.add(int(user[VK_UID]))
-                with open('./subscribers/spartakiada24.txt', 'a', encoding='UTF-8') as file:
-                    file.write(user[VK_UID] + '\n')
-            except OSError as e:
-                warn(f'Warning: can not write id {user[VK_UID]} in spartakiada DB because of: {e}')
-    elif sender_type == 'to0record1':
-        result.extend([{'peer_id': uid, 'message': 'to0record1 sending...'} for uid in admin])
-        result.extend([{'peer_id': uid, 'message': 'Рассылка пошла'} for uid in admin])
-        for isu in users.keys():
-            user = users.get(isu)
-            uid = user[VK_UID]
-            record = user[LOSE_ROUND_1]
-            if uid == '0':
-                continue
-            if record is True:
-                continue
-            result.append({'peer_id': uid, 'message': 'Добрый вечер! Я знаю, что ты регистрировался на спартакиаду, но всё ещё не отыграл две попытки. Варианта два:\n1: ты забыл поучаствовать, в таком случае беги скорее за майн и отыгрывай свои две попытки. Сделать это у тебя есть буквально меньше получаса. \n2: Данные в бот ещё не подгрузились, в таком случае зайди в майн, заскринь то, что тебя не пускает по причинам конца попыток или победы или напиши, во сколько примерно была катка, позови админа и в течение суток мы досоотнесём данные. (Убедись, что админы заметили твоё сообщение)'})  # TODO: заполни чё надо
-    print(*result, sep='\n')
+    for isu in users.keys():
+        user = users.get(isu)
+        uid = user[VK_UID]
+        if uid == '0':
+            continue
+        if eval_condition(user, condition) is True:
+            result.append({'peer_id': uid, 'message': msg})
+    print(*result, len(result), sep='\n')
     return result
 
 
@@ -316,73 +326,68 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
     uname = user_get['first_name']
     username = user_get['last_name']
 
-    msg = event.message.text.lower()
+    msg: str = event.message.text
     msgs = msg.split()
-
-    if event.from_chat:
-        id = event.chat_id
-        uid = event.obj['message']['from_id']
-        peer_id = 2000000000 + uid
-        return
-    else:
-        if ignored.is_ignored(uid):
-            if 'админ' not in msg:
-                return
-        if 'админ' in msg:
-            link = f'https://vk.com/gim{groupid}?sel={uid}'
-            buttons = [{'label': 'прямая ссылка', 'payload': {'type': 'userlink'}, 'link': link}]
-            link_keyboard = create_link_keyboard(buttons)
-            if ignored.is_ignored(uid):
-                ignored.remove(uid)
-                ignored.save_to_file()
-                tts = 'Надеюсь, вопрос снят!'
-                Ctts = f'{uname} {username} больше не вызывает!'
-                buttons = [{'label': 'ПОЗВАТЬ АДМИНА', 'payload': {'type': 'callmanager'}, 'color': 'positive'}]
-                keyboard = create_standart_keyboard(buttons)
-
-            else:
-                ignored.add(uid)
-                ignored.save_to_file()
-                tts = 'Принято, сейчас позову! Напиши свою проблему следующим сообщением. ' \
-                      'Когда вопрос будет решён, ещё раз напиши команду или нажми на кнопку.'
-                Ctts = f'{uname} {username} вызывает!'
-                buttons = [{'label': 'СПАСИБО АДМИН', 'payload': {'type': 'uncallmanager'}, 'color': 'negative'}]
-                keyboard = create_standart_keyboard(buttons)
-            return [
-                {
-                    'peer_id': uid,
-                    'message': tts,
-                    'keyboard': keyboard,
-                    'attachment': None
-                },
-                *[
-                    {
-                        'peer_id': uid,
-                        'message': Ctts,
-                        'keyboard': link_keyboard,
-                        'attachment': None
-                    } for uid in admin
-                ]
-            ]
-
     if uid in admin:
         if msgs[0] == 'stop':
             exit()
         elif msgs[0] == 'reload':
-            if self.users.load() is True:
-                return [{'peer_id': uid, 'message': 'Success'}]
-            else:
-                return [{'peer_id': uid, 'message': 'Failed'}]
+            return [{'peer_id': uid, 'message': 'Success' if (self.users.load() is True) else 'Failed'}]
         elif msgs[0] == 'sender':
-            if len(msgs) > 1:
-                self.handle_actions(sender(self, msgs[1]))
-                tts = 'Готово'
+            if len(msgs) > 2:
+                result = sender(self, msgs[1], ' '.join(msgs[2:]).strip())
+                self.handle_actions(result)
+                tts = f'Готово. Всего разослано {len(result)} сообщений'
+            elif len(msgs) == 2:
+                tts = 'Нет сообщения'
             else:
                 tts = 'Нет аргумента'
             return [{
                 'peer_id': uid,
                 'message': tts
             }]
+
+    if event.from_chat:
+        return
+
+    if ignored.is_ignored(uid) and 'админ' not in msg.lower():
+        return
+    if 'админ' in msg.lower():
+        link = f'https://vk.com/gim{groupid}?sel={uid}'
+        buttons = [{'label': 'прямая ссылка', 'payload': {'type': 'userlink'}, 'link': link}]
+        link_keyboard = create_link_keyboard(buttons)
+        if ignored.is_ignored(uid):
+            ignored.remove(uid)
+            ignored.save_to_file()
+            tts = 'Надеюсь, вопрос снят!'
+            atts = f'{uname} {username} больше не вызывает!'
+            buttons = [{'label': 'ПОЗВАТЬ АДМИНА', 'payload': {'type': 'callmanager'}, 'color': 'positive'}]
+            keyboard = create_standart_keyboard(buttons)
+        else:
+            ignored.add(uid)
+            ignored.save_to_file()
+            tts = 'Принято, сейчас позову! Напиши свою проблему следующим сообщением. ' \
+                  'Когда вопрос будет решён, ещё раз напиши команду или нажми на кнопку.'
+            atts = f'{uname} {username} вызывает!'
+            buttons = [{'label': 'СПАСИБО АДМИН', 'payload': {'type': 'uncallmanager'}, 'color': 'negative'}]
+            keyboard = create_standart_keyboard(buttons)
+        return [
+            {
+                'peer_id': uid,
+                'message': tts,
+                'keyboard': keyboard,
+                'attachment': None
+            },
+            *[
+                {
+                    'peer_id': uid,
+                    'message': atts,
+                    'keyboard': link_keyboard,
+                    'attachment': None
+                } for uid in admin
+            ]
+        ]
+
     if vk_helper.vk_session.method('groups.isMember', {'group_id': groupid, 'user_id': uid}) == 0:
         tts = info_message
     else:
@@ -391,25 +396,10 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
             user = users.get(isu)
             tts = welcome_message.format(
                 isu, user[NICKNAME],
-                ['Нет', 'Да'][user[WIN_ROUND_1]], ['Нет', 'Да'][user[LOSE_ROUND_1]], user[RECORD_ROUND_1])
+                ['Нет', 'Да'][user[WIN_ROUND_1]], ['Нет', 'Да'][user[HAS_10_BALLS]], user[RECORD_ROUND_1])
         else:
             tts = 'Кажется, у нас нет твоих данных. Позови админа'
     return [{
         'peer_id': uid,
         'message': tts
     }]
-    # if uid not in spartakiada25_subs:
-    #     spartakiada25_subs.add(uid)
-    #     with open(spartakiada_subs_path.format(25), 'a') as file:
-    #         file.write(str(uid) + '\n ')
-    #         tts = 'Привет, добро пожаловать в бота клуба ITMOcraft! Сейчас у нас проходит спартакиада, но, кажется, ' \
-    #               'у нас нет твоих данных. Если считаешь, что произошла ошибка — позови админа командой АДМИН. ' \
-    #               'Если хочешь зарегистрироваться — скорее делай это на сайте https://joutak.ru/minigames'
-    #     return [{
-    #         'peer_id': uid,
-    #         'message': tts
-    #     }]
-    # if uid not in spartakiada24_subs:
-    #     spartakiada24_subs.add(uid)
-    #     with open(spartakiada_subs_path.format(25), 'a') as file:
-    #         file.write(str(uid) + '\n')
