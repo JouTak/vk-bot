@@ -379,7 +379,7 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
     if uid not in spartakiada25_subs:
         spartakiada25_subs.add(uid)
         with open(spartakiada_subs_path.format(25), 'a') as file:
-            file.write(uid)
+            file.write(str(uid) + '\n')
             tts = 'Привет, добро пожаловать в бота клуба ITMOcraft! Сейчас у нас проходит спартакиада, но, кажется, ' \
                   'у нас нет твоих данных. Если считаешь, что произошла ошибка — позови админа командой АДМИН. ' \
                   'Если хочешь зарегистрироваться — скорее делай это на сайте https://joutak.ru/minigames'
