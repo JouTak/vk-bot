@@ -369,7 +369,7 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
             user = users.get(isu)
             tts = welcome_message.format(
                 isu, user[NICKNAME],
-                ['Нет', 'Да'][user[WIN_ROUND_1]], ['Да', 'Нет'][user[LOSE_ROUND_1]], user[RECORD_ROUND_1])
+                ['Нет', 'Да'][user[WIN_ROUND_1]], ['Нет', 'Да'][user[LOSE_ROUND_1]], user[RECORD_ROUND_1])
         else:
             tts = 'Кажется, у нас нет твоих данных. Позови админа'
         return [{
