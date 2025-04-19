@@ -145,8 +145,11 @@ class UserList:
                     changes = True
                 # весь ли ФИО заполнен
                 if len(s[5].split()) != 3:  # fio
-                    warn(f'something wrong with fio (isu = {s[1]}) in {n}-th line in DB:', s[6])
+                    warn(f'something wrong with fio (isu = {s[1]}) in {n}-th line in DB:', s[5])
                     # but okay, it's his or her problem
+                if len(s) < 9:
+                    s.extend(list('000'))
+                    changes = True
                 # DB   | timestamp isu vk_uid nick    group   fio first_time
                 # Dict | isu: (timestamp, vk_uid, nick, group, fio, first_time)
                 self.db[int(s[1])] = s[0], s[2], s[3], s[4], s[5], s[6], s[7] == '1', s[8] == '1', int(s[9])
