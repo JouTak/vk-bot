@@ -140,6 +140,7 @@ class UserList:
         changes = False
         incorrect_uids = set()
         incorrect_isu = 100000
+        self.db.clear()
         with open(self.path, 'r', encoding='UTF-8') as file:
             for n, line in enumerate(file):
                 s: list[str] = line.strip().split('\t')
@@ -351,6 +352,11 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
     if uid in admin:
         if msgs[0] == 'stop':
             exit()
+        elif msgs[0] == 'reload':
+            if self.users.load() is True:
+                return [{'peer_id': uid, 'message': 'Success'}]
+            else:
+                return [{'peer_id': uid, 'message': 'Failed'}]
         elif msgs[0] == 'sender':
             if len(msgs) > 1:
                 self.handle_actions(sender(self, msgs[1]))
@@ -379,7 +385,7 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
     if uid not in spartakiada25_subs:
         spartakiada25_subs.add(uid)
         with open(spartakiada_subs_path.format(25), 'a') as file:
-            file.write(str(uid) + '\n')
+            file.write(str(uid) + '\n ')
             tts = 'Привет, добро пожаловать в бота клуба ITMOcraft! Сейчас у нас проходит спартакиада, но, кажется, ' \
                   'у нас нет твоих данных. Если считаешь, что произошла ошибка — позови админа командой АДМИН. ' \
                   'Если хочешь зарегистрироваться — скорее делай это на сайте https://joutak.ru/minigames'
