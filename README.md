@@ -21,6 +21,10 @@ sender [some_logic] <message>
 !> - not in
 == - equals
 != - not equals
+>> - greater than
+>= - greater than or equals
+<< - less than
+<= - less than or equals
 
 tsp - timestamp
 uid - vk_uid
@@ -31,16 +35,22 @@ fst - first_time
 wr1 - won_round_1
 h10 - has_10_balls
 rr1 - record_round_1
+wr2 - won_round_2
+rr2 - record_round_2
+fnl - final_place
+rr3 - record_round_3
+
 
 s24 - spartakiada24_subs
 s25 - spartakiada25_subs
+adm - admin
 
 
-&, |, ->, !>, ==, != - logic
+&, |, ->, !>, ==, !=, >>, >=, <<, <= - logic
 tsp, uid, nck, grp, fio, fst, wr1, h10, rr1 - parameters
-s24, s25 - sets
+s24, s25, a - sets
 
 
 -> and !> only with parameters and sets (uid->s24)
-== and != only with parameters and value (nck==enderdissa)
+other logic only with parameters and value (nck==enderdissa)
 ```
