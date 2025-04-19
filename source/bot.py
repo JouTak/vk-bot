@@ -19,7 +19,7 @@ LOSE_ROUND_1 = WIN_ROUND_1 + 1
 RECORD_ROUND_1 = LOSE_ROUND_1 + 1
 # isu: (timestamp, vk_uid, link, nick, group, fio, first_time)
 
-groupid = 217494619 #230160029  
+groupid = 217494619  # 230160029
 joutek_ip = 'craft.joutak.ru'
 joutek_link = 'https://joutak.ru'
 form_link = 'https://forms.yandex.ru/u/6501f64f43f74f18a8da28de/'
@@ -78,6 +78,8 @@ IP: craft.itmo.ru
 Обязательно проверь все данные, только в случае несоответствий или важных вопросов напиши в ответ "АДМИН"
 Читай о нас подробнее на сайте https://joutak.ru/minigames и других разделах
 '''.strip()
+
+
 #    'Наш клуб — комьюнити итмошников, которым нравится играть в майнкрафт. ' \
 #    'Выживание, моды, мини-игры: если во что-то можно играть, мы создаём для этого условия. ' \
 #    'Недавно мы получили от университета ещё большие мощности, ' \
@@ -273,6 +275,18 @@ def sender(self, sender_type: str) -> list[dict]:
                     file.write(user[VK_UID] + '\n')
             except OSError as e:
                 warn(f'Warning: can not write id {user[VK_UID]} in spartakiada DB because of: {e}')
+    elif sender_type == 'to0record1':
+        result.extend([{'peer_id': uid, 'message': 'to0record1 sending...'} for uid in admin])
+        result.extend([{'peer_id': uid, 'message': 'Рассылка пошла'} for uid in admin])
+        for isu in users.keys():
+            user = users.get(isu)
+            uid = user[VK_UID]
+            record = user[RECORD_ROUND_1]
+            if uid == '0':
+                continue
+            if record != 0:
+                continue
+            result.append({'peer_id': uid, 'message': 'напиши чё-то'})  # TODO: заполни чё надо
     print(*result, sep='\n')
     return result
 
