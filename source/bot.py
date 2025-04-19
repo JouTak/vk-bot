@@ -281,12 +281,12 @@ def sender(self, sender_type: str) -> list[dict]:
         for isu in users.keys():
             user = users.get(isu)
             uid = user[VK_UID]
-            record = user[RECORD_ROUND_1]
+            record = user[LOSE_ROUND_1]
             if uid == '0':
                 continue
-            if record != 0:
+            if record is True:
                 continue
-            result.append({'peer_id': uid, 'message': 'напиши чё-то'})  # TODO: заполни чё надо
+            result.append({'peer_id': uid, 'message': 'Добрый вечер! Я знаю, что ты регистрировался на спартакиаду, но всё ещё не отыграл две попытки. Варианта два:\n1: ты забыл поучаствовать, в таком случае беги скорее за майн и отыгрывай свои две попытки. Сделать это у тебя есть буквально меньше получаса. \n2: Данные в бот ещё не подгрузились, в таком случае зайди в майн, заскринь то, что тебя не пускает по причинам конца попыток или победы или напиши, во сколько примерно была катка, позови админа и в течение суток мы досоотнесём данные. '})  # TODO: заполни чё надо
     print(*result, sep='\n')
     return result
 
