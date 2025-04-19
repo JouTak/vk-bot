@@ -218,6 +218,8 @@ def init_spartakiada_subs(year: int) -> set[int]:
     spartakiada_subs = set[int]()
     with open(spartakiada_subs_path.format(year), 'r', encoding='UTF-8') as file:
         for n, uid in enumerate(file):
+            if not uid:
+                continue
             if not all(d.isdigit() for d in uid.strip()):
                 warn(f'something wrong with id in {n}-th line in spartakiada subs DB')
                 continue
