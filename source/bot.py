@@ -6,7 +6,7 @@ from utils.VKHelper import *
 spartakiada_subs_path = './subscribers/spartakiada{}.txt'
 users_path = './users.txt'
 
-admin = [297002785, 275052029, 229488682]
+admin = [297002785, 275052029, 325899178, 229488682]
 
 TIMESTAMP = 0
 VK_UID = TIMESTAMP + 1
