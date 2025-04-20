@@ -457,7 +457,7 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
                 isu, user[NICKNAME],
                 ['Нет', 'Да'][user[WIN_ROUND_1]], ['Нет', 'Да'][user[HAS_10_BALLS]], user[RECORD_ROUND_1],
                 second_part.format(user[RECORD_ROUND_2] if user[RECORD_ROUND_2] != -1 else 'Нет данных',
-                                   ['Нет', 'Скорее да, чем нет'][user[WIN_ROUND_2]]) if user[WIN_ROUND_1] else '',
+                                   ['Нет', 'На данный момент да'][user[WIN_ROUND_2]]) if user[WIN_ROUND_1] else '',
                 third_part.format(user[FINAL_PLACE]) if user[WIN_ROUND_2] else '')
         else:
             tts = 'Кажется, у нас нет твоих данных. Позови админа, если это не должно быть так'
