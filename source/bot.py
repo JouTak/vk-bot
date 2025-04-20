@@ -400,11 +400,6 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
                 'peer_id': uid,
                 'message': tts
             }]
-        elif msgs[0] == 'UwU':
-            if len(msgs) == 2 and all(d.isdigit() for d in msgs[1]) and int(msgs[1]) in self.users.uid_to_isu:
-                return [{'peer_id': int(msgs[1]), 'message': f'{uname} отправил вам UwU'}]
-            else:
-                return [{'peer_id': uid, 'message': 'UwU'}]
 
     if event.from_chat:
         return
