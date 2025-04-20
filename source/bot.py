@@ -23,7 +23,6 @@ WIN_ROUND_2 = RECORD_ROUND_1 + 1
 RECORD_ROUND_2 = WIN_ROUND_2 + 1
 
 FINAL_PLACE = RECORD_ROUND_2 + 1
-RECORD_ROUND_3 = FINAL_PLACE + 1
 
 # UL: isu tsp uid nck grp fio fst wr1 h10 rr1 wr2 rr2 fnl rr3
 # DB: tsp isu uid nck grp fio fst wr1 h10 rr1 wr2 rr2 fnl rr3
@@ -73,15 +72,15 @@ IP: craft.itmo.ru
 {}
 
 Участвуешь ли ты в первом этапе (BlockParty):
-Да.
+Да
 
-Переходишь ли в следующий этап:
+Проходишь ли в следующий этап (AceRace):
 {}
 
 Поставят ли 10 баллов:
 {}
 
-Рекорд раундов в блокпати:
+Рекорд раундов в BlockParty:
 {}
 {}{}
 Обязательно проверь все данные, только в случае несоответствий или важных вопросов напиши в ответ "АДМИН"
@@ -89,18 +88,15 @@ IP: craft.itmo.ru
 '''.strip()
 
 second_part = '''
-Рекорд во втором этапе:
+Рекорд в AceRace:
 {}
 
-Проходишь ли ты в финал:
+Проходишь ли ты в финал (HungerGames):
 {}
 
 '''
 
 third_part = '''
-Рекорд в третьем этапе:
-{}
-
 Место в финале:
 {}
 
@@ -155,16 +151,15 @@ def ts2str(timestamp: int) -> str:
 class UserList:
     s2b = lambda s: s == '1'
     b2s = lambda b: '1' if b else '0'
-    load2db = (str2ts, int, int, str, str, str, s2b, s2b, s2b, int, s2b, int, int, int)
-    db_types = (str2ts, int, str, str, str, s2b, s2b, s2b, int, s2b, int, int, int)
-    db2save = (ts2str, str, str, str, str, str, b2s, b2s, b2s, str, b2s, str, str, str)
+    load2db = (str2ts, int, int, str, str, str, s2b, s2b, s2b, int, s2b, int, int)
+    db_types = (str2ts, int, str, str, str, s2b, s2b, s2b, int, s2b, int, int)
+    db2save = (ts2str, str, str, str, str, str, b2s, b2s, b2s, str, b2s, str, str)
 
     def __init__(self, path: str, vk_helper) -> None:
         # UL: isu tsp uid nck grp fio fst wr1 h10 rr1 wr2 rr2 fnl rr3
         # DB: tsp isu uid nck grp fio fst wr1 h10 rr1 wr2 rr2 fnl rr3
-        self.db = dict[int: tuple[int, int, str, str, str, bool, bool, bool, int, bool, int, int, int]]()
+        self.db = dict[int: tuple[int, int, str, str, str, bool, bool, bool, int, bool, int, int]]()
         self.uid_to_isu = dict[int:  int]()  # uid: isu
-        self.top = dict[int: int]()  # uid: rr2
         self.path = path
         self.vk_helper = vk_helper
         if self.load() is False:
@@ -205,10 +200,10 @@ class UserList:
                 if len(s) < 11:
                     s.extend(list('00'))
                 if len(s) < 13:
-                    s.extend(list('00'))
+                    s.extend(list('0'))
                     changes = True
-                # UL: isu tsp uid nck grp fio fst wr1 h10 rr1 wr2 rr2 fnl rr3
-                # DB: tsp isu uid nck grp fio fst wr1 h10 rr1 wr2 rr2 fnl rr3
+                # UL: isu tsp uid nck grp fio fst wr1 h10 rr1 wr2 rr2 fnl
+                # DB: tsp isu uid nck grp fio fst wr1 h10 rr1 wr2 rr2 fnl
                 s = [f(i) for f, i in zip(self.load2db, s)]
                 self.db[s[1]] = s[0], *s[2:]
         # достаём все vk_uid через vk_link
@@ -233,12 +228,19 @@ class UserList:
             user = self.db[isu]
             if user[VK_UID] != 0:
                 self.uid_to_isu[user[VK_UID]] = isu
-        # TODO: доделать
-        # for isu in self.db.keys():
-        #     user = self.db[isu]
-        #     self.top[user[VK_UID]] = user[RECORD_ROUND_2]
-        # self.top = dict.fromkeys(sorted(self.top.keys(), key=self.top.__getitem__, reverse=True)[:20])
-        # self.top = {uid: self.db[self.uid_to_isu[uid]] for uid in self.top.keys()}
+        top = dict[int: int]()
+        for isu in self.db.keys():
+            user = self.db[isu]
+            top[user[VK_UID]] = user[RECORD_ROUND_2]
+        top = dict.fromkeys(sorted(top.keys(), key=top.__getitem__, reverse=True)[:20])
+        top = {uid: self.db[self.uid_to_isu[uid]] for uid in top.keys()}
+        for isu in self.db.keys():
+            user = self.db[isu]
+            if user[WIN_ROUND_2] is not (user[VK_UID] in top):
+                user = list(user)
+                user[WIN_ROUND_2] = user[VK_UID] in top
+                self.db[isu] = tuple(user)
+                changes = True
         if changes is True:
             return self.save()
         return True
@@ -249,14 +251,14 @@ class UserList:
         to_save = []
         for isu in self.db.keys():
             v = self.db[isu]
-            v = [f(i) for f, i in zip(self.db2save, [v[0], isu] + list(v)[1:])]
-            to_save.append((v[0], '\t'.join(v)))
+            v = [f(i) for f, i in zip(self.db2save, [v[TIMESTAMP], isu] + list(v)[1:])]
+            to_save.append((v[TIMESTAMP], '\t'.join(v)))
         to_save.sort()
         with open(users_path, 'w', encoding='UTF-8') as file:
             file.write('\n'.join(i[1] for i in to_save))
         return True
 
-    def get(self, isu: int) -> tuple[int, int, str, str, str, bool, bool, bool, int, bool, int, int, int] | None:
+    def get(self, isu: int) -> tuple[int, int, str, str, str, bool, bool, bool, int, bool, int, int] | None:
         return self.db[isu] if isu in self.db.keys() else None
 
     def keys(self):
@@ -274,6 +276,10 @@ def init_spartakiada_subs(year: int) -> set[int]:
                 warn(f'something wrong with id in {n}-th line in spartakiada subs DB')
                 continue
             spartakiada_subs.add(int(uid.strip()))
+    if 0 in spartakiada_subs:
+        spartakiada_subs.remove(0)
+    if -1 in spartakiada_subs:
+        spartakiada_subs.remove(-1)
     return spartakiada_subs
 
 
@@ -292,7 +298,7 @@ tokens = (
     ('|', '&'),
     ('->', '!>'),
     ('==', '!=', '>>', '>=', '<<', '<='),
-    ('tsp', 'uid', 'nck', 'grp', 'fio', 'fst', 'wr1', 'h10', 'rr1', 'wr2', 'rr2', 'fnl', 'rr3'),
+    ('tsp', 'uid', 'nck', 'grp', 'fio', 'fst', 'wr1', 'h10', 'rr1', 'wr2', 'rr2', 'fnl'),
     ('s24', 's25', 'adm')
 )
 
@@ -313,6 +319,7 @@ def check_condition(cond: str) -> bool:
 
 
 def eval_condition(user: tuple, cond: str) -> bool:
+    print(cond)
     if '|' in cond:
         return any(eval_condition(user, i) for i in cond.split('|'))
     if '&' in cond:
@@ -329,10 +336,8 @@ def eval_condition(user: tuple, cond: str) -> bool:
             index = tokens[3].index(c[0])
             v = user[index]
             predicate = (v.__eq__, v.__ne__, v.__gt__, v.__ge__, v.__lt__, v.__le__)
+            print(v, n, c[1], token)
             return predicate[n](UserList.db_types[index](c[1]))
-    if '!=' in cond:
-        c = cond.split('!=')
-        return str(user[tokens[3].index(c[0])]) != c[1]
     return False
 
 
@@ -446,8 +451,9 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
             tts = welcome_message.format(
                 isu, user[NICKNAME],
                 ['Нет', 'Да'][user[WIN_ROUND_1]], ['Нет', 'Да'][user[HAS_10_BALLS]], user[RECORD_ROUND_1],
-                second_part.format(user[RECORD_ROUND_2], ['Нет', 'Да'][user[WIN_ROUND_2]]) if user[WIN_ROUND_1] else '',
-                third_part.format(user[RECORD_ROUND_3], user[FINAL_PLACE]) if user[WIN_ROUND_2] else '')
+                second_part.format(user[RECORD_ROUND_2] if user[RECORD_ROUND_2] != -1 else 'Нет данных',
+                                   ['Нет', 'Скорее да, чем нет'][user[WIN_ROUND_2]]) if user[WIN_ROUND_1] else '',
+                third_part.format(user[FINAL_PLACE]) if user[WIN_ROUND_2] else '')
         else:
             tts = 'Кажется, у нас нет твоих данных. Позови админа, если это не должно быть так'
     return [{
