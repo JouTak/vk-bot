@@ -222,7 +222,7 @@ class UserList:
                 if start == -1:
                     start = 0
                 links.append(uid[start:])
-            response = self.vk_helper.links_to_uids(links)
+            response: list[str] = self.vk_helper.links_to_uids(links)
             for pair, uid in zip(part, response):
                 user = list(self.db[pair[0]])
                 user[VK_UID] = int(uid)
