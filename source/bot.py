@@ -163,7 +163,8 @@ class UserList:
         # UL: isu tsp uid nck grp fio fst wr1 h10 rr1 wr2 rr2 fnl rr3
         # DB: tsp isu uid nck grp fio fst wr1 h10 rr1 wr2 rr2 fnl rr3
         self.db = dict[int: tuple[int, int, str, str, str, bool, bool, bool, int, bool, int, int, int]]()
-        self.uid_to_isu = dict[int, int]()
+        self.uid_to_isu = dict[int:  int]()  # uid: isu
+        self.top = dict[int: int]()  # uid: rr2
         self.path = path
         self.vk_helper = vk_helper
         if self.load() is False:
@@ -232,6 +233,12 @@ class UserList:
             user = self.db[isu]
             if user[VK_UID] != 0:
                 self.uid_to_isu[user[VK_UID]] = isu
+        # TODO: доделать
+        # for isu in self.db.keys():
+        #     user = self.db[isu]
+        #     self.top[user[VK_UID]] = user[RECORD_ROUND_2]
+        # self.top = dict.fromkeys(sorted(self.top.keys(), key=self.top.__getitem__, reverse=True)[:20])
+        # self.top = {uid: self.db[self.uid_to_isu[uid]] for uid in self.top.keys()}
         if changes is True:
             return self.save()
         return True
@@ -316,13 +323,13 @@ def eval_condition(user: tuple, cond: str) -> bool:
     if '!>' in cond:
         c = cond.split('!>')
         return user[tokens[3].index(c[0])] not in [spartakiada24_subs, spartakiada25_subs, admin][tokens[4].index(c[1])]
-    for token in tokens[2]:
+    for n, token in enumerate(tokens[2]):
         if token in cond:
             c = cond.split(token)
             index = tokens[3].index(c[0])
             v = user[index]
             predicate = (v.__eq__, v.__ne__, v.__gt__, v.__ge__, v.__lt__, v.__le__)
-            return predicate[index](UserList.db_types[index](c[1]))
+            return predicate[n](UserList.db_types[index](c[1]))
     if '!=' in cond:
         c = cond.split('!=')
         return str(user[tokens[3].index(c[0])]) != c[1]
