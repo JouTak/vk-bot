@@ -156,8 +156,8 @@ class UserList:
     db2save = (ts2str, str, str, str, str, str, b2s, b2s, b2s, str, b2s, str, str)
 
     def __init__(self, path: str, vk_helper) -> None:
-        # UL: isu tsp uid nck grp fio fst wr1 h10 rr1 wr2 rr2 fnl rr3
-        # DB: tsp isu uid nck grp fio fst wr1 h10 rr1 wr2 rr2 fnl rr3
+        # UL: isu tsp uid nck grp fio fst wr1 h10 rr1 wr2 rr2 fnl
+        # DB: tsp isu uid nck grp fio fst wr1 h10 rr1 wr2 rr2 fnl
         self.db = dict[int: tuple[int, int, str, str, str, bool, bool, bool, int, bool, int, int]]()
         self.uid_to_isu = dict[int:  int]()  # uid: isu
         self.path = path
