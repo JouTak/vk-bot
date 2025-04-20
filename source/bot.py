@@ -156,8 +156,8 @@ class UserList:
     db2save = (ts2str, str, str, str, str, str, b2s, b2s, b2s, str, b2s, str, str)
 
     def __init__(self, path: str, vk_helper) -> None:
-        # UL: isu tsp uid nck grp fio fst wr1 h10 rr1 wr2 rr2 fnl rr3
-        # DB: tsp isu uid nck grp fio fst wr1 h10 rr1 wr2 rr2 fnl rr3
+        # UL: isu tsp uid nck grp fio fst wr1 h10 rr1 wr2 rr2 fnl
+        # DB: tsp isu uid nck grp fio fst wr1 h10 rr1 wr2 rr2 fnl
         self.db = dict[int: tuple[int, int, str, str, str, bool, bool, bool, int, bool, int, int]]()
         self.uid_to_isu = dict[int:  int]()  # uid: isu
         self.path = path
@@ -232,7 +232,7 @@ class UserList:
         for isu in self.db.keys():
             user = self.db[isu]
             top[user[VK_UID]] = user[RECORD_ROUND_2]
-        top = dict.fromkeys(sorted(top.keys(), key=top.__getitem__, reverse=True)[:20])
+        top = dict.fromkeys(sorted(filter(lambda x: top[x] != -1, top.keys()), key=top.__getitem__)[:20])
         top = {uid: self.db[self.uid_to_isu[uid]] for uid in top.keys()}
         for isu in self.db.keys():
             user = self.db[isu]
