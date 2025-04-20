@@ -377,7 +377,7 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
             return [{'peer_id': uid, 'message': 'Success' if (self.users.load() is True) else 'Failed'}]
         elif msgs[0] == 'sender':
             if len(msgs) > 2:
-                result = sender(self, msgs[1], ' '.join(msgs[2:]).strip())
+                result = sender(self, msgs[1], msg.removeprefix(msgs[0]).strip().removeprefix(msgs[1]).strip())
                 self.handle_actions(result)
                 tts = f'Готово. Всего разослано {len(result)} сообщений'
             elif len(msgs) == 2:
