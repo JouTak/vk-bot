@@ -232,7 +232,7 @@ class UserList:
         for isu in self.db.keys():
             user = self.db[isu]
             top[user[VK_UID]] = user[RECORD_ROUND_2]
-        top = dict.fromkeys(sorted(top.keys(), key=top.__getitem__, reverse=True)[:20])
+        top = dict.fromkeys(sorted(top.keys(), key=top.__getitem__)[:20])
         top = {uid: self.db[self.uid_to_isu[uid]] for uid in top.keys()}
         for isu in self.db.keys():
             user = self.db[isu]
