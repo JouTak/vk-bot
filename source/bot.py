@@ -303,23 +303,30 @@ tokens = (
 )
 
 
-def check_condition(cond: str) -> bool:
+def check_condition(cond: str) -> str:
     for token in tokens[0]:
         if token in cond:
-            return all(check_condition(i) for i in cond.split(token))
+            for c in cond.split(token):
+                b = check_condition(c)
+                if b != 'ok':
+                    return b
+            return 'ok'
     for token in tokens[1]:
         if token in cond:
             c = cond.split(token)
-            return len(c) == 2 and c[0] in tokens[3] and c[1] in tokens[4]
+            if len(c) == 2 and c[0] in tokens[3] and c[1] in tokens[4]:
+                return 'ok'
+            return cond
     for token in tokens[2]:
         if token in cond:
             c = cond.split(token)
-            return len(c) == 2 and c[0] in tokens[3]
-    return False
+            if len(c) == 2 and c[0] in tokens[3]:
+                return 'ok'
+            return cond
+    return 'no matches with tokens'
 
 
 def eval_condition(user: tuple, cond: str) -> bool:
-    print(cond)
     if '|' in cond:
         return any(eval_condition(user, i) for i in cond.split('|'))
     if '&' in cond:
@@ -342,8 +349,9 @@ def eval_condition(user: tuple, cond: str) -> bool:
 
 
 def sender(self, condition: str, msg: str) -> list[dict]:
-    if check_condition(condition) is False:
-        return [{'peer_id': uid, 'message': 'Condition issue'} for uid in admin]
+    check = check_condition(condition)
+    if check_condition(condition) != 'ok':
+        return [{'peer_id': uid, 'message': 'Condition issue: ' + check} for uid in admin]
     users: UserList = self.users
     result = []
     for isu in users.keys():
@@ -402,7 +410,8 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
             }]
         elif msgs[0] == 'UwU':
             if len(msgs) == 2 and all(d.isdigit() for d in msgs[1]) and int(msgs[1]) in self.users.uid_to_isu:
-                return [{'peer_id': int(msgs[1]), 'message': f'{uname} отправил вам UwU'}]
+                return [{'peer_id': int(msgs[1]), 'message': f'{uname} отправил вам UwU'},
+                        {'peer_id': uid, 'message': 'UwU доставлено успешно'}]
             else:
                 return [{'peer_id': uid, 'message': 'UwU'}]
 

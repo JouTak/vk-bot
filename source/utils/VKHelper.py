@@ -1,5 +1,7 @@
 from vk_api.keyboard import VkKeyboard, VkKeyboardColor
 import vk_api
+from vk_api.utils import get_random_id
+import json
 
 
 class VKHelper:
@@ -37,12 +39,19 @@ class VKHelper:
             raise Exception(f'Ошибка отправки сообщения: {e}')
 
     def links_to_uids(self, links: list[str]) -> list[int]:
-        parts = []
-        for i in range(len(links)):
-            parts.append(f'API.utils.resolveScreenName({{"screen_name": "{links[i]}"}})')
+        parts = [f'API.utils.resolveScreenName({{"screen_name": "{link}"}})' for link in links]
         code = f'return [{",".join(parts)}];'
         response = self.vk_session.method("execute", {"code": code})
         return [i['object_id'] if isinstance(i, dict) and 'object_id' in i.keys() else '0' for i in response]
+
+    def send_messages(self, messages: list[dict]) -> list[dict]:
+        for d in messages:
+            d['group_id'] = 230160029
+            d['random_id'] = get_random_id()
+        parts = [f'API.messages.send({json.dumps(d, ensure_ascii=False)})' for d in messages]
+        code = f'return [{",".join(parts)}];'
+        response = self.vk_session.method("execute", {"code": code})
+        return response
 
 
 def create_keyboard(buttons):
