@@ -13,7 +13,7 @@ class Main:
         # ITMO 217494619
         # TEST 230160029
         self.group_id = 230160029
-        self.group_id = 217494619
+        # self.group_id = 217494619
 
         self.vk_session = vk_api.VkApi(token=self.token)
         self.VK = VKHelper(self.vk_session)
@@ -50,22 +50,21 @@ class Main:
         result = process_message_event(self, event, self.VK)
         self.handle_actions(result)
 
-    def handle_actions(self, actions: list[dict]):
+    def handle_actions(self, actions: list[dict]) -> int:
         if not actions:
-            return
-        for action in actions:
-            peer_id = action.get('peer_id')
-            message = action.get('message', '')
-            keyboard = action.get('keyboard')
-            attachment = action.get('attachment')
-            # message_sync = {
-            #     'user_message': {'peer_id': None, 'conversation_message_id': None},
-            #     'manager_message': {'peer_id': None, 'conversation_message_id': None}
-            # }
-            try:
-                self.VK.send_message(peer_id, message, keyboard, attachment)
-            except Exception as e:
-                self.error(f'Ошибка обработки действия: {e}')
+            return 0
+        counter = 0
+        for i in range(0, len(actions), 25):
+            chunk = actions[i:min(i + 25, len(actions))]
+            responses = self.VK.send_messages(chunk)
+            for action, response in zip(chunk, responses):
+                if not response:
+                    # print('Something wrong with', action)
+                    continue
+                else:
+                    # print('Success with', action)
+                    counter += 1
+        return counter
 
 
 if __name__ == '__main__':

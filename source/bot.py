@@ -152,7 +152,10 @@ class UserList:
     s2b = lambda s: s == '1'
     b2s = lambda b: '1' if b else '0'
     load2db = (str2ts, int, int, str, str, str, s2b, s2b, s2b, int, s2b, int, int)
-    db_types = (str2ts, int, str, str, str, s2b, s2b, s2b, int, s2b, int, int)
+    str2db = (str2ts, int, str, str, str, s2b, s2b, s2b, int, s2b, int, int)
+    s2ic = str.isdigit
+    s2bc = ['0', '1'].__contains__
+    db_t_check = (s2ic, s2ic, str, str, str, s2bc, s2bc, s2bc, s2ic, s2bc, s2ic, s2ic)
     db2save = (ts2str, str, str, str, str, str, b2s, b2s, b2s, str, b2s, str, str)
 
     def __init__(self, path: str, vk_helper) -> None:
@@ -303,23 +306,55 @@ tokens = (
 )
 
 
-def check_condition(cond: str) -> bool:
-    for token in tokens[0]:
-        if token in cond:
-            return all(check_condition(i) for i in cond.split(token))
-    for token in tokens[1]:
-        if token in cond:
-            c = cond.split(token)
-            return len(c) == 2 and c[0] in tokens[3] and c[1] in tokens[4]
-    for token in tokens[2]:
-        if token in cond:
-            c = cond.split(token)
-            return len(c) == 2 and c[0] in tokens[3]
-    return False
+def check_condition(cond: str, errors: list = None) -> str | None:
+    is_first = errors is None
+    if is_first is True:
+        errors = []
+    if any(token in cond for token in tokens[0]):
+        for token in tokens[0]:
+            if token in cond:
+                for c in cond.split(token):
+                    check_condition(c, errors)
+        if is_first is True:
+            return 'ok' if len(errors) == 0 else '\n'.join(errors)
+        return
+    elif any(token in cond for token in tokens[1]):
+        for token in tokens[1]:
+            if token in cond:
+                c = cond.split(token)
+                if len(c) > 2:
+                    errors.append(f'too many args in "{cond}"')
+                if len(c) < 2:
+                    errors.append(f'not enough args in "{cond}"')
+                if c[0] not in tokens[3]:
+                    errors.append(f'token "{c[0]}" in "{cond}" is unknown')
+                if c[1] not in tokens[4]:
+                    errors.append(f'token "{c[1]}" in "{cond}" is unknown')
+        if is_first is True:
+            return 'ok' if len(errors) == 0 else '\n'.join(errors)
+        return
+    elif any(token in cond for token in tokens[2]):
+        for token in tokens[2]:
+            if token in cond:
+                c = cond.split(token)
+                if len(c) > 2:
+                    errors.append('too many args in ' + cond)
+                if len(c) < 2:
+                    errors.append('not enough args in ' + cond)
+                if c[0] not in tokens[3]:
+                    errors.append(f'token "{c[0]}" in "{cond}" is unknown')
+                if not UserList.db_t_check[tokens[3].index(c[0])](c[1]):
+                    errors.append(f'token "{c[1]}" in "{cond}" has wrong type')
+        if is_first is True:
+            return 'ok' if len(errors) == 0 else '\n'.join(errors)
+        return
+    else:
+        if is_first is True:
+            return 'no matches with any token' if len(errors) == 0 else '\n'.join(errors)
+        return
 
 
 def eval_condition(user: tuple, cond: str) -> bool:
-    print(cond)
     if '|' in cond:
         return any(eval_condition(user, i) for i in cond.split('|'))
     if '&' in cond:
@@ -337,13 +372,14 @@ def eval_condition(user: tuple, cond: str) -> bool:
             v = user[index]
             predicate = (v.__eq__, v.__ne__, v.__gt__, v.__ge__, v.__lt__, v.__le__)
             print(v, n, c[1], token)
-            return predicate[n](UserList.db_types[index](c[1]))
+            return predicate[n](UserList.str2db[index](c[1]))
     return False
 
 
 def sender(self, condition: str, msg: str) -> list[dict]:
-    if check_condition(condition) is False:
-        return [{'peer_id': uid, 'message': 'Condition issue'} for uid in admin]
+    check = check_condition(condition)
+    if check_condition(condition) != 'ok':
+        return [{'peer_id': uid, 'message': 'Condition issue:\n' + check} for uid in admin]
     users: UserList = self.users
     result = []
     for isu in users.keys():
@@ -386,12 +422,12 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
         if msgs[0] == 'stop':
             exit()
         elif msgs[0] == 'reload':
-            return [{'peer_id': uid, 'message': 'Success' if (self.users.load() is True) else 'Failed'}]
+            return [{'peer_id': uid, 'message': 'Success' if self.users.load() else 'Failed'}]
         elif msgs[0] == 'sender':
             if len(msgs) > 2:
                 result = sender(self, msgs[1], msg.removeprefix(msgs[0]).strip().removeprefix(msgs[1]).strip())
-                self.handle_actions(result)
-                tts = f'Готово. Всего разослано {len(result)} сообщений'
+                count = self.handle_actions(result)
+                tts = f'Готово. Всего разослано {count} сообщений'
             elif len(msgs) == 2:
                 tts = 'Нет сообщения'
             else:
