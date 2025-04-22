@@ -394,12 +394,12 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
         if msgs[0] == 'stop':
             exit()
         elif msgs[0] == 'reload':
-            return [{'peer_id': uid, 'message': 'Success' if (self.users.load() is True) else 'Failed'}]
+            return [{'peer_id': uid, 'message': 'Success' if self.users.load() else 'Failed'}]
         elif msgs[0] == 'sender':
             if len(msgs) > 2:
                 result = sender(self, msgs[1], msg.removeprefix(msgs[0]).strip().removeprefix(msgs[1]).strip())
-                self.handle_actions(result)
-                tts = f'Готово. Всего разослано {len(result)} сообщений'
+                count = self.handle_actions(result)
+                tts = f'Готово. Всего разослано {count} сообщений'
             elif len(msgs) == 2:
                 tts = 'Нет сообщения'
             else:
@@ -408,15 +408,6 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
                 'peer_id': uid,
                 'message': tts
             }]
-<<<<<<< HEAD
-        elif msgs[0] == 'UwU':
-            if len(msgs) == 2 and all(d.isdigit() for d in msgs[1]) and int(msgs[1]) in self.users.uid_to_isu:
-                return [{'peer_id': int(msgs[1]), 'message': f'{uname} отправил вам UwU'},
-                        {'peer_id': uid, 'message': 'UwU доставлено успешно'}]
-            else:
-                return [{'peer_id': uid, 'message': 'UwU'}]
-=======
->>>>>>> 729e425235fd53fb64e98562ca28e03fea8fa301
 
     if event.from_chat:
         return

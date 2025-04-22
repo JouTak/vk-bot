@@ -59,10 +59,11 @@ class Main:
             responses = self.VK.send_messages(chunk)
             for action, response in zip(chunk, responses):
                 if not response:
-                    print('Something wrong with', action)
+                    # print('Something wrong with', action)
+                    continue
                 else:
+                    # print('Success with', action)
                     counter += 1
-                    print('Success with', action)
         return counter
 
 
