@@ -17,14 +17,14 @@ class Main:
 
         self.vk_session = vk_api.VkApi(token=self.token)
         self.VK = VKHelper(self.vk_session)
-
-        self.users = UserList(users_path, self.VK)
-        print('\n'.join(warnings))
-
+        
         self.info, self.error = log()
         self.longpoll = VkBotLongPoll(self.vk_session, self.group_id)
         self.ignored = IgnoredList()
         self.info(self.ignored.load_from_file())
+        self.users = UserList(users_path, self.VK)
+        print('\n'.join(warnings))
+
         self.info('готов!\n')
 
     def run(self):
