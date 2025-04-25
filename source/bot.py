@@ -153,6 +153,8 @@ class UserList:
     b2s = lambda b: '1' if b else '0'
     load2db = (str2ts, int, int, str, str, str, s2b, s2b, s2b, int, s2b, int, int)
     str2db = (str2ts, int, str, str, str, s2b, s2b, s2b, int, s2b, int, int)
+    b2t = lambda b: 'Да' if b else 'Нет'
+    db2t = (ts2str, str, str, str, str, b2t, b2t, b2t, str, b2t, str, str)
     s2ic = str.isdigit
     s2bc = ['0', '1'].__contains__
     db_t_check = (s2ic, s2ic, str, str, str, s2bc, s2bc, s2bc, s2ic, s2bc, s2ic, s2ic)
@@ -388,7 +390,9 @@ def sender(self, condition: str, msg: str) -> list[dict]:
         if uid == '0':
             continue
         if eval_condition(user, condition) is True:
-            result.append({'peer_id': uid, 'message': msg})
+            result.append({'peer_id': uid, 'message': msg.format(
+                **{key: f(value) for f, key, value in zip(UserList.db_t_check, tokens[3], user)}
+            )})
     return result
 
 
