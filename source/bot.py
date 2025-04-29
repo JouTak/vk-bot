@@ -10,7 +10,6 @@ admin = [297002785, 275052029, 325899178, 229488682]
 
 # DB: isu, uid, fio, grp, nck, {s24: {...}, s25: {...}, ...}
 
-groupid = 217494619  # 230160029
 itmocraft_ip = 'craft.itmo.ru'
 joutak_ip = 'mc.joutak.ru'
 joutak_link = 'https://joutak.ru'
@@ -19,35 +18,29 @@ telegram_link = 't.me/itmocraft'
 discord_link = 'https://discord.gg/YVj5tckahA'
 vk_link = 'https://vk.com/widget_community.php?act=a_subscribe_box&oid=-217494619&state=1|ITMOcraft'
 
-# format message with countd
-hi_message = \
-    'Привет! На прошлых выходных ты участвовал в спартакиаде, ' \
-    'проведённой клубом любителей игры «Майнкрафт» ITMOcraft. Думаю, самое время познакомиться!\n\n' \
-    'Наш клуб — комьюнити итмошников, которым нравится играть в майнкрафт. ' \
-    'Выживание, моды, мини-игры: если во что-то можно играть, мы создаём для этого условия. ' \
-    'Наша альма-матер — SMP JouTak. ' \
-    'Это сервер с шестилетней историей (без вайпов, без приватов, без случайных людей), ' \
-    'в итмошном районе которого мы вместе уже построили Кронву, Вязьму и даже Ленсовета, ' \
-    'а игроки возводят свои проекты, болтают в войсике и просто отдыхают. ' \
-    'Более того, мы регулярно проводим там ивенты, самое время залететь на сервер👻\n' \
-    'Точно! Тебе же ещё положены бонусы за участие в спартакиаде: {} дней проходки. ' \
-    '(+30дней, если у тебя лицензия)\n\n' \
-    'Как это сделать?\n' \
-    f'1) Подключайся в дискорд: {discord_link}\n' \
-    f'2) Заполняй анкету, чтобы мы с тобой связались: {form_link}\n' \
-    f'3) Следи за новостями в телеграм канале: {telegram_link}! ' \
-    'Помогая нашему продвижению, ты делаешь наши ивенты масштабнее, а сервера круче!\n' \
-    'P.S.: Плашку в ису "Член клуба ITMOcraft" тоже можно получить после заполнения этой анкеты, ' \
-    'по желанию. Если есть вопросы, пиши!'
+yagodnoy_message = ''
 
-info_message = \
-    'Привет! Для получения информации о серверах ИТМОкрафта подпишитесь:\n' \
-    f'[{vk_link}. Подписаться]\n\n' \
-    'После подписки отправь ещё одно сообщение. Только в случае возникновения проблем пиши "АДМИН"'
+info_message = (
+    f'Добро пожаловать в клуб любителей Майнкрафта ITMOcraft! Наш клуб — комьюнити итмошников, которым нравится играть '
+    f'в майнкрафт во всех его проявлениях: Выживание, моды, мини-игры: если во что-то можно играть, '
+    f'мы создаём для этого условия. Недавно мы получили от университета ещё большие мощности, '
+    f'поэтому с этой спартакиады мини-игры будут играться на постоянной основе! IP: {itmocraft_ip}. '
+    f'Наша альма-матер — SMP JouTak. Это сервер с шестилетней историей '
+    f'(без вайпов, без приватов, без случайных людей), в итмошном районе которого мы вместе уже построили Кронву, '
+    f'Вязьму и даже Ленсовета, а игроки возводят свои проекты, болтают в войсике и просто отдыхают. '
+    f'Более того, мы регулярно проводим там ивенты, самое время залететь на сервер 😇 '
+    f'(+30дней, если у тебя лицензия)\n'
+    f'Как это сделать?\n'
+    f'1) Почитай информацию о том, что мы делаем, на нашем сайте: {joutak_link}\n'
+    f'2) Заполняй анкету, чтобы мы с тобой связались: {form_link}\n'
+    f'3) Следи за новостями в нашем телеграм канале: {telegram_link}.\n'
+    f'Помогая нашему продвижению, ты делаешь ивенты масштабнее, а сервера круче!\n'
+    f'P.S.: Плашку в ису "Член клуба ITMOcraft" тоже можно получить после заполнения этой анкеты, по желанию.\n'
+    f'Если есть вопросы, в том числе по спартакиаде, пиши "АДМИН"!'
+)
 
-welcome_message = '''
-Добро пожаловать на спартакиаду ИТМО по майнкрафту! Записывай данные для входа на сервер:
-IP: craft.itmo.ru
+s25_message = '''
+Вот твои данные за Спартакиаду по Майнкрафту 2025!
 
 ИСУ:
 {}
@@ -71,7 +64,7 @@ IP: craft.itmo.ru
 Читай о нас подробнее на сайте https://joutak.ru/minigames и других разделах
 '''.strip()
 
-second_part = '''
+s25_second_part = '''
 Рекорд в AceRace:
 {}
 
@@ -80,30 +73,48 @@ second_part = '''
 
 '''
 
-third_part = '''
+s25_third_part = '''
 Место в финале:
 {}
 
 '''.lstrip()
 
+s24_message = '''
+Вот твои данные за Спартакиаду по Майнкрафту 2024!
 
-   # 'Наш клуб — комьюнити итмошников, которым нравится играть в майнкрафт. ' \
-   # 'Выживание, моды, мини-игры: если во что-то можно играть, мы создаём для этого условия. ' \
-   # 'Недавно мы получили от университета ещё большие мощности, ' \
-   # f'поэтому с этой спартакиады мини-игры будут играться на постоянной основе! IP: {joutek_ip}. ' \
-   # 'Наша альма-матер — SMP JouTak. Это сервер с шестилетней историей ' \
-   # '(без вайпов, без приватов, без случайных людей), ' \
-   # 'в итмошном районе которого мы вместе уже построили Кронву, Вязьму и даже Ленсовета, ' \
-   # 'а игроки возводят свои проекты, болтают в войсчате и просто отдыхают. ' \
-   # 'Более того, мы регулярно проводим там ивенты, самое время залететь на сервер👻 ' \
-   # '(+30дней, если у тебя лицензия)\n\n' \
-   # 'Как это сделать?\n' \
-   # f'1) Почитай информацию о том, что мы делаем, на нашем сайте: {joutek_link}\n' \
-   # f'2) Заполняй анкету, чтобы мы с тобой связались: {form_link}\n' \
-   # f'3) Следи за новостями в нашем телеграм канале: {telegram_link}. ' \
-   # 'Помогая нашему продвижению, ты делаешь ивенты масштабнее, а сервера круче!\n' \
-   # 'P.S.: Плашку в ису "Член клуба ITMOcraft" тоже можно получить после заполнения этой анкеты, по желанию. ' \
-   # 'Если есть вопросы, пиши "АДМИН"!'
+Ник:
+{}
+
+Участвуешь ли ты в первом этапе:
+Да
+
+Использовал ли ты все попытки:
+{}
+
+Проходишь ли в следующий этап:
+{}
+
+Поставят ли 10 баллов:
+{}
+
+{}{}
+Обязательно проверь все данные, только в случае несоответствий или важных вопросов напиши в ответ "АДМИН"
+Читай о нас подробнее на сайте https://joutak.ru/minigames и других разделах
+'''.strip()
+
+s24_second_part = '''
+Проходишь ли ты в финал:
+{}
+
+Ещё не отыграл в финале:
+{}
+'''
+
+s24_third_part = '''
+Победил ли в финале:
+{}
+
+'''.lstrip()
 
 
 def is_file_accessible(filepath: str) -> bool:
@@ -148,7 +159,8 @@ class User:
 
     text2info = (int, int, str, str, str,
                  {'s24': {'tsp': int, 'nck': str, 'lr1': s2b, 'wr1': s2b, 'wr2': s2b, 'nyt': s2b, 'fnl': s2b},
-                  's25': {'tsp': int, 'nck': str, 'wr1': s2b, 'rr1': str, 'wr2': s2b, 'rr2': str, 'fnl': str}})
+                  's25': {'tsp': int, 'nck': str, 'wr1': s2b, 'rr1': str, 'wr2': s2b, 'rr2': str, 'fnl': str},
+                  'y25': {}})
 
     s2ic = str.isdigit
     s2bc = ['0', '1'].__contains__
@@ -156,19 +168,19 @@ class User:
                        {'s24': {'tsp': s2ic, 'nck': bool, 'lr1': s2bc, 'wr1': s2bc, 'wr2': s2bc, 'nyt': s2bc,
                                 'fnl': s2bc},
                         's25': {'tsp': s2ic, 'nck': bool, 'wr1': s2bc, 'rr1': bool, 'wr2': s2bc, 'rr2': bool,
-                                'fnl': bool}})
+                                'fnl': bool},
+                        'y25': {}})
 
     b2t = lambda b: 'Да' if b else 'Нет'
     info2text = (str, str, str, str, str,
                  {'s24': {'tsp': ts2str, 'nck': str, 'lr1': b2t, 'wr1': b2t, 'wr2': b2t, 'nyt': b2t, 'fnl': b2t},
-                  's25': {'tsp': ts2str, 'nck': str, 'wr1': b2t, 'rr1': str, 'wr2': b2t, 'rr2': str, 'fnl': str}})
+                  's25': {'tsp': ts2str, 'nck': str, 'wr1': b2t, 'rr1': str, 'wr2': b2t, 'rr2': str, 'fnl': str},
+                  'y25': {}})
 
     b2s = lambda b: '1' if b else '0'
     db2save = (str, str, str, str, str, json.dumps)
 
     keys = ('isu', 'uid', 'fio', 'grp', 'nck', 'met')
-    s24keys = ('tsp', 'nck', 'lr1', 'wr1', 'wr2', 'nyt', 'fnl')
-    s25keys = ('tsp', 'nck', 'wr1', 'rr1', 'wr2', 'rr2', 'fnl')
 
     def __init__(self, info: tuple[int, int, str, str, str, dict[str: dict[str: str | int | bool]]]) -> None:
         self.info = info
@@ -323,43 +335,13 @@ class UserList:
         return self.db.keys()
 
 
-def init_spartakiada_subs(year: int) -> set[int]:
-    # DB   | timestamp isu vk_uid  vk_link nick    group   fio first_time
-    spartakiada_subs = set[int]()
-    with open(spartakiada_subs_path.format(year), 'r', encoding='UTF-8') as file:
-        for n, uid in enumerate(file):
-            if not uid:
-                continue
-            if not all(d.isdigit() for d in uid.strip()):
-                warn(f'something wrong with id in {n}-th line in spartakiada subs DB')
-                continue
-            spartakiada_subs.add(int(uid.strip()))
-    if 0 in spartakiada_subs:
-        spartakiada_subs.remove(0)
-    if -1 in spartakiada_subs:
-        spartakiada_subs.remove(-1)
-    return spartakiada_subs
-
-
-def save_spartakiada_subs(uids: set[int], year: int) -> bool:
-    if is_file_accessible(spartakiada_subs_path.format(year)) is False:
-        return False
-    with open(spartakiada_subs_path.format(year), 'w', encoding='UTF-8') as file:
-        file.writelines(map(str, sorted(uids)))
-    return True
-
-
-spartakiada24_subs = init_spartakiada_subs(24)
-spartakiada25_subs = init_spartakiada_subs(25)
-
 tokens = (
     ('|', '&'),
     ('->', '!>'),
     ('==', '!=', '>>', '>=', '<<', '<='),
     User.keys,
-    ('s24', 's25'),
-    (User.s24keys, User.s25keys),
-    ('s24', 's25', 'adm')
+    tuple(User.info2text[5].keys()),
+    tuple(tuple(value.keys()) for value in User.info2text[5].values())
 )
 
 
@@ -430,12 +412,12 @@ def eval_condition(user: tuple, cond: str) -> bool:
         return any(eval_condition(user, i) for i in cond.split('|'))
     if '&' in cond:
         return all(eval_condition(user, i) for i in cond.split('&'))
-    if '->' in cond:
-        c = cond.split('->')
-        return user[tokens[3].index(c[0])] in [spartakiada24_subs, spartakiada25_subs, admin][tokens[4].index(c[1])]
-    if '!>' in cond:
-        c = cond.split('!>')
-        return user[tokens[3].index(c[0])] not in [spartakiada24_subs, spartakiada25_subs, admin][tokens[4].index(c[1])]
+    # if '->' in cond:
+    #     c = cond.split('->')
+    #     return user[tokens[3].index(c[0])] in [spartakiada24_subs, spartakiada25_subs, admin][tokens[4].index(c[1])]
+    # if '!>' in cond:
+    #     c = cond.split('!>')
+    #     return user[tokens[3].index(c[0])] not in [spartakiada24_subs, spartakiada25_subs, admin][tokens[4].index(c[1])]
     for n, token in enumerate(tokens[2]):
         if token in cond:
             c = cond.split(token)
@@ -456,15 +438,13 @@ def eval_condition(user: tuple, cond: str) -> bool:
     return False
 
 
-def flat_info2text(d: dict) -> dict[str]:
+def flat_info2text() -> dict[str]:
     result = {key: value for key, value in zip(User.keys[:-1], User.info2text[:-1])}
-    for key in d.keys():
-        if isinstance(d[key], dict):
-            temp = {'met_' + key + '_' + ikey: value for ikey, value in flat_info2text(d[key]).items()}
-            for key in temp:
-                result[key] = temp[key]
-        else:
-            result[key] = d[key]
+    for key in tokens[3][:-1]:
+        result[key] = User.info2text[key]
+    for n, event in enumerate(tokens[3][:-1]):
+        for key in tokens[5][n]:
+            result[f'met_{event}_{key}'] = User.info2text[5][event][key]
     return result
 
 
@@ -481,7 +461,7 @@ def flat_info(info: User.info2text) -> dict[str]:
 
 
 def format_message(msg: str, user: User.info2text) -> str:
-    flat_fs = flat_info2text(User.info2text[5])
+    flat_fs = flat_info2text()
     flat_ui = flat_info(user.info)
     return msg.format(**{key: flat_fs[key](flat_ui[key]) for key in flat_ui.keys()})
 
@@ -518,7 +498,7 @@ def process_message_event(self, event, vk_helper) -> list[dict] | None:
 
 # Чёт без кнопки
 def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
-    users = self.users
+    users: UserList = self.users
     uid = event.message.from_id
 
     user_get = vk_helper.vk.users.get(user_ids=uid)
@@ -588,10 +568,30 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
             ]
         ]
 
-    if vk_helper.vk_session.method('groups.isMember', {'group_id': groupid, 'user_id': uid}) == 0:
+    if vk_helper.vk_session.method('groups.isMember', {'group_id': self.group_id, 'user_id': uid}) == 0:
         tts = info_message
+    elif uid in users.uid_to_isu:
+        isu = users.uid_to_isu[uid]
+        user = users.get(isu)
+        ny = ['Нет', 'Да']
+        if yagodnoy_message != '':
+            tts = format_message(yagodnoy_message, user)
+        elif 's25' in user.met.keys():
+            tts = s25_message.format(
+                user.isu, user.nck, ny[user.met['s25']['wr1']], ny[user.met['s25']['rr1'] != 0], user.met['s25']['rr1'],
+                second_part.format(user.met['s25']['rr2'] if user.met['s25']['rr2'] != -1 else 'Нет данных',
+                                   ny[user.met['s25']['wr2']]) if user.met['s25']['wr1'] else '',
+                third_part.format(user.met['s25']['fnl']) if user.met['s25']['wr2'] else '')
+        elif 's24' in user.met.keys():
+            tts = s24_message.format(
+                user.met['s24']['nck'], ny[user.met['s24']['lr1']], ny[user.met['s24']['wr1']], user.met['s24']['wr1'],
+                s24_second_part.format(ny[user.met['s24']['wr2']], ny[user.met['s24']['nyt']]),
+                s24_third_part.format(ny[user.met['s24']['fnl']])
+            )
+        else:
+            tts = info_message
     else:
-        return []
+        tts = info_message
     return [{
         'peer_id': uid,
         'message': tts
