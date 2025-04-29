@@ -322,44 +322,13 @@ class UserList:
     def keys(self):
         return self.db.keys()
 
-
-def init_spartakiada_subs(year: int) -> set[int]:
-    # DB   | timestamp isu vk_uid  vk_link nick    group   fio first_time
-    spartakiada_subs = set[int]()
-    with open(spartakiada_subs_path.format(year), 'r', encoding='UTF-8') as file:
-        for n, uid in enumerate(file):
-            if not uid:
-                continue
-            if not all(d.isdigit() for d in uid.strip()):
-                warn(f'something wrong with id in {n}-th line in spartakiada subs DB')
-                continue
-            spartakiada_subs.add(int(uid.strip()))
-    if 0 in spartakiada_subs:
-        spartakiada_subs.remove(0)
-    if -1 in spartakiada_subs:
-        spartakiada_subs.remove(-1)
-    return spartakiada_subs
-
-
-def save_spartakiada_subs(uids: set[int], year: int) -> bool:
-    if is_file_accessible(spartakiada_subs_path.format(year)) is False:
-        return False
-    with open(spartakiada_subs_path.format(year), 'w', encoding='UTF-8') as file:
-        file.writelines(map(str, sorted(uids)))
-    return True
-
-
-spartakiada24_subs = init_spartakiada_subs(24)
-spartakiada25_subs = init_spartakiada_subs(25)
-
 tokens = (
     ('|', '&'),
     ('->', '!>'),
     ('==', '!=', '>>', '>=', '<<', '<='),
     User.keys,
-    ('s24', 's25'),
-    (User.s24keys, User.s25keys),
-    ('s24', 's25', 'adm')
+    tuple(User.info2text[5].keys()),
+    tuple(tuple(value.keys()) for value in User.info2text[5].values())
 )
 
 
@@ -430,12 +399,12 @@ def eval_condition(user: tuple, cond: str) -> bool:
         return any(eval_condition(user, i) for i in cond.split('|'))
     if '&' in cond:
         return all(eval_condition(user, i) for i in cond.split('&'))
-    if '->' in cond:
-        c = cond.split('->')
-        return user[tokens[3].index(c[0])] in [spartakiada24_subs, spartakiada25_subs, admin][tokens[4].index(c[1])]
-    if '!>' in cond:
-        c = cond.split('!>')
-        return user[tokens[3].index(c[0])] not in [spartakiada24_subs, spartakiada25_subs, admin][tokens[4].index(c[1])]
+    # if '->' in cond:
+    #     c = cond.split('->')
+    #     return user[tokens[3].index(c[0])] in [spartakiada24_subs, spartakiada25_subs, admin][tokens[4].index(c[1])]
+    # if '!>' in cond:
+    #     c = cond.split('!>')
+    #     return user[tokens[3].index(c[0])] not in [spartakiada24_subs, spartakiada25_subs, admin][tokens[4].index(c[1])]
     for n, token in enumerate(tokens[2]):
         if token in cond:
             c = cond.split(token)
