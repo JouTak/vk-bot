@@ -43,39 +43,39 @@ s25_message = '''
 Вот твои данные за Спартакиаду по Майнкрафту 2025!
 
 ИСУ:
-{}
+{isu}
 
 Ник:
-{}
+{nck}
 
 Участвуешь ли ты в первом этапе (BlockParty):
 Да
 
 Проходишь ли в следующий этап (AceRace):
-{}
+{met_s25_wr1}
 
 Поставят ли 10 баллов:
-{}
+{met_s25_h10}
 
 Рекорд раундов в BlockParty:
-{}
-{}{}
+{met_s25_rr1}
+{part2}{part3}
 Обязательно проверь все данные, только в случае несоответствий или важных вопросов напиши в ответ "АДМИН"
 Читай о нас подробнее на сайте https://joutak.ru/minigames и других разделах
 '''.strip()
 
 s25_second_part = '''
 Рекорд в AceRace:
-{}
+{met_s25_rr2}
 
 Проходишь ли ты в финал (SurvivalGames):
-{}
+{met_s25_wr2}
 
 '''
 
 s25_third_part = '''
 Место в финале:
-{}
+{met_s25_fnl}
 
 '''.lstrip()
 
@@ -83,36 +83,36 @@ s24_message = '''
 Вот твои данные за Спартакиаду по Майнкрафту 2024!
 
 Ник:
-{}
+{met_s24_nck}
 
 Участвуешь ли ты в первом этапе:
 Да
 
 Использовал ли ты все попытки:
-{}
+{met_s24_lr1}
 
 Проходишь ли в следующий этап:
-{}
+{met_s24_wr1}
 
 Поставят ли 10 баллов:
-{}
+{met_s24_h10}
 
-{}{}
+{part2}{part3}
 Обязательно проверь все данные, только в случае несоответствий или важных вопросов напиши в ответ "АДМИН"
 Читай о нас подробнее на сайте https://joutak.ru/minigames и других разделах
 '''.strip()
 
 s24_second_part = '''
 Проходишь ли ты в финал:
-{}
+{met_s24_wr2}
 
 Ещё не отыграл в финале:
-{}
+{met_s24_nyt}
 '''
 
 s24_third_part = '''
 Победил ли в финале:
-{}
+{met_s24_fnl}
 
 '''.lstrip()
 
@@ -440,11 +440,13 @@ def eval_condition(user: tuple, cond: str) -> bool:
 
 def flat_info2text() -> dict[str]:
     result = {key: value for key, value in zip(User.keys[:-1], User.info2text[:-1])}
-    for key in tokens[3][:-1]:
-        result[key] = User.info2text[key]
-    for n, event in enumerate(tokens[3][:-1]):
+    for n, key in enumerate(tokens[3][:-1]):
+        result[key] = User.info2text[n]
+    for n, event in enumerate(tokens[4][:-1]):
         for key in tokens[5][n]:
             result[f'met_{event}_{key}'] = User.info2text[5][event][key]
+    result['met_s24_h10'] = User.b2t
+    result['met_s25_h10'] = User.b2t
     return result
 
 
@@ -455,15 +457,19 @@ def flat_info(info: User.info2text) -> dict[str]:
     for n, event in enumerate(tokens[4]):
         if event not in info[5].keys():
             continue
+        elif event == 's24':
+            result['met_s24_h10'] = info[5][event]['lr1'] is True
+        elif event == 's25':
+            result['met_s25_h10'] = info[5][event]['rr1'] != 0
         for key in tokens[5][n]:
             result[f'met_{event}_{key}'] = info[5][event][key]
     return result
 
 
-def format_message(msg: str, user: User.info2text) -> str:
+def format_message(msg: str, user: User.info2text, **additional) -> str:
     flat_fs = flat_info2text()
     flat_ui = flat_info(user.info)
-    return msg.format(**{key: flat_fs[key](flat_ui[key]) for key in flat_ui.keys()})
+    return msg.format(**{key: flat_fs[key](flat_ui[key]) for key in flat_ui.keys()}, **additional)
 
 
 def sender(self, condition: str, msg: str) -> list[dict]:
@@ -573,21 +579,16 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
     elif uid in users.uid_to_isu:
         isu = users.uid_to_isu[uid]
         user = users.get(isu)
-        ny = ['Нет', 'Да']
         if yagodnoy_message != '':
             tts = format_message(yagodnoy_message, user)
         elif 's25' in user.met.keys():
-            tts = s25_message.format(
-                user.isu, user.nck, ny[user.met['s25']['wr1']], ny[user.met['s25']['rr1'] != 0], user.met['s25']['rr1'],
-                second_part.format(user.met['s25']['rr2'] if user.met['s25']['rr2'] != -1 else 'Нет данных',
-                                   ny[user.met['s25']['wr2']]) if user.met['s25']['wr1'] else '',
-                third_part.format(user.met['s25']['fnl']) if user.met['s25']['wr2'] else '')
+            tts = format_message(s25_message, user,
+                                 part2=(format_message(s25_second_part, user) if user.met['s25']['wr1'] else ''),
+                                 part3=(format_message(third_part, user) if user.met['s25']['wr2'] else ''))
         elif 's24' in user.met.keys():
-            tts = s24_message.format(
-                user.met['s24']['nck'], ny[user.met['s24']['lr1']], ny[user.met['s24']['wr1']], user.met['s24']['wr1'],
-                s24_second_part.format(ny[user.met['s24']['wr2']], ny[user.met['s24']['nyt']]),
-                s24_third_part.format(ny[user.met['s24']['fnl']])
-            )
+            tts = format_message(s24_message, user,
+                                 part2=format_message(s24_second_part, user) if user.met['s24']['wr1'] else '',
+                                 part3=format_message(s24_third_part, user) if user.met['s24']['wr2'] else '')
         else:
             tts = info_message
     else:
