@@ -151,6 +151,18 @@ def ts2str(timestamp: int) -> str:
     return datetime.fromtimestamp(timestamp).strftime('%m/%d/%Y %H:%M:%S')
 
 
+def flat_info2text() -> dict[str]:
+    result = {key: value for key, value in zip(User.keys[:-1], User.info2text[:-1])}
+    for n, key in enumerate(tokens[3][:-1]):
+        result[key] = User.info2text[n]
+    for n, event in enumerate(tokens[4][:-1]):
+        for key in tokens[5][n]:
+            result[f'met_{event}_{key}'] = User.info2text[5][event][key]
+    result['met_s24_h10'] = User.b2t
+    result['met_s25_h10'] = User.b2t
+    return result
+
+
 class User:
     # isu, uid, fio, grp, nck, {s24: {...}, s25: {...}, ...}
     info_type = tuple[int, int, str, str, str, dict[str: dict[str: str | int | bool]]]
@@ -181,6 +193,7 @@ class User:
     db2save = (str, str, str, str, str, json.dumps)
 
     keys = ('isu', 'uid', 'fio', 'grp', 'nck', 'met')
+    flat_i2t: dict[str]
 
     def __init__(self, info: tuple[int, int, str, str, str, dict[str: dict[str: str | int | bool]]]) -> None:
         self.info = info
@@ -343,6 +356,7 @@ tokens = (
     tuple(User.info2text[5].keys()),
     tuple(tuple(value.keys()) for value in User.info2text[5].values())
 )
+User.flat_i2t = flat_info2text()
 
 
 def check_condition(cond: str, errors: list = None) -> str | None:
@@ -433,21 +447,8 @@ def eval_condition(user: tuple, cond: str) -> bool:
                 v = v[i[1]][i[2]]
                 f = f[i[1]][i[2]]
             predicate = (v.__eq__, v.__ne__, v.__gt__, v.__ge__, v.__lt__, v.__le__)
-            print((v, n, c[1], token))
             return predicate[n](f(c[1]))
     return False
-
-
-def flat_info2text() -> dict[str]:
-    result = {key: value for key, value in zip(User.keys[:-1], User.info2text[:-1])}
-    for n, key in enumerate(tokens[3][:-1]):
-        result[key] = User.info2text[n]
-    for n, event in enumerate(tokens[4][:-1]):
-        for key in tokens[5][n]:
-            result[f'met_{event}_{key}'] = User.info2text[5][event][key]
-    result['met_s24_h10'] = User.b2t
-    result['met_s25_h10'] = User.b2t
-    return result
 
 
 def flat_info(info: User.info2text) -> dict[str]:
@@ -467,9 +468,7 @@ def flat_info(info: User.info2text) -> dict[str]:
 
 
 def format_message(msg: str, user: User.info2text, **additional) -> str:
-    flat_fs = flat_info2text()
-    flat_ui = flat_info(user.info)
-    return msg.format(**{key: flat_fs[key](flat_ui[key]) for key in flat_ui.keys()}, **additional)
+    return msg.format(**{key: User.flat_i2t[key](value) for key, value in flat_info(user.info).items()}, **additional)
 
 
 def sender(self, condition: str, msg: str) -> list[dict]:
