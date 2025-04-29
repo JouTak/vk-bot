@@ -3,7 +3,7 @@ source/token.txt
 source/subscribers/spartakiada24.txt
 source/subscribers/spartakiada25.txt
 source/ignored.txt
-source/users.txt
+source/subscribers/users.txt
 source/py.log
 entrypoint.sh
 py.log
