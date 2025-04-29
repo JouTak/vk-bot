@@ -4,6 +4,7 @@ source/subscribers/spartakiada24.txt
 source/subscribers/spartakiada25.txt
 source/ignored.txt
 source/subscribers/users.txt
+source/__pycache__
 source/py.log
 entrypoint.sh
 py.log
