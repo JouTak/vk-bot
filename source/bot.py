@@ -482,8 +482,6 @@ def flat_info(info: User.info2text) -> dict[str]:
 def format_message(msg: str, user: User.info2text) -> str:
     flat_fs = flat_info2text(User.info2text[5])
     flat_ui = flat_info(user.info)
-    print(flat_fs.keys())
-    print(flat_ui.keys())
     return msg.format(**{key: flat_fs[key](flat_ui[key]) for key in flat_ui.keys()})
 
 
@@ -500,7 +498,6 @@ def sender(self, condition: str, msg: str) -> list[dict]:
             continue
         if eval_condition(user.info, condition) is True:
             result.append({'peer_id': uid, 'message': format_message(msg, user)})
-            print(msg)
     return result
 
 
