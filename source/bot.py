@@ -404,20 +404,24 @@ def check_condition(cond: str, errors: list = None) -> str | None:
         c = cond.split('.')
         if c[0] == 'met':
             if len(c) == 2:
-                errors.append(f'H | token "{c[1]}" in "{cond}" is unknown')
+                errors.append(f'G | token "{c[1]}" in "{cond}" is unknown')
             elif len(c) == 3:
                 if c[1] not in tokens[4]:
-                    errors.append(f'I | token "{c[1]}" in "{cond}" is unknown')
+                    errors.append(f'H | token "{c[1]}" in "{cond}" is unknown')
                 elif c[2] not in tokens[5][tokens[4].index(c[1])]:
-                    errors.append(f'J | token "{c[2]}" in "{cond}" is unknown')
+                    errors.append(f'I | token "{c[2]}" in "{cond}" is unknown')
             else:
-                errors.append('K | too many args in ' + cond)
+                errors.append('J | too many args in ' + cond)
+        else:
+            errors.append(f'K | token "{c[0]}" in "{cond}" is unknown')
         if is_first is True:
             return 'L | not enough conditions'
         return
+    elif cond not in tokens[3]:
+        errors.append(f'M | token "{cond}" is unknown')
     else:
         if is_first is True:
-            return 'M | no matches with any token' if len(errors) == 0 else '\n'.join(errors)
+            return 'N | no matches with any token' if len(errors) == 0 else '\n'.join(errors)
         return
 
 

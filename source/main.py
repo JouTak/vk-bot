@@ -33,6 +33,7 @@ class Main:
                     self.process_event(event)
             except Exception as e:
                 self.error(e)
+                self.VK.send_messages([{'peer_id': uid, 'message': str(e)} for uid in admin])
                 traceback.print_exc()
 
     def process_event(self, event):
