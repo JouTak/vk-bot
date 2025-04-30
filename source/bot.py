@@ -542,7 +542,7 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
     if ignored.is_ignored(uid) and 'админ' not in msg.lower():
         return
     if 'админ' in msg.lower():
-        link = f'https://vk.com/gim{groupid}?sel={uid}'
+        link = f'https://vk.com/gim{self.group_id}?sel={uid}'
         buttons = [{'label': 'прямая ссылка', 'payload': {'type': 'userlink'}, 'link': link}]
         link_keyboard = create_link_keyboard(buttons)
         if ignored.is_ignored(uid):
