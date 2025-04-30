@@ -1,3 +1,6 @@
+import os
+
+
 class IgnoredList:
     def __init__(self):
         self.ignored = set()
@@ -25,7 +28,7 @@ class IgnoredList:
 
     def save_to_file(self):
         try:
-            with open('ignored.txt', 'w+') as file:
+            with open('./subscribers/ignored.txt', 'w+', encoding='UTF-8') as file:
                 file.write('\n'.join(map(str, self.ignored)))
             print(f'Список игнорируемых сохранён.')
         except Exception as e:
@@ -33,8 +36,11 @@ class IgnoredList:
 
     def load_from_file(self):
         try:
-            with open('ignored.txt', 'r') as file:
+            if not os.path.exists('./subscribers/ignored.txt'):
+                with open('./subscribers/ignored.txt', 'w', encoding='UTF-8') as file:
+                    file.write('')
+            with open('./subscribers/ignored.txt', 'r', encoding='UTF-8') as file:
                 self.ignored = set(map(lambda x: int(x.strip()), file.readlines()))
-            return (f'Список игнорируемых загружен.')
+            return f'Список игнорируемых загружен.'
         except Exception as e:
             print(f'Ошибка при загрузке: {e}')
