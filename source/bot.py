@@ -583,7 +583,7 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
         elif 's25' in user.met.keys():
             tts = format_message(s25_message, user,
                                  part2=(format_message(s25_second_part, user) if user.met['s25']['wr1'] else ''),
-                                 part3=(format_message(third_part, user) if user.met['s25']['wr2'] else ''))
+                                 part3=(format_message(s25_third_part, user) if user.met['s25']['wr2'] else ''))
         elif 's24' in user.met.keys():
             tts = format_message(s24_message, user,
                                  part2=format_message(s24_second_part, user) if user.met['s24']['wr1'] else '',
