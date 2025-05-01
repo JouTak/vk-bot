@@ -9,10 +9,10 @@ from bot import *
 
 class Main:
     def __init__(self):
-        self.token = initialize()
+        self.token, self.group_id = initialize()
         # ITMO 217494619
         # TEST 230160029
-        self.group_id = 230160029
+        #self.group_id = 230160029
 
         self.vk_session = vk_api.VkApi(token=self.token)
         self.VK = VKHelper(self.vk_session)
