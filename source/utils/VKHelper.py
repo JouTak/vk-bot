@@ -46,7 +46,7 @@ class VKHelper:
 
     def send_messages(self, messages: list[dict]) -> list[dict]:
         for d in messages:
-            d['group_id'] = 230160029
+            d['group_id'] = 217494619
             d['random_id'] = get_random_id()
         parts = [f'API.messages.send({json.dumps(d, ensure_ascii=False)})' for d in messages]
         code = f'return [{",".join(parts)}];'
