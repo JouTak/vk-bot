@@ -27,6 +27,8 @@ class Main:
             try:
                 for event in self.longpoll.listen():
                     self.process_event(event)
+            except vk_api.VkRequestsPoolException:
+                pass
             except Exception as e:
                 self.error(e)
                 self.VK.send_messages([{'peer_id': uid, 'message': str(e)} for uid in admin])
