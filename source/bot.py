@@ -235,7 +235,7 @@ class UserList:
                 warn(f'empty {n}-th line in DB')
             if not all(d.isdigit() for d in s[0]):
                 warn(f'isu id is NaN in {n}-th line in DB: {s[0]}')
-                incorrect_isus.append(line)
+                incorrect_isus.append(s)
                 changes = True
             else:
                 result[0] = int(s[0])
@@ -243,11 +243,12 @@ class UserList:
                 used_specials_isus.add(result[0])
             if not all(d.isdigit() for d in s[1]):
                 warn(f'vk id is NaN (isu = {s[0]}) in {n}-th line in DB:', s[1])
-                incorrect_uids.append(line)
+                incorrect_uids.append(s)
+                result[1] = -1
                 changes = True
             else:
                 result[1] = int(s[1])
-            if result[1] <= 1:
+            if 0 <= result[1] <= 1:
                 self.errors.append(s)
                 if s in incorrect_isus:
                     incorrect_isus.remove(s)
@@ -260,7 +261,7 @@ class UserList:
             result[3] = s[3]
             result[4] = s[4]
             if is_json(s[5]) is False:
-                warn(f'something wrong with meta  info (isu = {s[0]}) in {n}-th line in DB:', s[5])
+                warn(f'something wrong with meta info (isu = {s[0]}) in {n}-th line in DB:', s[5])
                 self.errors.append(s)
                 if s in incorrect_isus:
                     incorrect_isus.remove(s)
@@ -288,7 +289,7 @@ class UserList:
         for i in range(0, len(incorrect_uids), 25):
             part = [incorrect_uids[j][1] for j in range(i, min(i + 25, len(incorrect_uids)))]
             links = []
-            for isu, uid in part:
+            for uid in part:
                 start = uid.rfind('/') + 1
                 if start == -1:
                     start = uid.find('@') + 1
