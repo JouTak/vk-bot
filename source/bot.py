@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+import re
+import json
 import os.path
 from datetime import datetime
 from utils.VKHelper import *
@@ -18,8 +20,6 @@ telegram_link = 't.me/itmocraft'
 discord_link = 'https://discord.gg/YVj5tckahA'
 vk_link = 'https://vk.com/widget_community.php?act=a_subscribe_box&oid=-217494619&state=1|ITMOcraft'
 
-yagodnoy_message = ''
-
 info_message = (
     f'Добро пожаловать в клуб любителей Майнкрафта ITMOcraft! Наш клуб — комьюнити итмошников, которым нравится играть '
     f'в майнкрафт во всех его проявлениях: Выживание, моды, мини-игры: если во что-то можно играть, '
@@ -38,6 +38,48 @@ info_message = (
     f'P.S.: Плашку в ису "Член клуба ITMOcraft" тоже можно получить после заполнения этой анкеты, по желанию.\n'
     f'Если есть вопросы, в том числе по спартакиаде, пиши "АДМИН"!'
 )
+
+y25_message = '''
+Вот твои данные по выезду в Ягодное 2025!
+
+Статус в ИТМО:
+{met_y25_sts}
+
+ИСУ:
+{isu}
+
+Ник:
+{nck}
+
+ФИО:
+{fio}
+
+Номер телефона:
+{met_y25_nmb}
+
+Планируешь ли взять бельё в ягодном:
+{met_y25_bed}
+
+Как планируешь добираться до Ягодного:
+{met_y25_way}{part2}
+
+Твоя мотивация:
+```
+{met_y25_why}
+```
+
+Твои предпочтения, где будешь жить:
+{met_y25_wsh}
+
+С кем ты живёшь:
+{met_y25_liv}
+'''.strip()
+
+y25_second_part = '''
+
+Номер машины:
+{met_y25_car}
+'''.rstrip()
 
 s25_message = '''
 Вот твои данные за Спартакиаду по Майнкрафту 2025!
@@ -155,7 +197,7 @@ def flat_info2text() -> dict[str]:
     result = {key: value for key, value in zip(User.keys[:-1], User.info2text[:-1])}
     for n, key in enumerate(tokens[3][:-1]):
         result[key] = User.info2text[n]
-    for n, event in enumerate(tokens[4][:-1]):
+    for n, event in enumerate(tokens[4]):
         for key in tokens[5][n]:
             result[f'met_{event}_{key}'] = User.info2text[5][event][key]
     result['met_s24_h10'] = User.b2t
@@ -164,32 +206,40 @@ def flat_info2text() -> dict[str]:
 
 
 class User:
-    # isu, uid, fio, grp, nck, {s24: {...}, s25: {...}, ...}
+    # isu, uid, fio, grp, nck, met: {
+    # s24: {tsp, nck, lr1, wr1, wr2, nyt, fnl},
+    # s25: {tsp, nck, wr1, rr1, wr2, rr2, fnl},
+    # y25: {tsp, nck, sts, nmb, why, jtk, gms, lgc, bed, way, car, liv}}
     info_type = tuple[int, int, str, str, str, dict[str: dict[str: str | int | bool]]]
     s2b = lambda s: s == '1'
     load2info = (int, int, str, str, str, json.loads)
 
-    text2info = (int, int, str, str, str,
-                 {'s24': {'tsp': int, 'nck': str, 'lr1': s2b, 'wr1': s2b, 'wr2': s2b, 'nyt': s2b, 'fnl': s2b},
-                  's25': {'tsp': int, 'nck': str, 'wr1': s2b, 'rr1': str, 'wr2': s2b, 'rr2': str, 'fnl': str},
-                  'y25': {}})
+    text2info = (int, int, str, str, str, {
+        's24': {'tsp': int, 'nck': str, 'lr1': s2b, 'wr1': s2b, 'wr2': s2b, 'nyt': s2b, 'fnl': s2b},
+        's25': {'tsp': int, 'nck': str, 'wr1': s2b, 'rr1': str, 'wr2': s2b, 'rr2': str, 'fnl': str},
+        'y25': {'tsp': int, 'nck': str, 'sts': int, 'nmb': str, 'why': str, 'jtk': s2b, 'gms': s2b, 'lgc': s2b,
+                'bed': s2b, 'way': int, 'car': str, 'wsh': str, 'liv': str, 'ugo': s2b}})
 
-    s2ic = str.isdigit
-    s2bc = ['0', '1'].__contains__
-    text2info_check = (s2ic, s2ic, bool, bool, bool,
-                       {'s24': {'tsp': s2ic, 'nck': bool, 'lr1': s2bc, 'wr1': s2bc, 'wr2': s2bc, 'nyt': s2bc,
-                                'fnl': s2bc},
-                        's25': {'tsp': s2ic, 'nck': bool, 'wr1': s2bc, 'rr1': bool, 'wr2': s2bc, 'rr2': bool,
-                                'fnl': bool},
-                        'y25': {}})
+    t2ic = str.isdigit  # text to integer check
+    t2bc = ['0', '1'].__contains__  # text to bool check
+    text2info_check = (t2ic, t2ic, bool, bool, bool, {
+        's24': {'tsp': t2ic, 'nck': bool, 'lr1': t2bc, 'wr1': t2bc, 'wr2': t2bc, 'nyt': t2bc, 'fnl': t2bc},
+        's25': {'tsp': t2ic, 'nck': bool, 'wr1': t2bc, 'rr1': t2ic, 'wr2': t2bc, 'rr2': t2ic, 'fnl': t2ic},
+        'y25': {'tsp': t2ic, 'nck': bool, 'sts': t2ic, 'nmb': bool, 'why': bool, 'jtk': t2bc, 'gms': t2bc, 'lgc': t2bc,
+                'bed': t2bc, 'way': t2ic, 'car': bool, 'wsh': bool, 'liv': bool, 'ugo': t2bc}})
 
-    b2t = lambda b: 'Да' if b else 'Нет'
-    info2text = (str, str, str, str, str,
-                 {'s24': {'tsp': ts2str, 'nck': str, 'lr1': b2t, 'wr1': b2t, 'wr2': b2t, 'nyt': b2t, 'fnl': b2t},
-                  's25': {'tsp': ts2str, 'nck': str, 'wr1': b2t, 'rr1': str, 'wr2': b2t, 'rr2': str, 'fnl': str},
-                  'y25': {}})
+    b2t = lambda b: 'Да' if b else 'Нет'  # bool to text
+    sts2t = ('Действующий студент', 'Выпускник / отчисляш', 'Сотрудник', 'Не из ИТМО').__getitem__
+    way2t = ('На бесплатном трансфере от ГК', 'Своим ходом (электричка)', 'Своим ходом (на машине)').__getitem__
+    opt = lambda x: x or 'Нет данных'
+    wsh_opt = lambda x: x or 'Мне всё равно'
+    info2text = (str, str, str, str, str, {
+        's24': {'tsp': ts2str, 'nck': opt, 'lr1': b2t, 'wr1': b2t, 'wr2': b2t, 'nyt': b2t, 'fnl': b2t},
+        's25': {'tsp': ts2str, 'nck': opt, 'wr1': b2t, 'rr1': opt, 'wr2': b2t, 'rr2': opt, 'fnl': opt},
+        'y25': {'tsp': ts2str, 'nck': opt, 'sts': sts2t, 'nmb': opt, 'why': opt, 'jtk': b2t, 'gms': b2t, 'lgc': b2t,
+                'bed': b2t, 'way': way2t, 'car': opt, 'wsh': wsh_opt, 'liv': opt, 'ugo': b2t}})
 
-    b2s = lambda b: '1' if b else '0'
+    b2s = lambda b: '1' if b else '0'  # bool to string
     db2save = (str, str, str, str, str, json.dumps)
 
     keys = ('isu', 'uid', 'fio', 'grp', 'nck', 'met')
@@ -223,6 +273,8 @@ class UserList:
             return False
         self.db.clear()
 
+        yagodnoe_injection()
+
         changes = False
         incorrect_uids = list[tuple[str]]()
         incorrect_isus = list[tuple[str]]()
@@ -235,7 +287,7 @@ class UserList:
                 warn(f'empty {n}-th line in DB')
             if not all(d.isdigit() for d in s[0]):
                 warn(f'isu id is NaN in {n}-th line in DB: {s[0]}')
-                incorrect_isus.append(line)
+                incorrect_isus.append(s)
                 changes = True
             else:
                 result[0] = int(s[0])
@@ -243,11 +295,12 @@ class UserList:
                 used_specials_isus.add(result[0])
             if not all(d.isdigit() for d in s[1]):
                 warn(f'vk id is NaN (isu = {s[0]}) in {n}-th line in DB:', s[1])
-                incorrect_uids.append(line)
+                incorrect_uids.append(s)
+                result[1] = -1
                 changes = True
             else:
                 result[1] = int(s[1])
-            if result[1] <= 1:
+            if 0 <= result[1] <= 1:
                 self.errors.append(s)
                 if s in incorrect_isus:
                     incorrect_isus.remove(s)
@@ -260,7 +313,7 @@ class UserList:
             result[3] = s[3]
             result[4] = s[4]
             if is_json(s[5]) is False:
-                warn(f'something wrong with meta  info (isu = {s[0]}) in {n}-th line in DB:', s[5])
+                warn(f'something wrong with meta info (isu = {s[0]}) in {n}-th line in DB:', s[5])
                 self.errors.append(s)
                 if s in incorrect_isus:
                     incorrect_isus.remove(s)
@@ -286,9 +339,9 @@ class UserList:
             incorrect_isus[i] = tuple(corrected)
         # достаём все vk_uid через vk_link
         for i in range(0, len(incorrect_uids), 25):
-            part = [incorrect_uids[j][1] for j in range(i, min(i + 25, len(incorrect_uids)))]
+            part = [j[1] for j in incorrect_uids[i:i + 25]]
             links = []
-            for isu, uid in part:
+            for uid in part:
                 start = uid.rfind('/') + 1
                 if start == -1:
                     start = uid.find('@') + 1
@@ -296,7 +349,7 @@ class UserList:
                     start = 0
                 links.append(uid[start:])
             response: list[str] = self.vk_helper.links_to_uids(links)
-            for j, uid in zip(range(i, min(i + 25, len(incorrect_uids))), response):
+            for j, uid in zip(range(i, i + 25), response):
                 user = list(incorrect_uids[j])
                 user[1] = str(uid)
                 incorrect_uids[j] = tuple(user)
@@ -472,6 +525,13 @@ def flat_info(info: User.info2text) -> dict[str]:
 
 
 def format_message(msg: str, user: User.info2text, **additional) -> str:
+    # info = flat_info(user.info)
+    # formating = {key: value for key, value in info.items()}
+    # for key in formating:
+    #     f = User.flat_i2t[key]
+    #     print(formating[key])
+    #     formating[key] = f(formating[key])
+    # return msg.format(**formating, **additional)
     return msg.format(**{key: User.flat_i2t[key](value) for key, value in flat_info(user.info).items()}, **additional)
 
 
@@ -582,8 +642,9 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
     elif uid in users.uid_to_isu:
         isu = users.uid_to_isu[uid]
         user = users.get(isu)
-        if yagodnoy_message != '':
-            tts = format_message(yagodnoy_message, user)
+        if 'y25' in user.met.keys() and user.met['y25']['ugo'] is True:
+            tts = format_message(y25_message, user,
+                                 part2=(format_message(y25_second_part, user) if user.met['y25']['way'] == 2 else ''))
         elif 's25' in user.met.keys():
             tts = format_message(s25_message, user,
                                  part2=(format_message(s25_second_part, user) if user.met['s25']['wr1'] else ''),
@@ -600,3 +661,64 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
         'peer_id': uid,
         'message': tts
     }]
+
+
+def yagodnoe_injection() -> None:
+    with open('./subscribers/yagodnoe.txt', 'r', encoding='UTF-8') as file:
+        yagodnoe = file.read()
+        yagodnoe = re.compile(r'(\t"[^"]*"\t)').sub(lambda x: x.group(0).replace('\n', '\\n'), yagodnoe)
+        yagodnoe = [[j.strip('"') for j in i.replace('\\n', '\n').split('\t')] for i in yagodnoe.split('\n')]
+
+    with open('./subscribers/users.txt', 'r', encoding='UTF-8') as file:
+        users = [i.split('\t') for i in file.read().strip().split('\n')]
+        for user in users:
+            meta = json.loads(user[5])
+            user[5] = json.dumps(meta, ensure_ascii=False)
+        special_uid = [int(i[0]) for i in users if int(i[0]) < 100000]
+        special_uid = (max(i for i in special_uid if i < 100000 or 999999 < i) + 1) if special_uid else 0
+        users = {int(i[0]): i for i in users}
+
+    keys = ('tsp', 'nck', 'sts', 'nmb', 'why', 'jtk', 'gms', 'lgc', 'bed', 'way', 'car', 'wsh', 'liv', 'ugo')
+    for line in yagodnoe[1:]:
+        tsp = int(datetime.strptime(line[1], '%Y-%m-%d %H:%M:%S').timestamp())
+        nck = line[2]
+        sts = ('Действующий студент', 'Выпускник / отчисляш', 'Сотрудник', 'Не из ИТМО').index(line[3])
+        isu = int(line[4]) if line[4].isdigit() and 100000 <= int(line[4]) <= 999999 else special_uid
+        if isu == special_uid:
+            for i in range(special_uid):
+                meta = json.loads(users[i][5])
+                if 'y25' in meta.keys() and meta['y25']['tsp'] == tsp:
+                    isu = i
+                    break
+            else:
+                special_uid += 1
+        fio = line[5]
+        nmb = line[6].lstrip('`')
+        uid = line[7]
+        why = line[8]
+        jtk = bool(line[9])
+        gms = bool(line[10])
+        leg = bool(line[11])
+        bed = bool(line[12])
+        way = ('На бесплатном трансфере от ГК', 'Своим ходом (электричка)', 'Своим ходом (на машине)').index(line[13])
+        car = line[14]
+        wsh = line[15] if line[15] != 'Мне всё равно' else ''
+        liv = line[17] if len(line) >= 18 else ''
+        ugo = line[18] == '1' if len(line) >= 19 else False
+        if isu in users.keys():
+            users[isu][1] = uid
+            users[isu][4] = nck
+            meta = json.loads(users[isu][5])
+            values = (tsp, nck, sts, nmb, why, jtk, gms, leg, bed, way, car, wsh, liv, ugo)
+            meta['y25'] = {key: value for key, value in zip(keys, values)}
+            users[isu][5] = json.dumps(meta, ensure_ascii=False)
+            print('User updated:', users[isu])
+        else:
+            values = (tsp, nck, sts, nmb, why, jtk, gms, leg, bed, way, car, wsh, liv, ugo)
+            meta = {'y25': {key: value for key, value in zip(keys, values)}}
+            user = [str(isu), uid, fio, '', nck, json.dumps(meta, ensure_ascii=False)]
+            users[isu] = user
+            print('New user:    ', user)
+    with open('./subscribers/users.txt', 'w', encoding='UTF-8') as file:
+        file.write('\n'.join(sorted('\t'.join(users[isu]) for isu in users.keys())))
+    print('Done!')

@@ -1,9 +1,4 @@
-source/passwords.txt
-source/token.txt
-source/subscribers/spartakiada24.txt
-source/subscribers/spartakiada25.txt
-source/ignored.txt
-source/subscribers/users.txt
+source/subscribers
 source/__pycache__
 source/.idea
 source/py.log
