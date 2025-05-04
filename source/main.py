@@ -33,6 +33,7 @@ class Main:
                 self.error(e)
                 self.VK.send_messages([{'peer_id': uid, 'message': str(e)} for uid in admin])
                 traceback.print_exc()
+                sleep(60)
 
     def process_event(self, event):
         if event.type == VkBotEventType.MESSAGE_NEW:

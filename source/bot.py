@@ -209,7 +209,7 @@ class User:
     # isu, uid, fio, grp, nck, met: {
     # s24: {tsp, nck, lr1, wr1, wr2, nyt, fnl},
     # s25: {tsp, nck, wr1, rr1, wr2, rr2, fnl},
-    # y25: {tsp, nck, sts, nmb, why, jtk, gms, lgc, bed, way, car, liv}}
+    # y25: {tsp, nck, sts, nmb, why, jtk, gms, lgc, bed, way, car, wsh, liv, ugo}}
     info_type = tuple[int, int, str, str, str, dict[str: dict[str: str | int | bool]]]
     s2b = lambda s: s == '1'
     load2info = (int, int, str, str, str, json.loads)
@@ -670,7 +670,7 @@ def yagodnoe_injection() -> None:
         yagodnoe = [[j.strip('"') for j in i.replace('\\n', '\n').split('\t')] for i in yagodnoe.split('\n')]
 
     with open('./subscribers/users.txt', 'r', encoding='UTF-8') as file:
-        users = [i.split('\t') for i in file.read().strip().split('\n')]
+        users = [i.split('\t') for i in file.read().strip().split('\n') if i]
         for user in users:
             meta = json.loads(user[5])
             user[5] = json.dumps(meta, ensure_ascii=False)
