@@ -53,7 +53,7 @@ class Main:
             return 0
         counter = 0
         for i in range(0, len(actions), 25):
-            chunk = actions[i:min(i + 25, len(actions))]
+            chunk = actions[i:i + 25]
             responses = self.VK.send_messages(chunk)
             for action, response in zip(chunk, responses):
                 if not response:
