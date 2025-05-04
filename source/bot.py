@@ -61,8 +61,25 @@ y25_message = '''
 {met_y25_bed}
 
 Как планируешь добираться до Ягодного:
-{met_y25_way}
-'''
+{met_y25_way}{part2}
+
+Твоя мотивация:
+```
+{met_y25_why}
+```
+
+Твои предпочтения, где будешь жить:
+{met_y25_wsh}
+
+С кем ты живёшь:
+{met_y25_liv}
+'''.strip()
+
+y25_second_part = '''
+
+Номер машины:
+{met_y25_car}
+'''.rstrip()
 
 s25_message = '''
 Вот твои данные за Спартакиаду по Майнкрафту 2025!
@@ -180,7 +197,7 @@ def flat_info2text() -> dict[str]:
     result = {key: value for key, value in zip(User.keys[:-1], User.info2text[:-1])}
     for n, key in enumerate(tokens[3][:-1]):
         result[key] = User.info2text[n]
-    for n, event in enumerate(tokens[4][:-1]):
+    for n, event in enumerate(tokens[4]):
         for key in tokens[5][n]:
             result[f'met_{event}_{key}'] = User.info2text[5][event][key]
     result['met_s24_h10'] = User.b2t
@@ -200,27 +217,27 @@ class User:
     text2info = (int, int, str, str, str, {
         's24': {'tsp': int, 'nck': str, 'lr1': s2b, 'wr1': s2b, 'wr2': s2b, 'nyt': s2b, 'fnl': s2b},
         's25': {'tsp': int, 'nck': str, 'wr1': s2b, 'rr1': str, 'wr2': s2b, 'rr2': str, 'fnl': str},
-        'y25': {'tsp': int, 'nck': str, 'sts': int, 'nmb': str, 'cnd': str,
-                'jtk': s2b, 'gms': s2b, 'lgc': s2b, 'bed': s2b, 'way': int, 'car': str, 'liv': str}})
+        'y25': {'tsp': int, 'nck': str, 'sts': int, 'nmb': str, 'why': str, 'jtk': s2b, 'gms': s2b, 'lgc': s2b,
+                'bed': s2b, 'way': int, 'car': str, 'wsh': str, 'liv': str, 'ugo': s2b}})
 
     t2ic = str.isdigit  # text to integer check
     t2bc = ['0', '1'].__contains__  # text to bool check
     text2info_check = (t2ic, t2ic, bool, bool, bool, {
         's24': {'tsp': t2ic, 'nck': bool, 'lr1': t2bc, 'wr1': t2bc, 'wr2': t2bc, 'nyt': t2bc, 'fnl': t2bc},
         's25': {'tsp': t2ic, 'nck': bool, 'wr1': t2bc, 'rr1': t2ic, 'wr2': t2bc, 'rr2': t2ic, 'fnl': t2ic},
-        'y25': {'tsp': t2ic, 'nck': bool, 'sts': t2ic, 'nmb': bool, 'cnd': bool,
-                'jtk': t2bc, 'gms': t2bc, 'lgc': t2bc, 'bed': t2bc, 'way': t2ic, 'car': bool, 'liv': bool}})
+        'y25': {'tsp': t2ic, 'nck': bool, 'sts': t2ic, 'nmb': bool, 'why': bool, 'jtk': t2bc, 'gms': t2bc, 'lgc': t2bc,
+                'bed': t2bc, 'way': t2ic, 'car': bool, 'wsh': bool, 'liv': bool, 'ugo': t2bc}})
 
     b2t = lambda b: 'Да' if b else 'Нет'  # bool to text
-    sts2t = ('На бесплатном трансфере от ГК', 'Своим ходом (электричка)', 'Своим ходом (на машине)').__getitem__
-    way2t = ('Действующий студент', 'Выпускник / отчисляш', 'Сотрудник', 'Не из ИТМО').__getitem__
+    sts2t = ('Действующий студент', 'Выпускник / отчисляш', 'Сотрудник', 'Не из ИТМО').__getitem__
+    way2t = ('На бесплатном трансфере от ГК', 'Своим ходом (электричка)', 'Своим ходом (на машине)').__getitem__
     opt = lambda x: x or 'Нет данных'
-    liv_opt = lambda x: x or 'Мне всё равно'
+    wsh_opt = lambda x: x or 'Мне всё равно'
     info2text = (str, str, str, str, str, {
         's24': {'tsp': ts2str, 'nck': opt, 'lr1': b2t, 'wr1': b2t, 'wr2': b2t, 'nyt': b2t, 'fnl': b2t},
         's25': {'tsp': ts2str, 'nck': opt, 'wr1': b2t, 'rr1': opt, 'wr2': b2t, 'rr2': opt, 'fnl': opt},
-        'y25': {'tsp': ts2str, 'nck': opt, 'sts': sts2t, 'nmb': opt, 'cnd': opt,
-                'jtk': b2t, 'gms': b2t, 'lgc': b2t, 'bed': b2t, 'way': way2t, 'car': opt, 'liv': liv_opt}})
+        'y25': {'tsp': ts2str, 'nck': opt, 'sts': sts2t, 'nmb': opt, 'why': opt, 'jtk': b2t, 'gms': b2t, 'lgc': b2t,
+                'bed': b2t, 'way': way2t, 'car': opt, 'wsh': wsh_opt, 'liv': opt, 'ugo': b2t}})
 
     b2s = lambda b: '1' if b else '0'  # bool to string
     db2save = (str, str, str, str, str, json.dumps)
@@ -508,6 +525,13 @@ def flat_info(info: User.info2text) -> dict[str]:
 
 
 def format_message(msg: str, user: User.info2text, **additional) -> str:
+    # info = flat_info(user.info)
+    # formating = {key: value for key, value in info.items()}
+    # for key in formating:
+    #     f = User.flat_i2t[key]
+    #     print(formating[key])
+    #     formating[key] = f(formating[key])
+    # return msg.format(**formating, **additional)
     return msg.format(**{key: User.flat_i2t[key](value) for key, value in flat_info(user.info).items()}, **additional)
 
 
@@ -618,8 +642,9 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
     elif uid in users.uid_to_isu:
         isu = users.uid_to_isu[uid]
         user = users.get(isu)
-        if yagodnoy_message != '':
-            tts = format_message(yagodnoy_message, user)
+        if 'y25' in user.met.keys() and user.met['y25']['ugo'] is True:
+            tts = format_message(y25_message, user,
+                                 part2=(format_message(y25_second_part, user) if user.met['y25']['way'] == 2 else ''))
         elif 's25' in user.met.keys():
             tts = format_message(s25_message, user,
                                  part2=(format_message(s25_second_part, user) if user.met['s25']['wr1'] else ''),
