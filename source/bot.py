@@ -20,8 +20,6 @@ telegram_link = 't.me/itmocraft'
 discord_link = 'https://discord.gg/YVj5tckahA'
 vk_link = 'https://vk.com/widget_community.php?act=a_subscribe_box&oid=-217494619&state=1|ITMOcraft'
 
-yagodnoy_message = ''
-
 info_message = (
     f'Добро пожаловать в клуб любителей Майнкрафта ITMOcraft! Наш клуб — комьюнити итмошников, которым нравится играть '
     f'в майнкрафт во всех его проявлениях: Выживание, моды, мини-игры: если во что-то можно играть, '
@@ -44,11 +42,26 @@ info_message = (
 y25_message = '''
 Вот твои данные по выезду в Ягодное 2025!
 
+Статус в ИТМО:
+{met_y25_sts}
+
 ИСУ:
 {isu}
 
 Ник:
-{nck
+{nck}
+
+ФИО:
+{fio}
+
+Номер телефона:
+{met_y25_nmb}
+
+Планируешь ли взять бельё в ягодном:
+{met_y25_bed}
+
+Как планируешь добираться до Ягодного:
+{met_y25_way}
 '''
 
 s25_message = '''
@@ -640,7 +653,7 @@ def yagodnoe_injection() -> None:
         special_uid = (max(i for i in special_uid if i < 100000 or 999999 < i) + 1) if special_uid else 0
         users = {int(i[0]): i for i in users}
 
-    keys = ('tsp', 'nck', 'sts', 'nmb', 'why', 'jtk', 'gms', 'lgc', 'bed', 'way', 'car', 'liv')
+    keys = ('tsp', 'nck', 'sts', 'nmb', 'why', 'jtk', 'gms', 'lgc', 'bed', 'way', 'car', 'wsh', 'liv', 'ugo')
     for line in yagodnoe[1:]:
         tsp = int(datetime.strptime(line[1], '%Y-%m-%d %H:%M:%S').timestamp())
         nck = line[2]
@@ -664,17 +677,19 @@ def yagodnoe_injection() -> None:
         bed = bool(line[12])
         way = ('На бесплатном трансфере от ГК', 'Своим ходом (электричка)', 'Своим ходом (на машине)').index(line[13])
         car = line[14]
-        liv = line[15] if line[15] != 'Мне всё равно' else ''
+        wsh = line[15] if line[15] != 'Мне всё равно' else ''
+        liv = line[17] if len(line) >= 18 else ''
+        ugo = line[18] == '1' if len(line) >= 19 else False
         if isu in users.keys():
             users[isu][1] = uid
             users[isu][4] = nck
             meta = json.loads(users[isu][5])
-            values = (tsp, nck, sts, nmb, why, jtk, gms, leg, bed, way, car, liv)
+            values = (tsp, nck, sts, nmb, why, jtk, gms, leg, bed, way, car, wsh, liv, ugo)
             meta['y25'] = {key: value for key, value in zip(keys, values)}
             users[isu][5] = json.dumps(meta, ensure_ascii=False)
             print('User updated:', users[isu])
         else:
-            values = (tsp, nck, sts, nmb, why, jtk, gms, leg, bed, way, car, liv)
+            values = (tsp, nck, sts, nmb, why, jtk, gms, leg, bed, way, car, wsh, liv, ugo)
             meta = {'y25': {key: value for key, value in zip(keys, values)}}
             user = [str(isu), uid, fio, '', nck, json.dumps(meta, ensure_ascii=False)]
             users[isu] = user
