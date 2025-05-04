@@ -674,7 +674,7 @@ def yagodnoe_injection() -> None:
         sts = ('Действующий студент', 'Выпускник / отчисляш', 'Сотрудник', 'Не из ИТМО').index(line[3])
         isu = int(line[4]) if line[4].isdigit() and 100000 <= int(line[4]) <= 999999 else special_uid
         if isu == special_uid:
-            for i in range(special_uid):
+            for i in range(special_uid - 1):
                 meta = json.loads(users[i][5])
                 if 'y25' in meta.keys() and meta['y25']['tsp'] == tsp:
                     isu = i
