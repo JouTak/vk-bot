@@ -5,6 +5,7 @@ from utils import IgnoredList, initialize
 from utils import VKHelper
 from utils.log import *
 from bot import *
+from time import sleep
 
 
 class Main:
@@ -67,5 +68,11 @@ class Main:
 
 
 if __name__ == '__main__':
-    bot = Main()
+    bot = None
+    while bot is None:
+        try:
+            bot = Main()
+        except Exception as e:
+            print(e)
+            sleep(60)
     bot.run()
