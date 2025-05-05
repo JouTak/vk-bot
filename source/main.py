@@ -67,11 +67,5 @@ class Main:
 
 
 if __name__ == '__main__':
-    bot = None
-    while bot is None:
-        try:
-            bot = Main()
-        except Exception as e:
-            print(e)
-            sleep(60)
+    bot = Main()
     bot.run()
