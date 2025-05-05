@@ -6,6 +6,7 @@ from utils import VKHelper
 from utils.log import *
 from bot import *
 from time import sleep
+import requests
 
 
 class Main:
@@ -28,7 +29,7 @@ class Main:
             try:
                 for event in self.longpoll.listen():
                     self.process_event(event)
-            except vk_api.VkRequestsPoolException:
+            except requests.exceptions.ReadTimeout:
                 pass
             except Exception as e:
                 self.error(e)

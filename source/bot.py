@@ -674,6 +674,7 @@ def yagodnoe_injection() -> None:
     with open('./subscribers/users.txt', 'r', encoding='UTF-8') as file:
         users = [i.split('\t') for i in file.read().strip().split('\n') if i]
         for user in users:
+            print(user)
             meta = json.loads(user[5])
             user[5] = json.dumps(meta, ensure_ascii=False)
         special_uid = [int(i[0]) for i in users if int(i[0]) < 100000]
