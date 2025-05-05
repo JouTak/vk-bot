@@ -665,7 +665,7 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
 
 def yagodnoe_injection() -> None:
     with open('./subscribers/yagodnoe.txt', 'r', encoding='UTF-8') as file:
-        yagodnoe = file.read()
+        yagodnoe = file.read().strip()
         yagodnoe = re.compile(r'(\t"[^"]*"\t)').sub(lambda x: x.group(0).replace('\n', '\\n'), yagodnoe)
         yagodnoe = [[j.strip('"') for j in i.replace('\\n', '\n').split('\t')] for i in yagodnoe.split('\n')]
 
