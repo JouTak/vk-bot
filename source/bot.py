@@ -671,6 +671,9 @@ def yagodnoe_injection() -> None:
 
     keys = ('tsp', 'nck', 'sts', 'nmb', 'why', 'jtk', 'gms', 'lgc', 'bed', 'way', 'car', 'wsh', 'liv', 'ugo')
     for line in yagodnoe[1:]:
+        if len(line)<2: 
+            print(line)
+            break
         tsp = int(datetime.strptime(line[1], '%Y-%m-%d %H:%M:%S').timestamp())
         nck = line[2]
         sts = ('Действующий студент', 'Выпускник / отчисляш', 'Сотрудник', 'Не из ИТМО').index(line[3])
