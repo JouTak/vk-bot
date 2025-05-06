@@ -26,15 +26,8 @@ class Main:
 
     def run(self):
         while True:
-            try:
-                for event in self.longpoll.listen():
-                    self.process_event(event)
-            except requests.exceptions.ReadTimeout:
-                pass
-            except Exception as e:
-                self.error(e)
-                self.VK.send_messages([{'peer_id': uid, 'message': str(e)} for uid in admin])
-                traceback.print_exc()
+            for event in self.longpoll.listen():
+                self.process_event(event)
 
     def process_event(self, event):
         if event.type == VkBotEventType.MESSAGE_NEW:
@@ -69,4 +62,12 @@ class Main:
 
 if __name__ == '__main__':
     bot = Main()
-    bot.run()
+    while True:
+        try:
+            bot.run()
+        except requests.exceptions.ReadTimeout:
+            pass
+        except Exception as e:
+            bot.error(e)
+            bot.VK.send_messages([{'peer_id': uid, 'message': str(e)} for uid in admin])
+            traceback.print_exc()
