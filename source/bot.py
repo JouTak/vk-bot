@@ -422,10 +422,10 @@ def check_condition(cond: str, errors: list = None) -> str | None:
                     errors.append(f'A | too many args in "{cond}"')
                 if len(c) < 2:
                     errors.append(f'B | not enough args in "{cond}"')
-                if not check_condition(c[0], errors):
-                    errors.append(f'C | token "{c[0]}" in "{cond}" is unknown')
-                if c[1] not in tokens[4]:
-                    errors.append(f'D | token "{c[1]}" in "{cond}" is unknown')
+                if c[0] not in tokens[4]:
+                    check_condition(c[0], errors)
+                if c[1] != 'met':
+                    errors.append(f'C | token "{c[1]}" in "{cond}" is unknown')
         if is_first is True:
             return 'ok' if len(errors) == 0 else '\n'.join(errors)
         return
@@ -434,12 +434,18 @@ def check_condition(cond: str, errors: list = None) -> str | None:
             if token in cond:
                 c = cond.split(token)
                 if len(c) > 2:
-                    errors.append('E | too many args in ' + cond)
+                    errors.append('D | too many args in ' + cond)
                 if len(c) < 2:
-                    errors.append('F | not enough args in ' + cond)
+                    errors.append('E | not enough args in ' + cond)
                 check_condition(c[0], errors)
-                # if not UserList.db_t_check[tokens[3].index(c[0])](c[1]):
-                #     errors.append(f'token "{c[1]}" in "{cond}" has wrong type')
+                t = c[0].split('.')
+                if t[0] not in tokens[3]:
+                    errors.append(f'F | token "{t[0]}" in "{cond}" is unknown')
+                if len(t) == 1 and c[0] in tokens[2] and not User.text2info_check[tokens[2].index(c[0])](c[1]):
+                    errors.append(f'G | token "{c[1]}" in "{cond}" has wrong type')
+                elif len(t) == 3 and t[0] == 'met' and t[1] in tokens[4] and t[2] in tokens[5][tokens[4].index(t[1])]:
+                    if not User.text2info_check[5][t[1]][t[2]](c[1]):
+                        errors.append(f'H | token "{c[1]}" in "{cond}" has wrong type')
         if is_first is True:
             return 'ok' if len(errors) == 0 else '\n'.join(errors)
         return
@@ -447,24 +453,24 @@ def check_condition(cond: str, errors: list = None) -> str | None:
         c = cond.split('.')
         if c[0] == 'met':
             if len(c) == 2:
-                errors.append(f'G | token "{c[1]}" in "{cond}" is unknown')
+                errors.append(f'I | token "{c[1]}" in "{cond}" is unknown')
             elif len(c) == 3:
                 if c[1] not in tokens[4]:
-                    errors.append(f'H | token "{c[1]}" in "{cond}" is unknown')
+                    errors.append(f'J | token "{c[1]}" in "{cond}" is unknown')
                 elif c[2] not in tokens[5][tokens[4].index(c[1])]:
-                    errors.append(f'I | token "{c[2]}" in "{cond}" is unknown')
+                    errors.append(f'K | token "{c[2]}" in "{cond}" is unknown')
             else:
-                errors.append('J | too many args in ' + cond)
+                errors.append('L | too many args in ' + cond)
         else:
-            errors.append(f'K | token "{c[0]}" in "{cond}" is unknown')
+            errors.append(f'M | token "{c[0]}" in "{cond}" is unknown')
         if is_first is True:
-            return 'L | not enough conditions'
+            return 'N | not enough conditions'
         return
     elif cond not in tokens[3]:
-        errors.append(f'M | token "{cond}" is unknown')
+        errors.append(f'O | token "{cond}" is unknown')
     else:
         if is_first is True:
-            return 'N | no matches with any token' if len(errors) == 0 else '\n'.join(errors)
+            return 'P | no matches with any token' if len(errors) == 0 else '\n'.join(errors)
         return
 
 
@@ -473,12 +479,12 @@ def eval_condition(user: tuple, cond: str) -> bool:
         return any(eval_condition(user, i) for i in cond.split('|'))
     if '&' in cond:
         return all(eval_condition(user, i) for i in cond.split('&'))
-    # if '->' in cond:
-    #     c = cond.split('->')
-    #     return user[tokens[3].index(c[0])] in [spartakiada24_subs, spartakiada25_subs, admin][tokens[4].index(c[1])]
-    # if '!>' in cond:
-    #     c = cond.split('!>')
-    #     return user[tokens[3].index(c[0])] not in [spartakiada24_subs, spartakiada25_subs, admin][tokens[4].index(c[1])]
+    if '->' in cond:
+        c = cond.split('->')
+        return c[0] in user[5].keys()
+    if '!>' in cond:
+        c = cond.split('!>')
+        return c[0] not in user[5].keys()
     for n, token in enumerate(tokens[2]):
         if token in cond:
             c = cond.split(token)
