@@ -26,24 +26,37 @@ sender [some_logic] <message>
 << - less than
 <= - less than or equals
 
-tsp - timestamp
-uid - vk_uid
-nck - nickname
-grp - group_id
-fio - fio
-fst - first_time
-wr1 - won_round_1
-h10 - has_10_balls
-rr1 - record_round_1
-wr2 - won_round_2
-rr2 - record_round_2
-fnl - final_place
-rr3 - record_round_3
+Формат БД:
+isu, uid, fio, grp, nck, met: {
+s24: {tsp, nck, lr1, wr1, wr2, nyt, fnl},
+s25: {tsp, nck, wr1, rr1, wr2, rr2, fnl},
+y25: {tsp, nck, sts, nmb, why, jtk, gms, lgc, bed, way, car, wsh, liv, ugo}}
+isu — ИСУ (спец номера от 0 до 99999, если не из ИТМО)
+uid — ссылка ВК, если ещё не обработана, иначе VK id
+fio — ФИО
+grp — group, группа ('', если не из ИТМО)
+nck — nick, никнейм в Майнкрафте
+met — словарь с мета-данными об ивентах
 
+tsp — timestamp, время заполнения формы в формате unix timestamp
+wrN — win round N, выиграл ли первый раунд
+lrN — loose round N, истратил ли все попытки (одновременно и этим может и выиграть (wr1==1))
+rrN — round record N, наилучший результат в раунде
+nyt — not yet — ещё не играл в финале
+fnl — играл ли в финале (s24), либо какое место в нём занял (s25)
 
-s24 - spartakiada24_subs
-s25 - spartakiada25_subs
-adm - admin
+sts — status, статус в ИТМО (является индексом из ('Действующий студент', 'Выпускник / отчисляш', 'Сотрудник', 'Не из ИТМО'))
+nmb — number, номер телефона
+why — мотивация поехать
+jtk — JouTak, играл ли на JouTak
+gms — Mini Games, играл ли в Mini Games
+lgc — Legacy, играл ли на Legacy
+bed — планирует ли взять бельё
+way — способ, каким чел добирается (индекс из ('На бесплатном трансфере от ГК', 'Своим ходом (электричка)', 'Своим ходом (на машине)'))
+car — номер машины, если добирается на машине, иначе '-'
+wsh — wish, с кем чел предпочитает жить
+liv — с кем чел живёт
+ugo — you go, поедет ли чел
 
 
 &, |, ->, !>, ==, !=, >>, >=, <<, <= - logic
