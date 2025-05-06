@@ -7,6 +7,6 @@ def initialize():
     # with open('token.txt', 'r') as f:
     #     token = f.readline()
     token = os.getenv('BOT_TOKEN')
-    group_id = int(os.getenv('GROUP_ID'))
+    group_id = os.getenv('GROUP_ID')
 
     return token, group_id

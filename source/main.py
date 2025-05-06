@@ -22,7 +22,7 @@ class Main:
         self.users = UserList(users_path, self.VK)
         print('\n'.join(warnings))
 
-        self.info('готов!\n')
+        self.info('Готов!\n')
 
     def run(self):
         while True:
@@ -68,5 +68,11 @@ class Main:
 
 
 if __name__ == '__main__':
-    bot = Main()
+    bot = None
+    while bot is None:
+        try:
+            bot = Main()
+        except Exception as e:
+            print(e)
+            sleep(60)
     bot.run()
