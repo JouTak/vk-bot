@@ -230,7 +230,7 @@ class User:
                 'bed': b2t, 'way': way2t, 'car': opt, 'wsh': wsh_opt, 'liv': opt, 'ugo': ugo2t}})
 
     b2s = lambda b: '1' if b else '0'  # bool to string
-    db2save = (str, str, str, str, str, json.dumps)
+    db2save = (str, str, str, str, str, lambda x: json.dumps(x, ensure_ascii=False))
 
     keys = ('isu', 'uid', 'fio', 'grp', 'nck', 'met')
     flat_i2t: dict[str]
