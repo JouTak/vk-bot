@@ -661,16 +661,13 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
 
 def yagodnoe_injection() -> None:
     with open('./subscribers/yagodnoe.txt', 'r', encoding='UTF-8') as file:
-        yagodnoe = file.read()
-        if yagodnoe[:-1] == '\n':
-            yagodnoe = yagodnoe[:-1]
+        yagodnoe = file.read().replace('""', '\'').strip()
         yagodnoe = re.compile(r'(\t"[^"]*"\t)').sub(lambda x: x.group(0).replace('\n', '\\n'), yagodnoe)
         yagodnoe = [[j.strip('"') for j in i.replace('\\n', '\n').split('\t')] for i in yagodnoe.split('\n')]
 
     with open('./subscribers/users.txt', 'r', encoding='UTF-8') as file:
         users = [i.split('\t') for i in file.read().strip().split('\n') if i]
         for user in users:
-            print(user)
             meta = json.loads(user[5])
             user[5] = json.dumps(meta, ensure_ascii=False)
         special_uid = [int(i[0]) for i in users if int(i[0]) < 100000]
