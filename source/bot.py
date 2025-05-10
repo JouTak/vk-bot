@@ -220,7 +220,7 @@ class User:
     b2t = lambda b: 'Да' if b else 'Нет'  # bool to text
     sts2t = ('Действующий студент', 'Выпускник / отчисляш', 'Сотрудник', 'Не из ИТМО').__getitem__
     way2t = ('На бесплатном трансфере от ГК', 'Своим ходом (электричка)', 'Своим ходом (на машине)').__getitem__
-    opt = lambda x: x or 'Нет данных'
+    opt = lambda x: x or '[НЕТ ДАННЫХ]'
     wsh_opt = lambda x: x or 'Мне всё равно'
     ugo2t = ('Нет.', 'Да, ты прошёл отбор, ждём оплату!', 'Оплата дошла до нас, ты едешь!').__getitem__
     info2text = (str, str, str, str, str, {
@@ -254,6 +254,8 @@ class UserList:
         self.errors = list[tuple[str]]()
         self.path = path
         self.vk_helper = vk_helper
+        self.max_special_isu = 0
+        self.used_specials_isus = set()
         if self.load() is False:
             raise OSError('Something went wrong while loading DB')
 
@@ -268,7 +270,6 @@ class UserList:
         changes = False
         incorrect_uids = list[tuple[str]]()
         incorrect_isus = list[tuple[str]]()
-        used_specials_isus = set()
 
         def parse_line(n: int, s: tuple[str, ...]) -> tuple | None:
             nonlocal changes
@@ -282,7 +283,7 @@ class UserList:
             else:
                 result[0] = int(s[0])
             if not 100000 <= result[0] <= 999999:
-                used_specials_isus.add(result[0])
+                self.used_specials_isus.add(result[0])
             if not all(d.isdigit() for d in s[1]):
                 warn(f'vk id is NaN (isu = {s[0]}) in {n}-th line in DB:', s[1])
                 incorrect_uids.append(s)
@@ -320,12 +321,9 @@ class UserList:
                 if user_info is not None:
                     self.db[user_info[0]] = User(user_info)
         # выдаём special isu для нетакусь:
-        special_isu = 1
         for i in range(len(incorrect_isus)):
-            while special_isu in used_specials_isus:
-                special_isu += 1
             corrected = list(incorrect_isus[i])
-            corrected[0] = str(special_isu)
+            corrected[0] = str(self.get_new_special_isu())
             incorrect_isus[i] = tuple(corrected)
         # достаём все vk_uid через vk_link
         for i in range(0, len(incorrect_uids), 25):
@@ -366,7 +364,7 @@ class UserList:
         # делаем штуку для быстрого доступа к пользователю через uid
         for isu in self.db.keys():
             user = self.db[isu]
-            if user.uid != 0:
+            if not (0 <= user.uid <= 1):
                 self.uid_to_isu[user.uid] = isu
         if changes is True:
             return self.save()
@@ -379,13 +377,27 @@ class UserList:
         for isu in self.db.keys():
             to_save.append('\t'.join(f(i) for f, i in zip(User.db2save, self.db[isu].info)))
         to_save.extend(map('\t'.join, self.errors))
-        to_save.sort()
+        to_save.sort(key=lambda x: int(x.split('\t')[0]) if x.split('\t')[0].isdigit() else -1)
         with open(users_path, 'w', encoding='UTF-8') as file:
             file.write('\n'.join(to_save))
         return True
 
     def get(self, isu: int) -> User | None:
         return self.db[isu] if isu in self.db.keys() else None
+
+    def add(self, info: tuple[int, int, str, str, str, dict[str: dict[str: str | int | bool]]]) -> User:
+        if info[0] == -1:
+            info = tuple([self.get_new_special_isu()] + list(info[1:]))
+        self.db[info[0]] = User(info)
+        if not (0 <= info[1] <= 1):
+            self.uid_to_isu[info[1]] = info[0]
+        return self.db[info[0]]
+
+    def get_new_special_isu(self) -> int:
+        while self.max_special_isu in self.used_specials_isus:
+            self.max_special_isu += 1
+        self.used_specials_isus.add(self.max_special_isu)
+        return self.max_special_isu
 
     def keys(self):
         return self.db.keys()
@@ -572,6 +584,10 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
     username = user_get['last_name']
 
     msg: str = event.message.text
+
+    if not msg:
+        return  # do some other logic if needed
+
     msgs = msg.split()
     if uid in admin:
         if msgs[0] == 'stop':
@@ -590,6 +606,25 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
             return [{
                 'peer_id': uid,
                 'message': tts
+            }]
+        elif msgs[0] == 'add_users':
+            errors = dict[str: str]()
+            for i in set(msgs[1:]):
+                try:
+                    if int(i) in users.uid_to_isu.keys():
+                        raise Exception(f'User {i} is already in database')
+                    users.add((-1, int(i), '', '', '', {}))
+                except Exception as e:
+                    errors[i] = str(e)
+            if errors:
+                tts = '\n'.join(f'Ошибка при добавлении "{key}":\n{errors[key]}\n' for key in errors.keys())
+            else:
+                tts = 'Успешный успех!'
+            if len(set(msgs)) - len(errors.keys()) - 1 != 0:
+                users.save()
+            return [{
+                'peer_id': uid,
+                'message': f'{tts}\n{len(set(msgs)) - len(errors.keys()) - 1} пользователей были успешно добавлены!'
             }]
 
     if event.from_chat:
@@ -670,8 +705,8 @@ def yagodnoe_injection() -> None:
         for user in users:
             meta = json.loads(user[5])
             user[5] = json.dumps(meta, ensure_ascii=False)
-        special_uid = [int(i[0]) for i in users if int(i[0]) < 100000]
-        special_uid = (max(i for i in special_uid if i < 100000 or 999999 < i) + 1) if special_uid else 0
+        max_special_uid = [int(i[0]) for i in users if int(i[0]) < 100000]
+        max_special_uid = max(i for i in max_special_uid if i < 100000 or 999999 < i) if max_special_uid else 0
         users = {int(i[0]): i for i in users}
 
     keys = ('tsp', 'nck', 'sts', 'nmb', 'why', 'jtk', 'gms', 'lgc', 'bed', 'way', 'car', 'wsh', 'liv', 'ugo')
@@ -680,15 +715,15 @@ def yagodnoe_injection() -> None:
             tsp = int(datetime.strptime(line[1], '%Y-%m-%d %H:%M:%S').timestamp())
             nck = line[2]
             sts = ('Действующий студент', 'Выпускник / отчисляш', 'Сотрудник', 'Не из ИТМО').index(line[3])
-            isu = int(line[4]) if line[4].isdigit() and 100000 <= int(line[4]) <= 999999 else special_uid
-            if isu == special_uid:
-                for i in range(special_uid):
+            isu = int(line[4]) if line[4].isdigit() and 100000 <= int(line[4]) <= 999999 else max_special_uid + 1
+            if isu == max_special_uid + 1:
+                for i in range(max_special_uid + 1):
                     meta = json.loads(users[i][5])
                     if 'y25' in meta.keys() and meta['y25']['tsp'] == tsp:
                         isu = i
                         break
                 else:
-                    special_uid += 1
+                    max_special_uid += 1
             fio = line[5]
             nmb = line[6].lstrip('`')
             uid = line[7]
@@ -697,7 +732,8 @@ def yagodnoe_injection() -> None:
             gms = bool(line[10])
             leg = bool(line[11])
             bed = bool(line[12])
-            way = ('На бесплатном трансфере от ГК', 'Своим ходом (электричка)', 'Своим ходом (на машине)').index(line[13])
+            way = ('На бесплатном трансфере от ГК', 'Своим ходом (электричка)', 'Своим ходом (на машине)').index(
+                line[13])
             car = line[14]
             wsh = line[15] if line[15] != 'Мне всё равно' else ''
             liv = line[17] if len(line) >= 18 else ''
