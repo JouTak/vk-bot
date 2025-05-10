@@ -322,10 +322,8 @@ class UserList:
                     self.db[user_info[0]] = User(user_info)
         # выдаём special isu для нетакусь:
         for i in range(len(incorrect_isus)):
-            while self.max_special_isu in self.used_specials_isus:
-                self.max_special_isu += 1
             corrected = list(incorrect_isus[i])
-            corrected[0] = str(self.max_special_isu)
+            corrected[0] = str(self.get_new_special_isu())
             incorrect_isus[i] = tuple(corrected)
         # достаём все vk_uid через vk_link
         for i in range(0, len(incorrect_uids), 25):
@@ -707,8 +705,8 @@ def yagodnoe_injection() -> None:
         for user in users:
             meta = json.loads(user[5])
             user[5] = json.dumps(meta, ensure_ascii=False)
-        special_uid = [int(i[0]) for i in users if int(i[0]) < 100000]
-        special_uid = (max(i for i in special_uid if i < 100000 or 999999 < i) + 1) if special_uid else 0
+        max_special_uid = [int(i[0]) for i in users if int(i[0]) < 100000]
+        max_special_uid = max(i for i in max_special_uid if i < 100000 or 999999 < i) if max_special_uid else 0
         users = {int(i[0]): i for i in users}
 
     keys = ('tsp', 'nck', 'sts', 'nmb', 'why', 'jtk', 'gms', 'lgc', 'bed', 'way', 'car', 'wsh', 'liv', 'ugo')
@@ -717,15 +715,15 @@ def yagodnoe_injection() -> None:
             tsp = int(datetime.strptime(line[1], '%Y-%m-%d %H:%M:%S').timestamp())
             nck = line[2]
             sts = ('Действующий студент', 'Выпускник / отчисляш', 'Сотрудник', 'Не из ИТМО').index(line[3])
-            isu = int(line[4]) if line[4].isdigit() and 100000 <= int(line[4]) <= 999999 else special_uid
-            if isu == special_uid:
-                for i in range(special_uid):
+            isu = int(line[4]) if line[4].isdigit() and 100000 <= int(line[4]) <= 999999 else max_special_uid + 1
+            if isu == max_special_uid + 1:
+                for i in range(max_special_uid + 1):
                     meta = json.loads(users[i][5])
                     if 'y25' in meta.keys() and meta['y25']['tsp'] == tsp:
                         isu = i
                         break
                 else:
-                    special_uid += 1
+                    max_special_uid += 1
             fio = line[5]
             nmb = line[6].lstrip('`')
             uid = line[7]
