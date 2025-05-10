@@ -379,7 +379,7 @@ class UserList:
         for isu in self.db.keys():
             to_save.append('\t'.join(f(i) for f, i in zip(User.db2save, self.db[isu].info)))
         to_save.extend(map('\t'.join, self.errors))
-        to_save.sort()
+        to_save.sort(key=lambda x: int(x.split('\t')[0]) if x.split('\t')[0].isdigit() else -1)
         with open(users_path, 'w', encoding='UTF-8') as file:
             file.write('\n'.join(to_save))
         return True
@@ -622,6 +622,8 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
                 tts = '\n'.join(f'Ошибка при добавлении "{key}":\n{errors[key]}\n' for key in errors.keys())
             else:
                 tts = 'Успешный успех!'
+            if len(set(msgs)) - len(errors.keys()) - 1 != 0:
+                users.save()
             return [{
                 'peer_id': uid,
                 'message': f'{tts}\n{len(set(msgs)) - len(errors.keys()) - 1} пользователей были успешно добавлены!'
