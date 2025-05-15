@@ -740,6 +740,7 @@ def yagodnoe_injection() -> None:
             ugo = int(line[18]) if len(line) >= 19 else 0
             if isu in users.keys():
                 users[isu][1] = uid
+                users[isu][2] = fio
                 users[isu][4] = nck
                 meta = json.loads(users[isu][5])
                 values = (tsp, nck, sts, nmb, why, jtk, gms, leg, bed, way, car, wsh, liv, ugo)
