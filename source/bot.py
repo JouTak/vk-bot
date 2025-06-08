@@ -198,7 +198,7 @@ class User:
     # isu, uid, fio, grp, nck, met: {
     # s24: {tsp, nck, lr1, wr1, wr2, nyt, fnl},
     # s25: {tsp, nck, wr1, rr1, wr2, rr2, fnl},
-    # y25: {tsp, nck, sts, nmb, why, jtk, gms, lgc, bed, way, car, wsh, liv, ugo}}
+    # y25: {tsp, nck, nmb, bed, way, car, liv, ugo}}
     info_type = tuple[int, int, str, str, str, dict[str: dict[str: str | int | bool]]]
     s2b = lambda s: s == '1'
     load2info = (int, int, str, str, str, json.loads)
@@ -206,28 +206,23 @@ class User:
     text2info = (int, int, str, str, str, {
         's24': {'tsp': int, 'nck': str, 'lr1': s2b, 'wr1': s2b, 'wr2': s2b, 'nyt': s2b, 'fnl': s2b},
         's25': {'tsp': int, 'nck': str, 'wr1': s2b, 'rr1': str, 'wr2': s2b, 'rr2': str, 'fnl': str},
-        'y25': {'tsp': int, 'nck': str, 'sts': int, 'nmb': str, 'why': str, 'jtk': s2b, 'gms': s2b, 'lgc': s2b,
-                'bed': s2b, 'way': int, 'car': str, 'wsh': str, 'liv': str, 'ugo': int}})
+        'y25': {'tsp': int, 'nck': str, 'nmb': str, 'bed': s2b, 'way': int, 'car': str, 'liv': str, 'ugo': int}})
 
     t2ic = str.isdigit  # text to integer check
     t2bc = ['0', '1'].__contains__  # text to bool check
     text2info_check = (t2ic, t2ic, bool, bool, bool, {
         's24': {'tsp': t2ic, 'nck': bool, 'lr1': t2bc, 'wr1': t2bc, 'wr2': t2bc, 'nyt': t2bc, 'fnl': t2bc},
         's25': {'tsp': t2ic, 'nck': bool, 'wr1': t2bc, 'rr1': t2ic, 'wr2': t2bc, 'rr2': t2ic, 'fnl': t2ic},
-        'y25': {'tsp': t2ic, 'nck': bool, 'sts': t2ic, 'nmb': bool, 'why': bool, 'jtk': t2bc, 'gms': t2bc, 'lgc': t2bc,
-                'bed': t2bc, 'way': t2ic, 'car': bool, 'wsh': bool, 'liv': bool, 'ugo': t2ic}})
+        'y25': {'tsp': t2ic, 'nck': bool, 'nmb': bool, 'bed': t2bc, 'way': t2ic, 'car': bool, 'liv': bool, 'ugo': t2ic}})
 
     b2t = lambda b: 'Да' if b else 'Нет'  # bool to text
-    sts2t = ('Действующий студент', 'Выпускник / отчисляш', 'Сотрудник', 'Не из ИТМО').__getitem__
     way2t = ('На бесплатном трансфере от ГК', 'Своим ходом (электричка)', 'Своим ходом (на машине)').__getitem__
     opt = lambda x: x or '[НЕТ ДАННЫХ]'
-    wsh_opt = lambda x: x or 'Мне всё равно'
     ugo2t = ('Нет.', 'Да, ты прошёл отбор, ждём оплату!', 'Оплата дошла до нас, ты едешь!').__getitem__
     info2text = (str, str, str, str, str, {
         's24': {'tsp': ts2str, 'nck': opt, 'lr1': b2t, 'wr1': b2t, 'wr2': b2t, 'nyt': b2t, 'fnl': b2t},
         's25': {'tsp': ts2str, 'nck': opt, 'wr1': b2t, 'rr1': opt, 'wr2': b2t, 'rr2': opt, 'fnl': opt},
-        'y25': {'tsp': ts2str, 'nck': opt, 'sts': sts2t, 'nmb': opt, 'why': opt, 'jtk': b2t, 'gms': b2t, 'lgc': b2t,
-                'bed': b2t, 'way': way2t, 'car': opt, 'wsh': wsh_opt, 'liv': opt, 'ugo': ugo2t}})
+        'y25': {'tsp': ts2str, 'nck': opt, 'nmb': opt, 'bed': b2t, 'way': way2t, 'car': opt, 'liv': opt, 'ugo': ugo2t}})
 
     b2s = lambda b: '1' if b else '0'  # bool to string
     db2save = (str, str, str, str, str, lambda x: json.dumps(x, ensure_ascii=False))
@@ -264,8 +259,6 @@ class UserList:
         if is_file_accessible(self.path) is False:
             return False
         self.db.clear()
-
-        yagodnoe_injection()
 
         changes = False
         incorrect_uids = list[tuple[str]]()
@@ -366,6 +359,18 @@ class UserList:
             user = self.db[isu]
             if not (0 <= user.uid <= 1):
                 self.uid_to_isu[user.uid] = isu
+
+        # TODO: REMOVE SOON
+        for isu in self.db.keys():
+            user = self.db[isu]
+            if 'y25' in user.met.keys():
+                y25 = user.met['y25']
+                for key in ('sts', 'why', 'jtk', 'gms', 'lgc', 'wsh'):
+                    if key in y25.keys():
+                        changes = True
+                        del y25[key]
+        # ------------------
+
         if changes is True:
             return self.save()
         return True
@@ -692,69 +697,3 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
         'peer_id': uid,
         'message': tts
     }]
-
-
-def yagodnoe_injection() -> None:
-    with open('./subscribers/yagodnoe.txt', 'r', encoding='UTF-8') as file:
-        yagodnoe = file.read().replace('""', '\'').strip()
-        yagodnoe = re.compile(r'(\t"[^"]*"\t)').sub(lambda x: x.group(0).replace('\n', '\\n'), yagodnoe)
-        yagodnoe = [[j.strip('"') for j in i.replace('\\n', '\n').split('\t')] for i in yagodnoe.split('\n')]
-
-    with open('./subscribers/users.txt', 'r', encoding='UTF-8') as file:
-        users = [i.split('\t') for i in file.read().strip().split('\n') if i]
-        for user in users:
-            meta = json.loads(user[5])
-            user[5] = json.dumps(meta, ensure_ascii=False)
-        max_special_uid = [int(i[0]) for i in users if int(i[0]) < 100000]
-        max_special_uid = max(i for i in max_special_uid if i < 100000 or 999999 < i) if max_special_uid else 0
-        users = {int(i[0]): i for i in users}
-
-    keys = ('tsp', 'nck', 'sts', 'nmb', 'why', 'jtk', 'gms', 'lgc', 'bed', 'way', 'car', 'wsh', 'liv', 'ugo')
-    for line in yagodnoe[1:]:
-        try:
-            tsp = int(datetime.strptime(line[1], '%Y-%m-%d %H:%M:%S').timestamp())
-            nck = line[2]
-            sts = ('Действующий студент', 'Выпускник / отчисляш', 'Сотрудник', 'Не из ИТМО').index(line[3])
-            isu = int(line[4]) if line[4].isdigit() and 100000 <= int(line[4]) <= 999999 else max_special_uid + 1
-            if isu == max_special_uid + 1:
-                for i in range(max_special_uid + 1):
-                    meta = json.loads(users[i][5])
-                    if 'y25' in meta.keys() and meta['y25']['tsp'] == tsp:
-                        isu = i
-                        break
-                else:
-                    max_special_uid += 1
-            fio = line[5]
-            nmb = line[6].lstrip('`')
-            uid = line[7]
-            why = line[8]
-            jtk = bool(line[9])
-            gms = bool(line[10])
-            leg = bool(line[11])
-            bed = bool(line[12])
-            way = ('На бесплатном трансфере от ГК', 'Своим ходом (электричка)', 'Своим ходом (на машине)').index(
-                line[13])
-            car = line[14]
-            wsh = line[15] if line[15] != 'Мне всё равно' else ''
-            liv = line[17] if len(line) >= 18 else ''
-            ugo = int(line[18]) if len(line) >= 19 else 0
-            if isu in users.keys():
-                users[isu][1] = uid
-                users[isu][2] = fio
-                users[isu][4] = nck
-                meta = json.loads(users[isu][5])
-                values = (tsp, nck, sts, nmb, why, jtk, gms, leg, bed, way, car, wsh, liv, ugo)
-                meta['y25'] = {key: value for key, value in zip(keys, values)}
-                users[isu][5] = json.dumps(meta, ensure_ascii=False)
-                print('User updated:', users[isu])
-            else:
-                values = (tsp, nck, sts, nmb, why, jtk, gms, leg, bed, way, car, wsh, liv, ugo)
-                meta = {'y25': {key: value for key, value in zip(keys, values)}}
-                user = [str(isu), uid, fio, '', nck, json.dumps(meta, ensure_ascii=False)]
-                users[isu] = user
-                print('New user:    ', user)
-        except Exception as e:
-            print('НЕ УДАЛОСЬ ОБРАБОТАТЬ СТРОКУ: "{}"\nПРИЧИНА: {}'.format(line, e))
-    with open('./subscribers/users.txt', 'w', encoding='UTF-8') as file:
-        file.write('\n'.join(sorted('\t'.join(users[isu]) for isu in users.keys())))
-    print('Done!')
