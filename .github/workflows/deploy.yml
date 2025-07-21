@@ -2,7 +2,7 @@ name: Deploy on Push
 
 on:
   push:
-    branches: [ "master" ]
+    branches: [ "master", "dev"]
 
 jobs:
   test:
@@ -31,6 +31,7 @@ jobs:
           flake8 . --count --exit-zero --max-complexity=10 --max-line-length=88 --statistics
 
   deploy:
+    if: github.ref == 'refs/heads/master'
     needs: test
     runs-on: ubuntu-latest
 
