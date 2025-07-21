@@ -198,7 +198,7 @@ class User:
     # isu, uid, fio, grp, nck, met: {
     # s24: {tsp, nck, lr1, wr1, wr2, nyt, fnl},
     # s25: {tsp, nck, wr1, rr1, wr2, rr2, fnl},
-    # y25: {tsp, nck, sts, nmb, why, jtk, gms, lgc, bed, way, car, liv}}
+    # y25: {tsp, nck, nmb, bed, way, car, liv, ugo}}
     info_type = tuple[int, int, str, str, str, dict[str: dict[str: str | int | bool]]]
     s2b = lambda s: s == '1'
     load2info = (int, int, str, str, str, json.loads)
@@ -206,30 +206,26 @@ class User:
     text2info = (int, int, str, str, str, {
         's24': {'tsp': int, 'nck': str, 'lr1': s2b, 'wr1': s2b, 'wr2': s2b, 'nyt': s2b, 'fnl': s2b},
         's25': {'tsp': int, 'nck': str, 'wr1': s2b, 'rr1': str, 'wr2': s2b, 'rr2': str, 'fnl': str},
-        'y25': {'tsp': int, 'nck': str, 'sts': int, 'nmb': str, 'why': str, 'jtk': s2b, 'gms': s2b, 'lgc': s2b,
-                'bed': s2b, 'way': int, 'car': str, 'wsh': str, 'liv': str, 'ugo': s2b}})
+        'y25': {'tsp': int, 'nck': str, 'nmb': str, 'bed': s2b, 'way': int, 'car': str, 'liv': str, 'ugo': int}})
 
     t2ic = str.isdigit  # text to integer check
     t2bc = ['0', '1'].__contains__  # text to bool check
     text2info_check = (t2ic, t2ic, bool, bool, bool, {
         's24': {'tsp': t2ic, 'nck': bool, 'lr1': t2bc, 'wr1': t2bc, 'wr2': t2bc, 'nyt': t2bc, 'fnl': t2bc},
         's25': {'tsp': t2ic, 'nck': bool, 'wr1': t2bc, 'rr1': t2ic, 'wr2': t2bc, 'rr2': t2ic, 'fnl': t2ic},
-        'y25': {'tsp': t2ic, 'nck': bool, 'sts': t2ic, 'nmb': bool, 'why': bool, 'jtk': t2bc, 'gms': t2bc, 'lgc': t2bc,
-                'bed': t2bc, 'way': t2ic, 'car': bool, 'wsh': bool, 'liv': bool, 'ugo': t2bc}})
+        'y25': {'tsp': t2ic, 'nck': bool, 'nmb': bool, 'bed': t2bc, 'way': t2ic, 'car': bool, 'liv': bool, 'ugo': t2ic}})
 
     b2t = lambda b: 'Да' if b else 'Нет'  # bool to text
-    sts2t = ('Действующий студент', 'Выпускник / отчисляш', 'Сотрудник', 'Не из ИТМО').__getitem__
     way2t = ('На бесплатном трансфере от ГК', 'Своим ходом (электричка)', 'Своим ходом (на машине)').__getitem__
-    opt = lambda x: x or 'Нет данных'
-    wsh_opt = lambda x: x or 'Мне всё равно'
+    opt = lambda x: x or '[НЕТ ДАННЫХ]'
+    ugo2t = ('Нет.', 'Да, ты прошёл отбор, ждём оплату!', 'Оплата дошла до нас, ты едешь!').__getitem__
     info2text = (str, str, str, str, str, {
         's24': {'tsp': ts2str, 'nck': opt, 'lr1': b2t, 'wr1': b2t, 'wr2': b2t, 'nyt': b2t, 'fnl': b2t},
         's25': {'tsp': ts2str, 'nck': opt, 'wr1': b2t, 'rr1': opt, 'wr2': b2t, 'rr2': opt, 'fnl': opt},
-        'y25': {'tsp': ts2str, 'nck': opt, 'sts': sts2t, 'nmb': opt, 'why': opt, 'jtk': b2t, 'gms': b2t, 'lgc': b2t,
-                'bed': b2t, 'way': way2t, 'car': opt, 'wsh': wsh_opt, 'liv': opt, 'ugo': b2t}})
+        'y25': {'tsp': ts2str, 'nck': opt, 'nmb': opt, 'bed': b2t, 'way': way2t, 'car': opt, 'liv': opt, 'ugo': ugo2t}})
 
     b2s = lambda b: '1' if b else '0'  # bool to string
-    db2save = (str, str, str, str, str, json.dumps)
+    db2save = (str, str, str, str, str, lambda x: json.dumps(x, ensure_ascii=False))
 
     keys = ('isu', 'uid', 'fio', 'grp', 'nck', 'met')
     flat_i2t: dict[str]
@@ -253,6 +249,8 @@ class UserList:
         self.errors = list[tuple[str]]()
         self.path = path
         self.vk_helper = vk_helper
+        self.max_special_isu = 0
+        self.used_specials_isus = set()
         if self.load() is False:
             raise OSError('Something went wrong while loading DB')
 
@@ -262,12 +260,9 @@ class UserList:
             return False
         self.db.clear()
 
-        yagodnoe_injection()
-
         changes = False
         incorrect_uids = list[tuple[str]]()
         incorrect_isus = list[tuple[str]]()
-        used_specials_isus = set()
 
         def parse_line(n: int, s: tuple[str, ...]) -> tuple | None:
             nonlocal changes
@@ -281,7 +276,7 @@ class UserList:
             else:
                 result[0] = int(s[0])
             if not 100000 <= result[0] <= 999999:
-                used_specials_isus.add(result[0])
+                self.used_specials_isus.add(result[0])
             if not all(d.isdigit() for d in s[1]):
                 warn(f'vk id is NaN (isu = {s[0]}) in {n}-th line in DB:', s[1])
                 incorrect_uids.append(s)
@@ -319,12 +314,9 @@ class UserList:
                 if user_info is not None:
                     self.db[user_info[0]] = User(user_info)
         # выдаём special isu для нетакусь:
-        special_isu = 1
         for i in range(len(incorrect_isus)):
-            while special_isu in used_specials_isus:
-                special_isu += 1
             corrected = list(incorrect_isus[i])
-            corrected[0] = str(special_isu)
+            corrected[0] = str(self.get_new_special_isu())
             incorrect_isus[i] = tuple(corrected)
         # достаём все vk_uid через vk_link
         for i in range(0, len(incorrect_uids), 25):
@@ -365,8 +357,20 @@ class UserList:
         # делаем штуку для быстрого доступа к пользователю через uid
         for isu in self.db.keys():
             user = self.db[isu]
-            if user.uid != 0:
+            if not (0 <= user.uid <= 1):
                 self.uid_to_isu[user.uid] = isu
+
+        # TODO: REMOVE SOON
+        for isu in self.db.keys():
+            user = self.db[isu]
+            if 'y25' in user.met.keys():
+                y25 = user.met['y25']
+                for key in ('sts', 'why', 'jtk', 'gms', 'lgc', 'wsh'):
+                    if key in y25.keys():
+                        changes = True
+                        del y25[key]
+        # ------------------
+
         if changes is True:
             return self.save()
         return True
@@ -378,13 +382,27 @@ class UserList:
         for isu in self.db.keys():
             to_save.append('\t'.join(f(i) for f, i in zip(User.db2save, self.db[isu].info)))
         to_save.extend(map('\t'.join, self.errors))
-        to_save.sort()
+        to_save.sort(key=lambda x: int(x.split('\t')[0]) if x.split('\t')[0].isdigit() else -1)
         with open(users_path, 'w', encoding='UTF-8') as file:
             file.write('\n'.join(to_save))
         return True
 
     def get(self, isu: int) -> User | None:
         return self.db[isu] if isu in self.db.keys() else None
+
+    def add(self, info: tuple[int, int, str, str, str, dict[str: dict[str: str | int | bool]]]) -> User:
+        if info[0] == -1:
+            info = tuple([self.get_new_special_isu()] + list(info[1:]))
+        self.db[info[0]] = User(info)
+        if not (0 <= info[1] <= 1):
+            self.uid_to_isu[info[1]] = info[0]
+        return self.db[info[0]]
+
+    def get_new_special_isu(self) -> int:
+        while self.max_special_isu in self.used_specials_isus:
+            self.max_special_isu += 1
+        self.used_specials_isus.add(self.max_special_isu)
+        return self.max_special_isu
 
     def keys(self):
         return self.db.keys()
@@ -421,10 +439,10 @@ def check_condition(cond: str, errors: list = None) -> str | None:
                     errors.append(f'A | too many args in "{cond}"')
                 if len(c) < 2:
                     errors.append(f'B | not enough args in "{cond}"')
-                if not check_condition(c[0], errors):
-                    errors.append(f'C | token "{c[0]}" in "{cond}" is unknown')
-                if c[1] not in tokens[4]:
-                    errors.append(f'D | token "{c[1]}" in "{cond}" is unknown')
+                if c[0] not in tokens[4]:
+                    check_condition(c[0], errors)
+                if c[1] != 'met':
+                    errors.append(f'C | token "{c[1]}" in "{cond}" is unknown')
         if is_first is True:
             return 'ok' if len(errors) == 0 else '\n'.join(errors)
         return
@@ -433,12 +451,18 @@ def check_condition(cond: str, errors: list = None) -> str | None:
             if token in cond:
                 c = cond.split(token)
                 if len(c) > 2:
-                    errors.append('E | too many args in ' + cond)
+                    errors.append('D | too many args in ' + cond)
                 if len(c) < 2:
-                    errors.append('F | not enough args in ' + cond)
+                    errors.append('E | not enough args in ' + cond)
                 check_condition(c[0], errors)
-                # if not UserList.db_t_check[tokens[3].index(c[0])](c[1]):
-                #     errors.append(f'token "{c[1]}" in "{cond}" has wrong type')
+                t = c[0].split('.')
+                if t[0] not in tokens[3]:
+                    errors.append(f'F | token "{t[0]}" in "{cond}" is unknown')
+                if len(t) == 1 and c[0] in tokens[2] and not User.text2info_check[tokens[2].index(c[0])](c[1]):
+                    errors.append(f'G | token "{c[1]}" in "{cond}" has wrong type')
+                elif len(t) == 3 and t[0] == 'met' and t[1] in tokens[4] and t[2] in tokens[5][tokens[4].index(t[1])]:
+                    if not User.text2info_check[5][t[1]][t[2]](c[1]):
+                        errors.append(f'H | token "{c[1]}" in "{cond}" has wrong type')
         if is_first is True:
             return 'ok' if len(errors) == 0 else '\n'.join(errors)
         return
@@ -446,24 +470,24 @@ def check_condition(cond: str, errors: list = None) -> str | None:
         c = cond.split('.')
         if c[0] == 'met':
             if len(c) == 2:
-                errors.append(f'G | token "{c[1]}" in "{cond}" is unknown')
+                errors.append(f'I | token "{c[1]}" in "{cond}" is unknown')
             elif len(c) == 3:
                 if c[1] not in tokens[4]:
-                    errors.append(f'H | token "{c[1]}" in "{cond}" is unknown')
+                    errors.append(f'J | token "{c[1]}" in "{cond}" is unknown')
                 elif c[2] not in tokens[5][tokens[4].index(c[1])]:
-                    errors.append(f'I | token "{c[2]}" in "{cond}" is unknown')
+                    errors.append(f'K | token "{c[2]}" in "{cond}" is unknown')
             else:
-                errors.append('J | too many args in ' + cond)
+                errors.append('L | too many args in ' + cond)
         else:
-            errors.append(f'K | token "{c[0]}" in "{cond}" is unknown')
+            errors.append(f'M | token "{c[0]}" in "{cond}" is unknown')
         if is_first is True:
-            return 'L | not enough conditions'
+            return 'N | not enough conditions'
         return
     elif cond not in tokens[3]:
-        errors.append(f'M | token "{cond}" is unknown')
+        errors.append(f'O | token "{cond}" is unknown')
     else:
         if is_first is True:
-            return 'N | no matches with any token' if len(errors) == 0 else '\n'.join(errors)
+            return 'P | no matches with any token' if len(errors) == 0 else '\n'.join(errors)
         return
 
 
@@ -472,12 +496,12 @@ def eval_condition(user: tuple, cond: str) -> bool:
         return any(eval_condition(user, i) for i in cond.split('|'))
     if '&' in cond:
         return all(eval_condition(user, i) for i in cond.split('&'))
-    # if '->' in cond:
-    #     c = cond.split('->')
-    #     return user[tokens[3].index(c[0])] in [spartakiada24_subs, spartakiada25_subs, admin][tokens[4].index(c[1])]
-    # if '!>' in cond:
-    #     c = cond.split('!>')
-    #     return user[tokens[3].index(c[0])] not in [spartakiada24_subs, spartakiada25_subs, admin][tokens[4].index(c[1])]
+    if '->' in cond:
+        c = cond.split('->')
+        return c[0] in user[5].keys()
+    if '!>' in cond:
+        c = cond.split('!>')
+        return c[0] not in user[5].keys()
     for n, token in enumerate(tokens[2]):
         if token in cond:
             c = cond.split(token)
@@ -565,6 +589,10 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
     username = user_get['last_name']
 
     msg: str = event.message.text
+
+    if not msg:
+        return  # do some other logic if needed
+
     msgs = msg.split()
     if uid in admin:
         if msgs[0] == 'stop':
@@ -583,6 +611,25 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
             return [{
                 'peer_id': uid,
                 'message': tts
+            }]
+        elif msgs[0] == 'add_users':
+            errors = dict[str: str]()
+            for i in set(msgs[1:]):
+                try:
+                    if int(i) in users.uid_to_isu.keys():
+                        raise Exception(f'User {i} is already in database')
+                    users.add((-1, int(i), '', '', '', {}))
+                except Exception as e:
+                    errors[i] = str(e)
+            if errors:
+                tts = '\n'.join(f'Ошибка при добавлении "{key}":\n{errors[key]}\n' for key in errors.keys())
+            else:
+                tts = 'Успешный успех!'
+            if len(set(msgs)) - len(errors.keys()) - 1 != 0:
+                users.save()
+            return [{
+                'peer_id': uid,
+                'message': f'{tts}\n{len(set(msgs)) - len(errors.keys()) - 1} пользователей были успешно добавлены!'
             }]
 
     if event.from_chat:
@@ -631,7 +678,7 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
     elif uid in users.uid_to_isu:
         isu = users.uid_to_isu[uid]
         user = users.get(isu)
-        if 'y25' in user.met.keys() and user.met['y25']['ugo'] is True:
+        if 'y25' in user.met.keys() and user.met['y25']['ugo'] != 0:
             tts = format_message(y25_message, user,
                                  part2=(format_message(y25_second_part, user) if user.met['y25']['way'] == 2 else ''))
         elif 's25' in user.met.keys():
@@ -650,64 +697,3 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
         'peer_id': uid,
         'message': tts
     }]
-
-
-def yagodnoe_injection() -> None:
-    with open('./subscribers/yagodnoe.txt', 'r', encoding='UTF-8') as file:
-        yagodnoe = file.read()
-        yagodnoe = re.compile(r'(\t"[^"]*"\t)').sub(lambda x: x.group(0).replace('\n', '\\n'), yagodnoe)
-        yagodnoe = [[j.strip('"') for j in i.replace('\\n', '\n').split('\t')] for i in yagodnoe.split('\n')]
-
-    with open('./subscribers/users.txt', 'r', encoding='UTF-8') as file:
-        users = [i.split('\t') for i in file.read().strip().split('\n')]
-        for user in users:
-            meta = json.loads(user[5])
-            user[5] = json.dumps(meta, ensure_ascii=False)
-        special_uid = [int(i[0]) for i in users if int(i[0]) < 100000]
-        special_uid = (max(i for i in special_uid if i < 100000 or 999999 < i) + 1) if special_uid else 0
-        users = {int(i[0]): i for i in users}
-
-    keys = ('tsp', 'nck', 'sts', 'nmb', 'why', 'jtk', 'gms', 'lgc', 'bed', 'way', 'car', 'wsh', 'liv', 'ugo')
-    for line in yagodnoe[1:]:
-        tsp = int(datetime.strptime(line[1], '%Y-%m-%d %H:%M:%S').timestamp())
-        nck = line[2]
-        sts = ('Действующий студент', 'Выпускник / отчисляш', 'Сотрудник', 'Не из ИТМО').index(line[3])
-        isu = int(line[4]) if line[4].isdigit() and 100000 <= int(line[4]) <= 999999 else special_uid
-        if isu == special_uid:
-            for i in range(special_uid - 1):
-                meta = json.loads(users[i][5])
-                if 'y25' in meta.keys() and meta['y25']['tsp'] == tsp:
-                    isu = i
-                    break
-            else:
-                special_uid += 1
-        fio = line[5]
-        nmb = line[6].lstrip('`')
-        uid = line[7]
-        why = line[8]
-        jtk = bool(line[9])
-        gms = bool(line[10])
-        leg = bool(line[11])
-        bed = bool(line[12])
-        way = ('На бесплатном трансфере от ГК', 'Своим ходом (электричка)', 'Своим ходом (на машине)').index(line[13])
-        car = line[14]
-        wsh = line[15] if line[15] != 'Мне всё равно' else ''
-        liv = line[17] if len(line) >= 18 else ''
-        ugo = line[18] == '1' if len(line) >= 19 else False
-        if isu in users.keys():
-            users[isu][1] = uid
-            users[isu][4] = nck
-            meta = json.loads(users[isu][5])
-            values = (tsp, nck, sts, nmb, why, jtk, gms, leg, bed, way, car, wsh, liv, ugo)
-            meta['y25'] = {key: value for key, value in zip(keys, values)}
-            users[isu][5] = json.dumps(meta, ensure_ascii=False)
-            print('User updated:', users[isu])
-        else:
-            values = (tsp, nck, sts, nmb, why, jtk, gms, leg, bed, way, car, wsh, liv, ugo)
-            meta = {'y25': {key: value for key, value in zip(keys, values)}}
-            user = [str(isu), uid, fio, '', nck, json.dumps(meta, ensure_ascii=False)]
-            users[isu] = user
-            print('New user:    ', user)
-    with open('./subscribers/users.txt', 'w', encoding='UTF-8') as file:
-        file.write('\n'.join(sorted('\t'.join(users[isu]) for isu in users.keys())))
-    print('Done!')
