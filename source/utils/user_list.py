@@ -1,4 +1,4 @@
-from source.utils.json_worker import *
+from utils.json_worker import *
 from datetime import datetime
 
 def warn(*s: str) -> None:
