@@ -9,6 +9,7 @@ required_dirs = [
 required_files = [
     'source/subscribers/spartakiada24.txt'
     'source/subscribers/spartakiada.txt'
+    'source/subscribers/ignored.txt'
 ]
 
 def create():

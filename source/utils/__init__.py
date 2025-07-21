@@ -1,5 +1,5 @@
 from .ignored_list import IgnoredList
-from .VKHelper import *
+from .vk_helper import *
 import os
 
 

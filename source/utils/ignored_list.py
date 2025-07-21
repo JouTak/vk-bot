@@ -1,6 +1,7 @@
 import os
 
 
+
 class IgnoredList:
     def __init__(self):
         self.ignored = set()
@@ -8,31 +9,32 @@ class IgnoredList:
     def add(self, uid):
         if uid not in self.ignored:
             self.ignored.add(uid)
-            print(f'Пользователь {uid} добавлен в игнор.')
+            return f'Пользователь {uid} добавлен в игнор.'
         else:
-            print(f'Пользователь {uid} уже в игноре.')
+            return f'Пользователь {uid} уже в игноре.'
 
     def remove(self, uid):
         if uid in self.ignored:
             self.ignored.remove(uid)
-            print(f'Пользователь {uid} удалён из игнора.')
+            return f'Пользователь {uid} удалён из игнора.'
         else:
-            print(f'Пользователь {uid} не найден в списке игнорируемых.')
+            return f'Пользователь {uid} не найден в списке игнорируемых.'
 
     def is_ignored(self, uid):
         return uid in self.ignored
 
     def clear(self):
         self.ignored.clear()
-        # self.info('Список игнорируемых пользователей очищен.')
+        return 'Список игнорируемых пользователей очищен.'
 
     def save_to_file(self):
         try:
+
             with open('./subscribers/ignored.txt', 'w+', encoding='UTF-8') as file:
                 file.write('\n'.join(map(str, self.ignored)))
-            print(f'Список игнорируемых сохранён.')
+            return f'Список игнорируемых сохранён.'
         except Exception as e:
-            print(f'Ошибка при сохранении: {e}')
+            return f'Ошибка при сохранении: {e}', True
 
     def load_from_file(self):
         try:
@@ -43,4 +45,4 @@ class IgnoredList:
                 self.ignored = set(map(lambda x: int(x.strip()), file.readlines()))
             return f'Список игнорируемых загружен.'
         except Exception as e:
-            print(f'Ошибка при загрузке: {e}')
+            return f'Ошибка при загрузке: {e}', True
