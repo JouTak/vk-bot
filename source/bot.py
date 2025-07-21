@@ -540,7 +540,7 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
                 tts = 'Надеюсь, вопрос снят!'
                 atts = f'{uname} {usurname} больше не вызывает!'
                 buttons = [{'label': 'ПОЗВАТЬ АДМИНА', 'payload': {'type': 'callmanager'}, 'color': 'positive'}]
-                keyboard = create_standart_keyboard(buttons)
+                keyboard = create_standard_keyboard(buttons)
             # User is calling for admin support
             else:
                 self.info(ignored.add(uid))
@@ -549,7 +549,7 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
                       'Когда вопрос будет решён, ещё раз напиши команду или нажми на кнопку.'
                 atts = f'{uname} {usurname} вызывает!'
                 buttons = [{'label': 'СПАСИБО АДМИН', 'payload': {'type': 'uncallmanager'}, 'color': 'negative'}]
-                keyboard = create_standart_keyboard(buttons)
+                keyboard = create_standard_keyboard(buttons)
             # Return messages for both the user and all admins
             return [
                 {
