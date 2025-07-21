@@ -149,7 +149,7 @@ def create_keyboard(buttons):
     return keyboard.get_keyboard() if buttons else None
 
 
-def create_standart_keyboard(buttons):
+def create_standard_keyboard(buttons):
     """
     Creates a non-inline keyboard with regular buttons from a list of button definitions.
 
