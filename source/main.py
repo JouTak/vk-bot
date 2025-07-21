@@ -1,11 +1,8 @@
-import vk_api
 from vk_api.bot_longpoll import VkBotLongPoll, VkBotEventType
 import traceback
 from utils import IgnoredList, initialize
-from utils import VKHelper
 from utils.log import *
 from bot import *
-from time import sleep
 import requests
 
 
@@ -14,14 +11,14 @@ class Main:
         self.token, self.group_id = initialize()
 
         self.vk_session = vk_api.VkApi(token=self.token)
-        self.VK = VKHelper(self.vk_session)
-        self.info, self.error = log()
+        self.VK = VKHelper(self.vk_session, self.group_id)
+        self.info, self.warn, self.error = log()
         self.longpoll = VkBotLongPoll(self.vk_session, self.group_id)
         self.ignored = IgnoredList()
         self.info(self.ignored.load_from_file())
         self.users = UserList(users_path, self.VK)
-        print('\n'.join(warnings))
 
+        if warnings: self.warn('\n'.join(warnings))
         self.info('Готов!\n')
 
     def run(self):
@@ -62,11 +59,11 @@ class Main:
 
 if __name__ == '__main__':
     bot = Main()
+
     while True:
         try:
             bot.run()
-        except requests.exceptions.ReadTimeout:
-            pass
+        except requests.exceptions.ReadTimeout: pass
         except Exception as e:
             bot.error(e)
             bot.VK.send_messages([{'peer_id': uid, 'message': str(e)} for uid in admin])

@@ -1,6 +1,5 @@
 source/subscribers
 source/__pycache__
-source/.idea
+.idea/
 source/py.log
 entrypoint.sh
-py.log
