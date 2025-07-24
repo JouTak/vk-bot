@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from utils.query_helper import MinecraftServerQuery
 from utils.vk_helper import *
 from utils.user_list import *
 
@@ -596,6 +597,8 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
     # This block is for messages received in group chats.
     else:
         # TODO: фича на вывод в чат инфы от сервера
+        mc = MinecraftServerQuery()
+        players, version = mc.get_dummy_info()
         return
 
     # Default return for processed private messages
