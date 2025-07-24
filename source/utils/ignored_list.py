@@ -1,7 +1,6 @@
 import os
 
 
-
 class IgnoredList:
     def __init__(self):
         self.ignored = set()

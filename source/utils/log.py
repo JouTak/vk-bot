@@ -18,7 +18,7 @@ logger.addHandler(console_handler)
 
 
 def log():
-    def info(_, error = False):
+    def info(_, error=False):
         if error:
             logger.error(_)
         else:

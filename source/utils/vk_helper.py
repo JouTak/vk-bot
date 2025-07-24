@@ -9,6 +9,7 @@ class VKHelper:
     A helper class to simplify interactions with the VK API,
     especially for sending messages and resolving links.
     """
+
     def __init__(self, vk_session, group_id):
         """
         Initializes the VKHelper with a VK API session.
@@ -73,7 +74,7 @@ class VKHelper:
         payload = {
             'peer_id': peer_id,
             'message': message,
-            'random_id': 0 # Use dynamic random_id for production to avoid duplicates
+            'random_id': 0  # Use dynamic random_id for production to avoid duplicates
         }
         if keyboard is not None:
             payload['keyboard'] = keyboard

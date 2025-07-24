@@ -63,7 +63,8 @@ if __name__ == '__main__':
     while True:
         try:
             bot.run()
-        except requests.exceptions.ReadTimeout: pass
+        except requests.exceptions.ReadTimeout:
+            pass
         except Exception as e:
             bot.error(e)
             bot.VK.send_messages([{'peer_id': uid, 'message': str(e)} for uid in admin])
