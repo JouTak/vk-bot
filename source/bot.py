@@ -608,12 +608,12 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
         if not msg:
             return
         msgs = msg.split()
-        if '@club230160029' in msgs[0]:
-            is_ping = True
-            msgs.pop(0)
-            msg = msg[msg.index(']') + 2:]
-        elif '@club230160029' in msgs:
-            is_ping = True
+        # if '@club230160029' in msgs[0]:
+        #     is_ping = True
+        #     msgs.pop(0)
+        #     msg = msg[msg.index(']') + 2:]
+        # elif '@club230160029' in msg:
+        #     is_ping = True
 
         uid = event.object['message']['peer_id']
         cuid = event.object['message'].get('conversation_message_id')
@@ -621,13 +621,16 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
         if msgs[0].lstrip('/') == 'ping':
             mc = MinecraftServerQuery()
             try:
-                players, version = mc.get_info()
-                tts = f'JouTak {version}\n\n== Zadry {len(players)}/375 ==\n{f"{chr(10)}".join(players)}'
+                players, version = mc.get_dummy_info()
+                if players:
+                    player_list = '\n📶'.join([''] + players)
+                    tts = f'❗ JouTak ☭ {version} ❗\n== Zadry 🤓 {len(players)}/375 =={player_list}'
+                else:
+                    tts = 'Все антизадры (╥﹏╥)'
             except Exception as e:
                 tts = 'Server connection error: ' + str(e)
         else:
             return
-        # TODO: чекнуть оформление, возможно, подправить
         return [{'peer_id': uid, 'message': tts, 'conversation_message_id': cuid}]
 
     # Default return for processed private messages
