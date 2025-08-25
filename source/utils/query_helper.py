@@ -1,5 +1,6 @@
 from mcipc.query import Client
 
+
 class MinecraftServerQuery:
     def __init__(self, host='localhost', port=25611):
         self.host = host
@@ -21,8 +22,7 @@ class MinecraftServerQuery:
             return "connection error: " + str(exc)
 
     def get_dummy_info(self):
-        host = self.host, port = self.port
+        host, port = self.host, self.port
         players = ['EnderDissa', 'Zve1223']
         version = '1.21.5'
         return players, version
-

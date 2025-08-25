@@ -603,10 +603,14 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
     # --- CHAT MESSAGES HANDLER ---
     # This block is for messages received in group chats.
     else:
-        # TODO: фича на вывод в чат инфы от сервера
         mc = MinecraftServerQuery()
         players, version = mc.get_dummy_info()
-        return
+        uid = event.object['message']['peer_id']
+        cuid = event.object['message'].get('conversation_message_id')
+        tts = f'JouTak {version}\n\n== Zadry {len(players)}/375 ==\n{f"{chr(10)}".join(players)}'
+        # TODO: чекнуть оформление, возможно, подправить
+        msg = event.object['message']['text'].split()[1:]  # на будущее
+        return [{'peer_id': uid, 'message': tts, 'conversation_message_id': cuid}]
 
     # Default return for processed private messages
     return [{
