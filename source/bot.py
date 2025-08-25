@@ -603,13 +603,31 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
     # --- CHAT MESSAGES HANDLER ---
     # This block is for messages received in group chats.
     else:
-        mc = MinecraftServerQuery()
-        players, version = mc.get_dummy_info()
+        is_ping = False
+        msg = event.object['message']['text']
+        if not msg:
+            return
+        msgs = msg.split()
+        if '@club230160029' in msgs[0]:
+            is_ping = True
+            msgs.pop(0)
+            msg = msg[msg.index(']') + 2:]
+        elif '@club230160029' in msgs:
+            is_ping = True
+
         uid = event.object['message']['peer_id']
         cuid = event.object['message'].get('conversation_message_id')
-        tts = f'JouTak {version}\n\n== Zadry {len(players)}/375 ==\n{f"{chr(10)}".join(players)}'
+
+        if msgs[0].lstrip('/') == 'ping':
+            mc = MinecraftServerQuery()
+            try:
+                players, version = mc.get_info()
+                tts = f'JouTak {version}\n\n== Zadry {len(players)}/375 ==\n{f"{chr(10)}".join(players)}'
+            except Exception as e:
+                tts = 'Server connection error: ' + str(e)
+        else:
+            return
         # TODO: чекнуть оформление, возможно, подправить
-        msg = event.object['message']['text'].split()[1:]  # на будущее
         return [{'peer_id': uid, 'message': tts, 'conversation_message_id': cuid}]
 
     # Default return for processed private messages

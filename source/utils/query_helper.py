@@ -7,19 +7,13 @@ class MinecraftServerQuery:
         self.port = port
 
     def get_info(self):
-        try:
-            with Client(self.host, self.port) as client:
-                stats = client.stats(full=True)
-
-                # plugins = stats['plugins']
-                # num_players = stats['num_players']
-                players = stats['players']
-                version = stats['version']
-
-                return players, version
-
-        except Exception as exc:
-            return "connection error: " + str(exc)
+        with Client(self.host, self.port) as client:
+            stats = client.stats(full=True)
+            # plugins = stats['plugins']
+            # num_players = stats['num_players']
+            players = stats['players']
+            version = stats['version']
+            return players, version
 
     def get_dummy_info(self):
         host, port = self.host, self.port
