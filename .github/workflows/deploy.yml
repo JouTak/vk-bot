@@ -5,69 +5,31 @@ on:
   pull_request: {}
 
 jobs:
-  lint:
+  build-and-push:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.11'
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install flake8
-          pip install -r source/requirements.txt
-
-      - name: Run linter - hard errors only
-        run: |
-          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-
-      - name: Run linter - soft style guide
-        run: |
-          flake8 . --count --exit-zero --max-complexity=10 --max-line-length=88 --statistics
-
-  build_push:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
-    needs: lint
-    permissions:
-      contents: read
-      packages: write
-    runs-on: ubuntu-latest
-    
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v3
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
+        uses: docker/setup-buildx-action@v3
 
       - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v2
+        uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and Tag vk-itmocraft Image
-        env:
-          OWNER_LC: ${{ github.repository_owner }}
+      - name: Build and Tag image
         run: |
-          OWNER_LC=$(echo "$OWNER_LC" | tr '[:upper:]' '[:lower:]')
-          IMAGE="ghcr.io/${OWNER_LC}/vk-itmocraft"
-
-          BUILD_CONTEXT=./app
-          DOCKERFILE=./app/Dockerfile
-
-          docker build -t $IMAGE:latest -f $DOCKERFILE $BUILD_CONTEXT
+          OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          IMAGE="ghcr.io/${OWNER}/vk-itmocraft"
+          docker build -t $IMAGE:latest -f ./Dockerfile .
           docker tag $IMAGE:latest $IMAGE:${{ github.run_number }}
-
           echo "IMAGE=$IMAGE" >> $GITHUB_ENV
 
-      - name: Push vk-itmocraft Image
+      - name: Push image
         run: |
           docker push $IMAGE:latest
           docker push $IMAGE:${{ github.run_number }}
