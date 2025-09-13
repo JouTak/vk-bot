@@ -7,8 +7,8 @@ required_dirs = [
     'data/subscribers'
 ]
 required_files = [
-    'data/subscribers/spartakiada24.txt'
-    'data/subscribers/spartakiada.txt'
+    'data/subscribers/spartakiada24.txt',
+    'data/subscribers/spartakiada.txt',
     'data/subscribers/ignored.txt'
 ]
 
