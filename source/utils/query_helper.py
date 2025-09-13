@@ -2,7 +2,7 @@ from mcipc.query import Client
 
 
 class MinecraftServerQuery:
-    def __init__(self, host='localhost', port=25611):
+    def __init__(self, host='joutak', port=25611):
         self.host = host
         self.port = port
 

@@ -3,3 +3,4 @@ requests>=2.32.3
 pyyaml
 vk-api
 loguru>=0.7.3
+mcipc>=2.3.0
