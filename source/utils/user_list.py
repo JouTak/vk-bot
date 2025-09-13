@@ -1,7 +1,7 @@
 from utils.json_worker import *
 from datetime import datetime
 
-users_path = './subscribers/users.txt'
+users_path = '/app/data/subscribers/users.txt'
 warnings = []
 
 
