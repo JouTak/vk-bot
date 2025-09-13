@@ -1,6 +1,10 @@
 from utils.json_worker import *
 from datetime import datetime
 
+users_path = './subscribers/users.txt'
+warnings = []
+
+
 def warn(*s: str) -> None:
     warnings.append('Warning: ' + ' '.join(s))
     # print('Warning:', *s)
@@ -9,6 +13,7 @@ def warn(*s: str) -> None:
 def str2ts(s: str) -> int:
     # Convert date string to UNIX timestamp
     return int(datetime.strptime(s, '%m/%d/%Y %H:%M:%S').timestamp())
+
 
 def ts2str(timestamp: int) -> str:
     # Convert UNIX timestamp to formatted date string
@@ -22,7 +27,7 @@ class User:
     # s25: {tsp, nck, wr1, rr1, wr2, rr2, fnl},
     # y25: {tsp, nck, nmb, bed, way, car, liv, ugo}}
     info_type = tuple[int, int, str, str, str, dict[str: dict[str: str | int | bool]]]
-    s2b = lambda s: s == '1' # converter string '1' to boolean True
+    s2b = lambda s: s == '1'  # ('0', '1') -> (False, True)
     load2info = (int, int, str, str, str, json.loads)
 
     # Conversion functions for parsing text fields to proper typed user info
@@ -31,33 +36,39 @@ class User:
         's25': {'tsp': int, 'nck': str, 'wr1': s2b, 'rr1': str, 'wr2': s2b, 'rr2': str, 'fnl': str},
         'y25': {'tsp': int, 'nck': str, 'nmb': str, 'bed': s2b, 'way': int, 'car': str, 'liv': str, 'ugo': int}})
 
-    # Checks for parsing validity: text to int and text to bool validators
+    # Checks for parsing validity: text to int and text to bool validators (checkers) (t2ic = Text to Int Checker)
     t2ic = str.isdigit
     t2bc = ['0', '1'].__contains__
-    # Validators for correctness of conversion from text to info fields
+    # Validators (checkers) for correctness of conversion from text to info fields
     text2info_check = (t2ic, t2ic, bool, bool, bool, {
         's24': {'tsp': t2ic, 'nck': bool, 'lr1': t2bc, 'wr1': t2bc, 'wr2': t2bc, 'nyt': t2bc, 'fnl': t2bc},
         's25': {'tsp': t2ic, 'nck': bool, 'wr1': t2bc, 'rr1': t2ic, 'wr2': t2bc, 'rr2': t2ic, 'fnl': t2ic},
-        'y25': {'tsp': t2ic, 'nck': bool, 'nmb': bool, 'bed': t2bc, 'way': t2ic, 'car': bool, 'liv': bool, 'ugo': t2ic}})
+        'y25': {'tsp': t2ic, 'nck': bool, 'nmb': bool, 'bed': t2bc, 'way': t2ic, 'car': bool, 'liv': bool,
+                'ugo': t2ic}})
 
-    b2t = lambda b: 'Да' if b else 'Нет'  # bool to text
-    way2t = ('На бесплатном трансфере от ГК', 'Своим ходом (электричка)', 'Своим ходом (на машине)').__getitem__ # Translates 'way' integer codes to string descriptions
-    opt = lambda x: x or '[НЕТ ДАННЫХ]' # String display helper: converts falsy to '[НЕТ ДАННЫХ]'
-    ugo2t = ('Нет.', 'Да, ты прошёл отбор, ждём оплату!', 'Оплата дошла до нас, ты едешь!').__getitem__ # Converts 'ugo' status integer codes to textual descriptions
+    # bool to text
+    b2t = lambda b: 'Да' if b else 'Нет'
+    # Translates 'way' integer codes to string descriptions
+    way2t = ('На бесплатном трансфере от ГК', 'Своим ходом (электричка)', 'Своим ходом (на машине)').__getitem__
+    # String display helper: converts falsy to '[НЕТ ДАННЫХ]' (opt = optional)
+    opt = lambda x: x or '[НЕТ ДАННЫХ]'
+    # Converts 'ugo' status integer codes to textual descriptions
+    ugo2t = ('Нет.', 'Да, ты прошёл отбор, ждём оплату!', 'Оплата дошла до нас, ты едешь!').__getitem__
     # Functions to convert user info fields to text representations, including nested metadata
     info2text = (str, str, str, str, str, {
         's24': {'tsp': ts2str, 'nck': opt, 'lr1': b2t, 'wr1': b2t, 'wr2': b2t, 'nyt': b2t, 'fnl': b2t},
         's25': {'tsp': ts2str, 'nck': opt, 'wr1': b2t, 'rr1': opt, 'wr2': b2t, 'rr2': opt, 'fnl': opt},
         'y25': {'tsp': ts2str, 'nck': opt, 'nmb': opt, 'bed': b2t, 'way': way2t, 'car': opt, 'liv': opt, 'ugo': ugo2t}})
 
-    # Converts boolean to string '1' or '0' for storage or transmission
+    # (False, True) -> ('0', '1')
     b2s = lambda b: '1' if b else '0'
     # Functions used to serialize user info for saving, including JSON dump for metadata
     db2save = (str, str, str, str, str, lambda x: json.dumps(x, ensure_ascii=False))
 
     # List of main user info keys consistent with info tuple indexes
     keys = ('isu', 'uid', 'fio', 'grp', 'nck', 'met')
-    flat_i2t: dict[str] # Placeholder for flat mapping of info keys to text, initialized elsewhere
+    # Placeholder for flat mapping of info keys to text, initialized elsewhere
+    flat_i2t: dict[str]
 
     def __init__(self, info: tuple[int, int, str, str, str, dict[str: dict[str: str | int | bool]]]) -> None:
         self.info = info
@@ -88,6 +99,7 @@ class UserList:
        max_special_isu (int): Counter for assigning special ISU IDs.
        used_specials_isus (set[int]): Set of special ISU IDs already assigned.
     """
+
     def __init__(self, path: str, vk_helper) -> None:
         """
         Initialize UserList, attempt to load the database from file.
@@ -159,7 +171,7 @@ class UserList:
                 if s in incorrect_uids:
                     incorrect_uids.remove(s)
                 return None
-            if len(s[2].split()) != 3: # Check correct fio format
+            if len(s[2].split()) != 3:  # Check correct fio format
                 # warn(f'something wrong with fio (isu = {s[0]}) in {n}-th line in DB:', s[2])
                 pass
             result[2] = s[2]
@@ -196,10 +208,8 @@ class UserList:
             links = []
             for uid in part:
                 start = uid.rfind('/') + 1
-                if start == -1: # Adjust if slash not found
+                if start == -1:  # Adjust if slash not found
                     start = uid.find('@') + 1
-                if start == -1: # Adjust if '@' not found
-                    start = 0
                 links.append(uid[start:])
             response: list[str] = self.vk_helper.links_to_uids(links)
             for j, uid in zip(range(i, i + 25), response):
@@ -320,6 +330,3 @@ class UserList:
             KeysView[int]: A view of all ISU keys.
         """
         return self.db.keys()
-
-users_path = './subscribers/users.txt'
-warnings = []

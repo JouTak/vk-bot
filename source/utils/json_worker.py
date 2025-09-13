@@ -1,6 +1,7 @@
 import os
 import json
 
+
 def is_file_accessible(filepath: str) -> bool:
     if not os.path.exists(filepath):
         return False
@@ -9,6 +10,7 @@ def is_file_accessible(filepath: str) -> bool:
     if not os.access(filepath, os.R_OK):
         return False
     return True
+
 
 def is_json(myjson: str) -> bool:
     try:

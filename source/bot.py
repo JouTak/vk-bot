@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from utils.query_helper import MinecraftServerQuery
 from utils.vk_helper import *
 from utils.user_list import *
 
@@ -143,6 +144,7 @@ s24_third_part = '''
 
 '''.lstrip()
 
+
 def flat_info2text() -> dict[str]:
     """
    Builds a flattened dictionary mapping user info keys and nested metadata keys
@@ -163,6 +165,7 @@ def flat_info2text() -> dict[str]:
     result['met_s24_h10'] = User.b2t
     result['met_s25_h10'] = User.b2t
     return result
+
 
 tokens = (
     ('|', '&'),
@@ -201,7 +204,8 @@ def check_condition(cond: str, errors: list = None) -> str | None:
                 # Recursively validate each sub-condition separated by this token
                 for c in cond.split(token):
                     check_condition(c, errors)
-        if is_first is True: # If this is the top-level call, return 'ok' or error messages
+        # If this is the top-level call, return 'ok' or error messages
+        if is_first is True:
             return 'ok' if len(errors) == 0 else '\n'.join(errors)
         return
 
@@ -305,23 +309,25 @@ def eval_condition(user: tuple, cond: str) -> bool:
       Returns:
           bool: True if the condition evaluates to true for the given user, False otherwise.
       """
-    if '|' in cond: # Logical OR: condition is true if any subcondition separated by '|' is true
+    if '|' in cond:
         return any(eval_condition(user, i) for i in cond.split('|'))
-    if '&' in cond: # Logical AND: condition is true only if all subconditions separated by '&' are true
+    if '&' in cond:
         return all(eval_condition(user, i) for i in cond.split('&'))
-    if '->' in cond: # Check presence of a metadata key in user's data
+    if '->' in cond:
         # Return True if the key (before '->') exists in user[5] (metadata dictionary)
         c = cond.split('->')
         return c[0] in user[5].keys()
-    if '!>' in cond: # Check absence of a metadata key in user's data
+    if '!>' in cond:
         # Return True if the key (before '!>') does NOT exist in user[5]
         c = cond.split('!>')
         return c[0] not in user[5].keys()
-    for n, token in enumerate(tokens[2]): # Check if one of the comparison tokens (e.g. '=', '!=', '>', etc.) is in the condition string
+    # Check if one of the comparison tokens (e.g. '==', '!=', '>>', etc.) is in the condition string
+    for n, token in enumerate(tokens[2]):
         if token in cond:
-            c = cond.split(token) # Split condition on the comparison operator
-            i = c[0].split('.') # Extract possible nested keys
-            index = tokens[3].index(i[0]) # Find index of the main field in tokens[3] to get user's corresponding value and formatter
+            c = cond.split(token)  # Split condition on the comparison operator
+            i = c[0].split('.')  # Extract possible nested keys
+            # Find index of the main field in tokens[3] to get user's corresponding value and formatter
+            index = tokens[3].index(i[0])
             v = user[index]
             f = User.text2info[index]
             if i[0] == 'met':
@@ -345,7 +351,7 @@ def flat_info(info: User.info2text) -> dict[str]:
 
     This function processes specific fields from the `info` object and its nested 'metadata' dictionary.
     It extracts direct info fields and transforms metadata event data into
-    flat keys (e.g., 'met_s24_h10').
+    flat keys (e.g., 'met_s24_rr1').
 
     Args:
         info (User.info2text): The structured user information object.
@@ -415,6 +421,7 @@ def sender(self, condition: str, msg: str) -> list[dict]:
             result.append({'peer_id': uid, 'message': format_message(msg, user)})
     return result
 
+
 def process_message_event(self, event, vk_helper) -> list[dict] | None:
     """
     NOTE: This function is currently not used.
@@ -473,7 +480,7 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
     usurname = user_get['last_name']
 
     msg: str = event.message.text
-    msgs = msg.split() # Split message into words for command parsing
+    msgs = msg.split()  # Split message into words for command parsing
     if not msg:
         # If the message text is empty, no further processing needed for this path.
         # Consider if other logic (e.g., handling attachments) is required here.
@@ -482,16 +489,16 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
     # --- PRIVATE MESSAGES HANDLER ---
     # This block handles messages sent directly to the bot, not in group chats.
     if not event.from_chat:
-        #ADMIN COMMANDS
+        # ADMIN COMMANDS
         if uid in admin:
-            if msgs[0] == 'stop': # Shuts down the bot process (typically leads to container restart)
+            if msgs[0] == 'stop':  # Shuts down the bot process (typically leads to container restart)
                 exit()
-            elif msgs[0] == 'reload': # Forces a reload of the user list from storage
+            elif msgs[0] == 'reload':  # Forces a reload of the user list from storage
                 return [{'peer_id': uid, 'message': 'Success' if self.users.load() else 'Failed'}]
-            elif msgs[0] == 'sender': # Dispatches a custom message to a group of users based on a condition
-                if len(msgs) > 2: # Extracts the condition and the message text for the sender function
+            elif msgs[0] == 'sender':  # Dispatches a custom message to a group of users based on a condition
+                if len(msgs) > 2:  # Extracts the condition and the message text for the sender function
                     result = sender(self, msgs[1], msg.removeprefix(msgs[0]).strip().removeprefix(msgs[1]).strip())
-                    count = self.handle_actions(result) # Executes the sending actions
+                    count = self.handle_actions(result)  # Executes the sending actions
                     tts = f'Готово. Всего разослано {count} сообщений'
                 elif len(msgs) == 2:
                     tts = 'Нет сообщения'
@@ -501,16 +508,16 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
                     'peer_id': uid,
                     'message': tts
                 }]
-            elif msgs[0] == 'add_users':# Adds specified user IDs as 'dummy' users to the database
+            elif msgs[0] == 'add_users':  # Adds specified user IDs as 'dummy' users to the database
                 errors = dict[str: str]()
                 for i in set(msgs[1:]):
                     try:
                         if int(i) in users.uid_to_isu.keys():
                             raise Exception(f'User {i} is already in database')
-                        users.add((-1, int(i), '', '', '', {})) # Add user with default empty metadata
+                        users.add((-1, int(i), '', '', '', {}))  # Add user with default empty metadata
                     except Exception as e:
                         errors[i] = str(e)
-                if errors: # Formats error messages for the admin
+                if errors:  # Formats error messages for the admin
                     tts = '\n'.join(f'Ошибка при добавлении "{key}":\n{errors[key]}\n' for key in errors.keys())
                 else:
                     tts = 'Успешный успех!'
@@ -571,14 +578,15 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
         # --- DEFAULT MESSAGE RESPONSE LOGIC ---
         # Determines the bot's response based on user's group membership and metadata
         if vk_helper.vk_session.method('groups.isMember', {'group_id': self.group_id, 'user_id': uid}) == 0:
-            tts = info_message # User is not a member of our group
+            tts = info_message  # User is not a member of our group
         elif uid in users.uid_to_isu:
             isu = users.uid_to_isu[uid]
             user = users.get(isu)
             # Check specific metadata keys to tailor the response
             if 'y25' in user.met.keys() and user.met['y25']['ugo'] != 0:
                 tts = format_message(y25_message, user,
-                                     part2=(format_message(y25_second_part, user) if user.met['y25']['way'] == 2 else ''))
+                                     part2=(
+                                         format_message(y25_second_part, user) if user.met['y25']['way'] == 2 else ''))
             elif 's25' in user.met.keys():
                 tts = format_message(s25_message, user,
                                      part2=(format_message(s25_second_part, user) if user.met['s25']['wr1'] else ''),
@@ -588,15 +596,39 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
                                      part2=format_message(s24_second_part, user) if user.met['s24']['wr1'] else '',
                                      part3=format_message(s24_third_part, user) if user.met['s24']['wr2'] else '')
             else:
-                tts = info_message # No specific metadata matched
+                tts = info_message  # No specific metadata matched
         else:
-            tts = info_message # User not found in the database
+            tts = info_message  # User not found in the database
 
     # --- CHAT MESSAGES HANDLER ---
     # This block is for messages received in group chats.
     else:
-        # TODO: фича на вывод в чат инфы от сервера
-        return
+        is_ping = False
+        msg = event.object['message']['text']
+        if not msg:
+            return
+        msgs = msg.split()
+        if '@club230160029' in msgs[0]:
+            is_ping = True
+            msgs.pop(0)
+            msg = msg[msg.index(']') + 2:]
+        elif '@club230160029' in msgs:
+            is_ping = True
+
+        uid = event.object['message']['peer_id']
+        cuid = event.object['message'].get('conversation_message_id')
+
+        if msgs[0].lstrip('/') == 'ping':
+            mc = MinecraftServerQuery()
+            try:
+                players, version = mc.get_info()
+                tts = f'JouTak {version}\n\n== Zadry {len(players)}/375 ==\n{f"{chr(10)}".join(players)}'
+            except Exception as e:
+                tts = 'Server connection error: ' + str(e)
+        else:
+            return
+        # TODO: чекнуть оформление, возможно, подправить
+        return [{'peer_id': uid, 'message': tts, 'conversation_message_id': cuid}]
 
     # Default return for processed private messages
     return [{
