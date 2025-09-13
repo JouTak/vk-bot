@@ -4,25 +4,24 @@ import getpass
 from pathlib import Path
 
 required_dirs = [
-    'source/subscribers'
+    'data/subscribers'
 ]
 required_files = [
-    'source/subscribers/spartakiada24.txt'
-    'source/subscribers/spartakiada.txt'
-    'source/subscribers/ignored.txt'
+    'data/subscribers/spartakiada24.txt'
+    'data/subscribers/spartakiada.txt'
+    'data/subscribers/ignored.txt'
 ]
 
 def create():
-    pass
-    # for directory in required_dirs:
-    #     if not os.path.exists(directory):
-    #         os.makedirs(directory)
-    #         print(f"Создана папка: {directory}")
-    # for file in required_files:
-    #     path = Path(file)
-    #     if not path.exists():
-    #         path.touch()
-    #         print(f"Создан файл: {file}")
+    for directory in required_dirs:
+        if not os.path.exists(directory):
+            os.makedirs(directory)
+            print(f"Создана папка: {directory}")
+    for file in required_files:
+        path = Path(file)
+        if not path.exists():
+            path.touch()
+            print(f"Создан файл: {file}")
     """
     if not os.path.exists('token.txt'):
         token=getpass.getpass("введи токен приложения VK:\n")

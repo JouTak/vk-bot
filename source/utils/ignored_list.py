@@ -29,7 +29,7 @@ class IgnoredList:
     def save_to_file(self):
         try:
 
-            with open('./subscribers/ignored.txt', 'w+', encoding='UTF-8') as file:
+            with open('/app/data/subscribers/ignored.txt', 'w+', encoding='UTF-8') as file:
                 file.write('\n'.join(map(str, self.ignored)))
             return f'Список игнорируемых сохранён.'
         except Exception as e:
@@ -37,10 +37,10 @@ class IgnoredList:
 
     def load_from_file(self):
         try:
-            if not os.path.exists('./subscribers/ignored.txt'):
-                with open('./subscribers/ignored.txt', 'w', encoding='UTF-8') as file:
+            if not os.path.exists('/app/data/subscribers/ignored.txt'):
+                with open('/app/data/subscribers/ignored.txt', 'w', encoding='UTF-8') as file:
                     file.write('')
-            with open('./subscribers/ignored.txt', 'r', encoding='UTF-8') as file:
+            with open('/app/data/subscribers/ignored.txt', 'r', encoding='UTF-8') as file:
                 self.ignored = set(map(lambda x: int(x.strip()), file.readlines()))
             return f'Список игнорируемых загружен.'
         except Exception as e:
