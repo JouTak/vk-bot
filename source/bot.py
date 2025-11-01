@@ -3,7 +3,7 @@ from utils.query_helper import MinecraftServerQuery
 from utils.vk_helper import *
 from utils.user_list import *
 
-# DB: isu, uid, fio, grp, nck, {s24: {...}, s25: {...}, ...}
+# DB: isu, uid, fio, grp, nck, {a24: {...}, s25: {...}, ...}
 
 spartakiada_subs_path = './subscribers/spartakiada{}.txt'
 
@@ -33,8 +33,28 @@ info_message = (
     f'3) Следи за новостями в нашем телеграм канале: {telegram_link}.\n'
     f'Помогая нашему продвижению, ты делаешь ивенты масштабнее, а сервера круче!\n'
     f'P.S.: Плашку в ису "Член клуба ITMOcraft" тоже можно получить после заполнения этой анкеты, по желанию.\n'
-    f'Если есть вопросы, в том числе по спартакиаде, пиши "АДМИН"!'
+    f'Если есть вопросы, в том числе по спартакиаде, пиши "АДМИН"!\n'
+    f'\n'
+    f'P.P.S.: У нас скоро начнётся осенняя Спартакиада, если хочешь, можешь зарегистрироваться: '
+    f'[Зве, вставь сюда ссылку на регу]'
 )
+
+a25_message = '''
+Вот твои данные за осеннюю Спартакиаду по Майнкрафту 2025!
+
+ИСУ:
+{isu}
+
+Ник:
+{nck}
+
+Команда:
+{met_a25_cmd}
+
+Обязательно проверь все данные, только в случае несоответствий или важных вопросов напиши в ответ "АДМИН"
+Читай о нас подробнее на сайте https://joutak.ru/minigames и других разделах
+(Сообщение тестовое, будет дополняться)
+'''.strip()
 
 y25_message = '''
 Вот твои данные по выезду в Ягодное 2025!
@@ -59,6 +79,9 @@ y25_message = '''
 
 В каком домике ты живёшь:
 {met_y25_liv}
+
+P.S.: У нас сейчас проходит осенняя Спартакиада по Майнкрафту 2025! Скорей беги регистрироваться!
+[Зве, вставь сюда ссылку на регу]
 '''.strip()
 
 y25_second_part = '''
@@ -68,7 +91,7 @@ y25_second_part = '''
 '''.rstrip()
 
 s25_message = '''
-Вот твои данные за Спартакиаду по Майнкрафту 2025!
+Вот твои данные за весеннюю Спартакиаду по Майнкрафту 2025!
 
 ИСУ:
 {isu}
@@ -90,6 +113,9 @@ s25_message = '''
 {part2}{part3}
 Обязательно проверь все данные, только в случае несоответствий или важных вопросов напиши в ответ "АДМИН"
 Читай о нас подробнее на сайте https://joutak.ru/minigames и других разделах
+
+P.S.: У нас сейчас проходит осенняя Спартакиада по Майнкрафту 2025! Скорей беги регистрироваться!
+[Зве, вставь сюда ссылку на регу]
 '''.strip()
 
 s25_second_part = '''
@@ -107,40 +133,43 @@ s25_third_part = '''
 
 '''.lstrip()
 
-s24_message = '''
-Вот твои данные за Спартакиаду по Майнкрафту 2024!
+a24_message = '''
+Вот твои данные за осеннюю Спартакиаду по Майнкрафту 2024!
 
 Ник:
-{met_s24_nck}
+{met_a24_nck}
 
 Участвуешь ли ты в первом этапе:
 Да
 
 Использовал ли ты все попытки:
-{met_s24_lr1}
+{met_a24_lr1}
 
 Проходишь ли в следующий этап:
-{met_s24_wr1}
+{met_a24_wr1}
 
 Поставят ли 10 баллов:
-{met_s24_h10}
+{met_a24_h10}
 
 {part2}{part3}
 Обязательно проверь все данные, только в случае несоответствий или важных вопросов напиши в ответ "АДМИН"
 Читай о нас подробнее на сайте https://joutak.ru/minigames и других разделах
+
+P.S.: У нас сейчас проходит осенняя Спартакиада по Майнкрафту 2025! Скорей беги регистрироваться!
+[Зве, вставь сюда ссылку на регу]
 '''.strip()
 
-s24_second_part = '''
+a24_second_part = '''
 Проходишь ли ты в финал:
-{met_s24_wr2}
+{met_a24_wr2}
 
 Ещё не отыграл в финале:
-{met_s24_nyt}
+{met_a24_nyt}
 '''
 
-s24_third_part = '''
+a24_third_part = '''
 Победил ли в финале:
-{met_s24_fnl}
+{met_a24_fnl}
 
 '''.lstrip()
 
@@ -162,7 +191,7 @@ def flat_info2text() -> dict[str]:
     for n, event in enumerate(tokens[4]):
         for key in tokens[5][n]:
             result[f'met_{event}_{key}'] = User.info2text[5][event][key]
-    result['met_s24_h10'] = User.b2t
+    result['met_a24_h10'] = User.b2t
     result['met_s25_h10'] = User.b2t
     return result
 
@@ -351,7 +380,7 @@ def flat_info(info: User.info2text) -> dict[str]:
 
     This function processes specific fields from the `info` object and its nested 'metadata' dictionary.
     It extracts direct info fields and transforms metadata event data into
-    flat keys (e.g., 'met_s24_rr1').
+    flat keys (e.g., 'met_a24_rr1').
 
     Args:
         info (User.info2text): The structured user information object.
@@ -368,8 +397,8 @@ def flat_info(info: User.info2text) -> dict[str]:
     for n, event in enumerate(tokens[4]):
         if event not in info[5].keys():
             continue
-        elif event == 's24':
-            result['met_s24_h10'] = info[5][event]['lr1'] is True
+        elif event == 'a24':
+            result['met_a24_h10'] = info[5][event]['lr1'] is True
         elif event == 's25':
             result['met_s25_h10'] = info[5][event]['rr1'] != 0
         for key in tokens[5][n]:
@@ -477,7 +506,7 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
     user_get = vk_helper.vk.users.get(user_ids=uid)
     user_get = user_get[0]  # The API returns a list, even for a single user_id
     uname = user_get['first_name']
-    usurname = user_get['last_name']
+    username = user_get['last_name']
 
     msg: str = event.message.text
     msgs = msg.split()  # Split message into words for command parsing
@@ -545,7 +574,7 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
                 self.info(ignored.remove(uid))
                 self.info(ignored.save_to_file())
                 tts = 'Надеюсь, вопрос снят!'
-                atts = f'{uname} {usurname} больше не вызывает!'
+                atts = f'{uname} {username} больше не вызывает!'
                 buttons = [{'label': 'ПОЗВАТЬ АДМИНА', 'payload': {'type': 'callmanager'}, 'color': 'positive'}]
                 keyboard = create_standard_keyboard(buttons)
             # User is calling for admin support
@@ -554,7 +583,7 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
                 self.info(ignored.save_to_file())
                 tts = 'Принято, сейчас позову! Напиши свою проблему следующим сообщением. ' \
                       'Когда вопрос будет решён, ещё раз напиши команду или нажми на кнопку.'
-                atts = f'{uname} {usurname} вызывает!'
+                atts = f'{uname} {username} вызывает!'
                 buttons = [{'label': 'СПАСИБО АДМИН', 'payload': {'type': 'uncallmanager'}, 'color': 'negative'}]
                 keyboard = create_standard_keyboard(buttons)
             # Return messages for both the user and all admins
@@ -583,7 +612,9 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
             isu = users.uid_to_isu[uid]
             user = users.get(isu)
             # Check specific metadata keys to tailor the response
-            if 'y25' in user.met.keys() and user.met['y25']['ugo'] != 0:
+            if 'a25' in user.met.keys():
+                tts = format_message(a25_message, user)
+            elif 'y25' in user.met.keys() and user.met['y25']['ugo'] != 0:
                 tts = format_message(y25_message, user,
                                      part2=(
                                          format_message(y25_second_part, user) if user.met['y25']['way'] == 2 else ''))
@@ -591,10 +622,10 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
                 tts = format_message(s25_message, user,
                                      part2=(format_message(s25_second_part, user) if user.met['s25']['wr1'] else ''),
                                      part3=(format_message(s25_third_part, user) if user.met['s25']['wr2'] else ''))
-            elif 's24' in user.met.keys():
-                tts = format_message(s24_message, user,
-                                     part2=format_message(s24_second_part, user) if user.met['s24']['wr1'] else '',
-                                     part3=format_message(s24_third_part, user) if user.met['s24']['wr2'] else '')
+            elif 'a24' in user.met.keys():
+                tts = format_message(a24_message, user,
+                                     part2=format_message(a24_second_part, user) if user.met['a24']['wr1'] else '',
+                                     part3=format_message(a24_third_part, user) if user.met['a24']['wr2'] else '')
             else:
                 tts = info_message  # No specific metadata matched
         else:
