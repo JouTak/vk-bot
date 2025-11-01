@@ -281,7 +281,7 @@ class UserList:
         to_save.extend(map('\t'.join, self.errors))
         to_save.sort(key=lambda x: int(x.split('\t')[0]) if x.split('\t')[0].isdigit() else -1)
         with open(users_path, 'w', encoding='UTF-8') as file:
-            file.write('\n'.join(to_save))
+            file.write('\n'.join([i for i in to_save if i and i[0] != '0']))
         return True
 
     def get(self, isu: int) -> User | None:
@@ -340,7 +340,7 @@ class UserList:
 def inject_a25(vk_helper):
     with open('./subscribers/a25.txt', 'r', encoding='UTF-8') as file:
         # ису    фио    наш    вк    ник    команда    кэп    команды    раунд1?    раунд2?    раунд3?    баллы?
-        data = [i.split('\t') for i in file.read().strip().split('\n')]
+        data = [i.split('\t') for i in file.read().strip('\n').split('\n')]
 
     with open('./subscribers/users.txt', 'r', encoding='UTF-8') as file:
         all_users = [i.split('\t') for i in file.read().strip().split('\n') if i]
@@ -388,4 +388,4 @@ def inject_a25(vk_helper):
             all_users.append(list(map(str, user)))
 
     with open('./subscribers/users.txt', 'w', encoding='UTF-8') as file:
-        file.write('\n'.join('\t'.join(map(str, i)) for i in all_users))
+        file.write('\n'.join('\t'.join(map(str, i)) for i in all_users if i and i[0] != '0'))
