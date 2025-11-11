@@ -18,7 +18,8 @@ class Main:
         self.info(self.ignored.load_from_file())
         self.users = UserList(users_path, self.VK)
 
-        if warnings: self.warn('\n'.join(warnings))
+        if warnings:
+            self.warn('\n'.join(warnings))
         self.info('Готов!\n')
 
     def run(self):
