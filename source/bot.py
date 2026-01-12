@@ -13,7 +13,7 @@ itmocraft_ip = 'craft.itmo.ru'
 joutak_ip = 'mc.joutak.ru'
 joutak_link = 'https://joutak.ru'
 form_link = 'https://forms.yandex.ru/u/6501f64f43f74f18a8da28de/'
-a25_reg_link = form_link
+a25_reg_link = '*скоро появится*'
 telegram_link = 't.me/itmocraft'
 discord_link = 'https://discord.gg/YVj5tckahA'
 vk_link = 'https://vk.com/widget_community.php?act=a_subscribe_box&oid=-217494619&state=1|ITMOcraft'
@@ -64,7 +64,7 @@ a25_welcome_message = (
     "Хочешь участвовать — зарегистрируйся по ссылке:\n"
     f"{a25_reg_link}\n\n"
     "После регистрации бот покажет твою команду и данные.\n"
-    "Если ты уже зарегистрировался, но бот ничего не показывает — подожди, в нескольких рабочих часов информация точно должна появиться."
+    "Если ты уже зарегистрировался, но бот ничего не показывает — подожди, в течение нескольких рабочих часов информация точно должна появиться."
     "Если она не появилась, напиши в ответ: АДМИН"
 )
 y25_message = '''
