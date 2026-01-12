@@ -13,6 +13,7 @@ itmocraft_ip = 'craft.itmo.ru'
 joutak_ip = 'mc.joutak.ru'
 joutak_link = 'https://joutak.ru'
 form_link = 'https://forms.yandex.ru/u/6501f64f43f74f18a8da28de/'
+a25_reg_link = form_link
 telegram_link = 't.me/itmocraft'
 discord_link = 'https://discord.gg/YVj5tckahA'
 vk_link = 'https://vk.com/widget_community.php?act=a_subscribe_box&oid=-217494619&state=1|ITMOcraft'
@@ -56,6 +57,16 @@ a25_message = '''
 (Сообщение тестовое, будет дополняться)
 '''.strip()
 
+
+a25_welcome_message = (
+    "Привет! \n\n"
+    "Сейчас идёт третий сезон Майнокиады по Майнкрафту!\n"
+    "Хочешь участвовать — зарегистрируйся по ссылке:\n"
+    f"{a25_reg_link}\n\n"
+    "После регистрации бот покажет твою команду и данные.\n"
+    "Если ты уже зарегистрировался, но бот ничего не показывает — подожди, в нескольких рабочих часов информация точно должна появиться."
+    "Если она не появилась, напиши в ответ: АДМИН"
+)
 y25_message = '''
 Вот твои данные по выезду в Ягодное 2025!
 
@@ -603,33 +614,19 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
                     } for uid in admin
                 ]
             ]
-
         # --- DEFAULT MESSAGE RESPONSE LOGIC ---
-        # Determines the bot's response based on user's group membership and metadata
-        if vk_helper.vk_session.method('groups.isMember', {'group_id': self.group_id, 'user_id': uid}) == 0:
-            tts = info_message  # User is not a member of our group
-        elif uid in users.uid_to_isu:
+        # Priority:
+        # 1) If user participates in A25 -> show A25 info
+        # 2) Otherwise -> show welcome message with registration link
+        if uid in users.uid_to_isu:
             isu = users.uid_to_isu[uid]
             user = users.get(isu)
-            # Check specific metadata keys to tailor the response
-            if 'a25' in user.met.keys():
+            if user is not None and 'a25' in user.met.keys():
                 tts = format_message(a25_message, user)
-            elif 'y25' in user.met.keys() and user.met['y25']['ugo'] != 0:
-                tts = format_message(y25_message, user,
-                                     part2=(
-                                         format_message(y25_second_part, user) if user.met['y25']['way'] == 2 else ''))
-            elif 's25' in user.met.keys():
-                tts = format_message(s25_message, user,
-                                     part2=(format_message(s25_second_part, user) if user.met['s25']['wr1'] else ''),
-                                     part3=(format_message(s25_third_part, user) if user.met['s25']['wr2'] else ''))
-            elif 'a24' in user.met.keys():
-                tts = format_message(a24_message, user,
-                                     part2=format_message(a24_second_part, user) if user.met['a24']['wr1'] else '',
-                                     part3=format_message(a24_third_part, user) if user.met['a24']['wr2'] else '')
             else:
-                tts = info_message  # No specific metadata matched
+                tts = a25_welcome_message
         else:
-            tts = info_message  # User not found in the database
+            tts = a25_welcome_message
 
     # --- CHAT MESSAGES HANDLER ---
     # This block is for messages received in group chats.
