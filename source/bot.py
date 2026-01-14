@@ -7,13 +7,13 @@ from utils.user_list import *
 
 spartakiada_subs_path = './subscribers/spartakiada{}.txt'
 
-admin = [297002785, 325899178, 229488682]
+admin = [297002785, 275052029, 325899178, 229488682]
 
 itmocraft_ip = 'craft.itmo.ru'
 joutak_ip = 'mc.joutak.ru'
 joutak_link = 'https://joutak.ru'
 form_link = 'https://forms.yandex.ru/u/6501f64f43f74f18a8da28de/'
-a25_reg_link = '*скоро появится*'
+a25_reg_link='https://itmo.events/events/116180'
 telegram_link = 't.me/itmocraft'
 discord_link = 'https://discord.gg/YVj5tckahA'
 vk_link = 'https://vk.com/widget_community.php?act=a_subscribe_box&oid=-217494619&state=1|ITMOcraft'
@@ -39,7 +39,11 @@ info_message = (
     f'P.P.S.: У нас скоро начнётся осенняя Спартакиада, если хочешь, можешь зарегистрироваться: '
     f'[Зве, вставь сюда ссылку на регу]'
 )
-
+a25_welcome_message = ( "Привет! \n\n" "Сейчас идёт третий сезон Майнокиады по Майнкрафту!\n"
+                        "Хочешь участвовать — зарегистрируйся по ссылке:\n" f"{a25_reg_link}\n\n"
+                        "После регистрации бот покажет твою команду и данные.\n" 
+                        "Если ты уже зарегистрировался, но бот ничего не показывает — подожди, в нескольких рабочих часов информация точно должна появиться." 
+                        "Если она не появилась, напиши в ответ: АДМИН" )
 a25_message = '''
 Вот твои данные за осеннюю Спартакиаду по Майнкрафту 2025!
 
@@ -47,7 +51,7 @@ a25_message = '''
 {isu}
 
 Ник:
-{nck}
+{met_a25_nck}
 
 Команда:
 {met_a25_cmd}
@@ -58,15 +62,6 @@ a25_message = '''
 '''.strip()
 
 
-a25_welcome_message = (
-    "Привет! \n\n"
-    "Сейчас идёт третий сезон Майнокиады по Майнкрафту!\n"
-    "Хочешь участвовать — зарегистрируйся по ссылке:\n"
-    f"{a25_reg_link}\n\n"
-    "После регистрации бот покажет твою команду и данные.\n"
-    "Если ты уже зарегистрировался, но бот ничего не показывает — подожди, в течение нескольких рабочих часов информация точно должна появиться."
-    "Если она не появилась, напиши в ответ: АДМИН"
-)
 y25_message = '''
 Вот твои данные по выезду в Ягодное 2025!
 
@@ -614,10 +609,11 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
                     } for uid in admin
                 ]
             ]
+
         # --- DEFAULT MESSAGE RESPONSE LOGIC ---
         # Priority:
         # 1) If user participates in A25 -> show A25 info
-        # 2) Otherwise -> show welcome message with registration link
+        # 2) Otherwise -> show welcome message about A25 with registration link
         if uid in users.uid_to_isu:
             isu = users.uid_to_isu[uid]
             user = users.get(isu)
@@ -627,6 +623,8 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
                 tts = a25_welcome_message
         else:
             tts = a25_welcome_message
+
+
 
     # --- CHAT MESSAGES HANDLER ---
     # This block is for messages received in group chats.
