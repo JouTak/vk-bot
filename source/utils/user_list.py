@@ -1,6 +1,7 @@
 from utils.json_worker import *
 from datetime import datetime
 
+
 users_path = './subscribers/users.txt'
 warnings = []
 
@@ -341,12 +342,13 @@ def inject_a25(vk_helper):
     """
     Injects Autumn Spartakiad 2025 (A25) data from ./subscribers/a25.txt into ./subscribers/users.txt.
 
-    Expected a25.txt format (TSV, header allowed):
-        ису    фио    наш    вк    ник    команда    кэп команды    раунд1?    раунд2?    раунд3?    баллы?
+    Supports TSV with header. Expected columns:
+        ису    фио    наш    вк    ник    команда    кэп команды    раунд1?    раунд2?    раунд3?   [баллы?]
+    The last column "баллы?" is optional. If missing -> brs = False.
 
     Notes:
     - Header line is skipped automatically.
-    - Rows with missing columns are skipped.
+    - Rows with too few columns are skipped.
     - If a user exists in users.txt (matched by ISU first, then by VK uid), their met['a25'] is replaced/updated.
     - New users are appended to users.txt.
     - If a25.txt is missing, the function logs a warning and does nothing (bot keeps running).
@@ -359,7 +361,6 @@ def inject_a25(vk_helper):
         warn(f"A25 inject skipped: file not found: {a25_path}")
         return
 
-    raw = ''
     with open(a25_path, 'r', encoding='UTF-8') as f:
         raw = f.read().replace('\r\n', '\n').replace('\r', '\n')
 
@@ -368,19 +369,208 @@ def inject_a25(vk_helper):
         warn("A25 inject skipped: a25.txt is empty")
         return
 
+    def parse_yes(value: str) -> bool:
+        x = (value or '').strip().lower()
+        return x in ('да', 'yes', 'true', '1', '+')
+
+    def parse_is_internal(value: str) -> bool:
+        """
+        Returns True for internal participants, False for external.
+        In the table, column "наш" may contain an email (internal) or text like "Внешний человек".
+        """
+        x = (value or '').strip().lower()
+        if not x:
+            return True
+        if x in ('внешний человек', 'внешний', 'external'):
+            return False
+        if '@' in x:  # email -> internal
+            return True
+        return True
+
+    def clean_vk_link(s: str) -> str:
+        s = (s or '').strip()
+        if not s:
+            return ''
+        s = s.replace('https://vk.com/', '').replace('http://vk.com/', '')
+        s = s.replace('https://m.vk.com/', '').replace('http://m.vk.com/', '')
+        s = s.replace('https://vk.ru/', '').replace('http://vk.ru/', '')
+        s = s.lstrip('@')
+        return s
+
+    def resolve_links_same_len(links: list[str]) -> list[str]:
+        """
+        Resolves only non-empty links, preserves list length, empty -> '0'.
+        """
+        out = ['0'] * len(links)
+        idxs = [i for i, l in enumerate(links) if l]
+        if not idxs:
+            return out
+
+        to_resolve = [links[i] for i in idxs]
+        resolved = []
+        for i in range(0, len(to_resolve), 25):
+            resolved.extend(vk_helper.links_to_uids(to_resolve[i:i + 25]))
+
+        for i, uid in zip(idxs, resolved):
+            out[i] = str(uid)
+        return out
+
+    def parse_isu_value(s: str) -> int | None:
+        """
+        ISU in this inject is used only as a strong ID.
+        Treat <= 0 (including -1) as 'missing' to avoid collisions between external participants.
+        """
+        try:
+            v = int((s or '').strip())
+        except Exception:
+            return None
+        return v if v > 0 else None
+
     # Parse rows (skip header if present)
-    rows = []
+    rows: list[list[str]] = []
     for line in raw_lines:
         cols = [c.strip() for c in line.split('\t')]
-        if len(cols) < 11:
+
+        if cols and cols[0].strip().lower() == 'ису':
+            continue
+
+        # Need at least 10 columns (without "баллы?")
+        if len(cols) < 10:
             warn("A25 inject: skipping row with missing columns:", line)
             continue
-        if cols[0].strip().lower() == 'ису':
-            continue
-        rows.append(cols[:11])
+
+        # If "баллы?" missing -> append empty
+        if len(cols) == 10:
+            cols.append('')
+
+        # Cut extra columns, keep first 11
+        if len(cols) > 11:
+            cols = cols[:11]
+
+        # Final safety: pad to 11
+        while len(cols) < 11:
+            cols.append('')
+
+        rows.append(cols)
 
     if not rows:
         return
+
+    # Read existing users.txt
+    users_path = './subscribers/users.txt'
+    all_users: list[list[str]] = []
+    if os.path.exists(users_path):
+        with open(users_path, 'r', encoding='UTF-8') as f:
+            content = f.read().replace('\r\n', '\n').replace('\r', '\n').strip()
+            if content:
+                all_users = [i.split('\t') for i in content.split('\n') if i]
+
+    # Ensure each row has at least 6 columns: isu, uid, fio, grp, nck, met
+    for i in range(len(all_users)):
+        while len(all_users[i]) < 6:
+            all_users[i].append('-')
+
+    # Build indexes (ISU only for >0)
+    isu_to_index: dict[int, int] = {}
+    uid_to_index: dict[int, int] = {}
+    for idx, row in enumerate(all_users):
+        isu = parse_isu_value(row[0]) if row else None
+        try:
+            uid = int(row[1]) if row and str(row[1]).isdigit() else None
+        except Exception:
+            uid = None
+
+        if isu is not None:
+            isu_to_index[isu] = idx
+        if uid is not None and uid not in (0, 1):
+            uid_to_index[uid] = idx
+
+    # Resolve VK uids in batches (empty links -> '0')
+    vk_links = [clean_vk_link(r[3]) for r in rows]
+    cap_links = [clean_vk_link(r[6]) for r in rows]
+
+    resolved_uids = resolve_links_same_len(vk_links)
+    resolved_cids = resolve_links_same_len(cap_links)
+
+    # Inject
+    for cols, uid, cid in zip(rows, resolved_uids, resolved_cids):
+        isu_s, fio, sts_raw, vk_link, nick, team, cap_link, r1, r2, r3, brs = cols
+
+        isu_int = parse_isu_value(isu_s)
+        uid_int = int(uid) if str(uid).isdigit() else 0
+        cid_int = int(cid) if str(cid).isdigit() else 0
+
+        info = {
+            'fio': str(fio),
+            'sts': parse_is_internal(sts_raw),
+            'uid': uid_int,
+            'nck': str(nick),
+            'cmd': str(team),
+            'cid': cid_int,
+            'wr1': parse_yes(r1),
+            'wr2': parse_yes(r2),
+            'wr3': parse_yes(r3),
+            'brs': parse_yes(brs),
+        }
+
+        target_index = None
+        if isu_int is not None and isu_int in isu_to_index:
+            target_index = isu_to_index[isu_int]
+        elif uid_int not in (0, 1) and uid_int in uid_to_index:
+            target_index = uid_to_index[uid_int]
+
+        if target_index is not None:
+            # Update existing record
+            u = all_users[target_index]
+            if isu_int is not None:
+                u[0] = str(isu_int)
+            if uid_int not in (0, 1):
+                u[1] = str(uid_int)
+            if fio:
+                u[2] = fio
+            if nick:
+                u[4] = nick
+
+            try:
+                met = json.loads(u[5]) if u[5] and u[5] != '-' else {}
+                if not isinstance(met, dict):
+                    met = {}
+            except Exception:
+                met = {}
+
+            met['a25'] = info
+            u[5] = json.dumps(met, ensure_ascii=False)
+        else:
+            # Append new record (assign special ISU if missing)
+            if isu_int is None:
+                special = 1000000
+                used = set()
+                for row in all_users:
+                    try:
+                        used.add(int(row[0]))
+                    except Exception:
+                        pass
+                while special in used:
+                    special += 1
+                isu_int = special
+
+            new_user = [
+                str(isu_int),
+                str(uid_int),
+                fio or '-',
+                '-',
+                nick or '-',
+                json.dumps({'a25': info}, ensure_ascii=False)
+            ]
+            all_users.append(new_user)
+            idx = len(all_users) - 1
+            isu_to_index[isu_int] = idx
+            if uid_int not in (0, 1):
+                uid_to_index[uid_int] = idx
+
+    with open(users_path, 'w', encoding='UTF-8') as f:
+        f.write('\n'.join('\t'.join(map(str, i)) for i in all_users if i and i[0] != '0'))
+
 
     def parse_is_internal(value: str) -> bool:
         """
