@@ -13,12 +13,19 @@ itmocraft_ip = 'craft.itmo.ru'
 joutak_ip = 'mc.joutak.ru'
 joutak_link = 'https://joutak.ru'
 form_link = 'https://forms.yandex.ru/u/6501f64f43f74f18a8da28de/'
-a25_reg_link='https://itmo.events/events/116180'
+a25_reg_link = 'https://itmo.events/events/116180'
 telegram_link = 't.me/itmocraft'
 discord_link = 'https://discord.gg/YVj5tckahA'
 vk_link = 'https://vk.com/widget_community.php?act=a_subscribe_box&oid=-217494619&state=1|ITMOcraft'
 
-info_message = (
+# --- ВАЖНО: как раньше — сообщение для неподписанных ---
+info_message = \
+    'Привет! Для получения информации о серверах ИТМОкрафта подпишитесь:\n' \
+    f'[{vk_link}. Подписаться]\n\n' \
+    'После подписки отправь ещё одно сообщение. Только в случае возникновения проблем пиши "АДМИН"'
+
+# --- Это было старым hi_message (у тебя сейчас называлось info_message) ---
+hi_message = (
     f'Добро пожаловать в клуб любителей Майнкрафта ITMOcraft! Наш клуб — комьюнити итмошников, которым нравится играть '
     f'в майнкрафт во всех его проявлениях: Выживание, моды, мини-игры: если во что-то можно играть, '
     f'мы создаём для этого условия. Недавно мы получили от университета ещё большие мощности, '
@@ -37,13 +44,19 @@ info_message = (
     f'Если есть вопросы, в том числе по спартакиаде, пиши "АДМИН"!\n'
     f'\n'
     f'P.P.S.: У нас скоро начнётся осенняя Спартакиада, если хочешь, можешь зарегистрироваться: '
-    f'[Зве, вставь сюда ссылку на регу]'
+    f'{a25_reg_link}'
 )
-a25_welcome_message = ( "Привет! \n\n" "Сейчас идёт третий сезон Майнокиады по Майнкрафту!\n"
-                        "Хочешь участвовать — зарегистрируйся по ссылке:\n" f"{a25_reg_link}\n\n"
-                        "После регистрации бот покажет твою команду и данные.\n" 
-                        "Если ты уже зарегистрировался, но бот ничего не показывает — подожди, в нескольких рабочих часов информация точно должна появиться." 
-                        "Если она не появилась, напиши в ответ: АДМИН" )
+
+a25_welcome_message = (
+    "Привет! \n\n"
+    "Сейчас идёт третий сезон Майнокиады по Майнкрафту!\n"
+    "Хочешь участвовать — зарегистрируйся по ссылке:\n"
+    f"{a25_reg_link}\n\n"
+    "После регистрации бот покажет твою команду и данные.\n"
+    "Если ты уже зарегистрировался, но бот ничего не показывает — подожди, в нескольких рабочих часов информация точно должна появиться."
+    "Если она не появилась, напиши в ответ: АДМИН"
+)
+
 a25_message = '''
 Вот твои данные за третий сезон Майнокиады ITMOcraft!
 
@@ -61,7 +74,6 @@ a25_message = '''
 
 P.S. Сообщение будет дополняться твоими данными по мере участия в играх
 '''.strip()
-
 
 y25_message = '''
 Вот твои данные по выезду в Ягодное 2025!
@@ -516,17 +528,14 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
     username = user_get['last_name']
 
     msg: str = event.message.text
+    msg = (event.object['message'].get('text') or '')
     msgs = msg.split()  # Split message into words for command parsing
-    if not msg:
-        # If the message text is empty, no further processing needed for this path.
-        # Consider if other logic (e.g., handling attachments) is required here.
-        return
 
     # --- PRIVATE MESSAGES HANDLER ---
     # This block handles messages sent directly to the bot, not in group chats.
     if not event.from_chat:
-        # ADMIN COMMANDS
-        if uid in admin:
+        # ADMIN COMMANDS (важно: не падаем на пустом тексте/стикере)
+        if uid in admin and msgs:
             if msgs[0] == 'stop':  # Shuts down the bot process (typically leads to container restart)
                 exit()
             elif msgs[0] == 'reload':  # Forces a reload of the user list from storage
@@ -545,7 +554,7 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
                     'message': tts
                 }]
             elif msgs[0] == 'add_users':  # Adds specified user IDs as 'dummy' users to the database
-                errors = dict[str: str]()
+                errors = dict[str, str]()  # FIX: было dict[str: str]() -> SyntaxError
                 for i in set(msgs[1:]):
                     try:
                         if int(i) in users.uid_to_isu.keys():
@@ -611,21 +620,27 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
                 ]
             ]
 
+        is_member = vk_helper.vk_session.method(
+            'groups.isMember',
+            {'group_id': self.group_id, 'user_id': uid}
+        ) != 0
+
         # --- DEFAULT MESSAGE RESPONSE LOGIC ---
         # Priority:
         # 1) If user participates in A25 -> show A25 info
-        # 2) Otherwise -> show welcome message about A25 with registration link
+        # 2) If not member -> send old subscribe prompt (info_message)
+        # 3) Otherwise -> show welcome message about A25 with registration link
+        user = None
         if uid in users.uid_to_isu:
             isu = users.uid_to_isu[uid]
             user = users.get(isu)
-            if user is not None and 'a25' in user.met.keys():
-                tts = format_message(a25_message, user)
-            else:
-                tts = a25_welcome_message
+
+        if user is not None and 'a25' in user.met.keys():
+            tts = format_message(a25_message, user)
+        elif not is_member:
+            tts = info_message
         else:
             tts = a25_welcome_message
-
-
 
     # --- CHAT MESSAGES HANDLER ---
     # This block is for messages received in group chats.
@@ -645,7 +660,7 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
         uid = event.object['message']['peer_id']
         cuid = event.object['message'].get('conversation_message_id')
 
-        if msgs[0].lstrip('/') == 'ping':
+        if msgs and msgs[0].lstrip('/') == 'ping':
             mc = MinecraftServerQuery()
             try:
                 players, version = mc.get_dummy_info()
