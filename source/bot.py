@@ -7,7 +7,7 @@ from utils.user_list import *
 
 spartakiada_subs_path = './subscribers/spartakiada{}.txt'
 
-admin = [297002785, 325899178, 229488682]
+admin = [297002785, 325899178, 229488682, 304032635]
 
 itmocraft_ip = 'craft.itmo.ru'
 joutak_ip = 'mc.joutak.ru'
