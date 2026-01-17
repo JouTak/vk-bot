@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+import json
+import time
 from utils.query_helper import MinecraftServerQuery
 from utils.vk_helper import *
 from utils.user_list import *
@@ -200,6 +202,9 @@ a24_third_part = '''
 
 # --- A25: призыв капитанов поиграть ---
 CAPTAIN_CALL_LABEL = 'ПРИЗВАТЬ ПОИГРАТЬ'
+CAPTAIN_CALL_COOLDOWN_SECONDS = 120
+CAPTAIN_CALL_COOLDOWN_UNTIL: dict[int, float] = {}
+
 
 
 def is_a25_captain(user: User, uid: int) -> bool:
@@ -587,6 +592,18 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
     msg = (event.object['message'].get('text') or '')
     msgs = msg.split()  # Split message into words for command parsing
 
+    payload_raw = event.object['message'].get('payload')
+    payload_type = None
+    if payload_raw:
+        try:
+            payload_obj = json.loads(payload_raw) if isinstance(payload_raw, str) else payload_raw
+        except Exception:
+            payload_obj = None
+        if isinstance(payload_obj, dict):
+            payload_type = payload_obj.get('type')
+
+    callplay_trigger = (payload_type == 'callplay') or ('призвать поиграть' in msg.lower())
+
     # --- PRIVATE MESSAGES HANDLER ---
     # This block handles messages sent directly to the bot, not in group chats.
     if not event.from_chat:
@@ -633,7 +650,7 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
 
         # --- SUPPORT CONVERSATION HANDLING ---
         # Skips further processing if the user is currently ignored AND not attempting to call admin
-        if ignored.is_ignored(uid) and 'админ' not in msg.lower() and 'призвать поиграть' not in msg.lower():
+        if ignored.is_ignored(uid) and 'админ' not in msg.lower() and not callplay_trigger:
             return
 
         # handling messages, that initiating or ending a support request
@@ -683,12 +700,18 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
             isu = users.uid_to_isu[uid]
             user = users.get(isu)
 
-        if 'призвать поиграть' in msg.lower():
+        if callplay_trigger:
             if user is None or not isinstance(user.met, dict) or 'a25' not in user.met:
                 return [{'peer_id': uid, 'message': 'Эта команда доступна только капитанам команд Майнокиады.'}]
 
             if not is_a25_captain(user, uid):
                 return [{'peer_id': uid, 'message': 'Эта команда доступна только капитанам команд Майнокиады.'}]
+
+            now = time.time()
+            until = CAPTAIN_CALL_COOLDOWN_UNTIL.get(int(uid), 0)
+            if until > now:
+                remaining = int(until - now + 0.999)
+                return [{'peer_id': uid, 'message': f'Слишком часто. Подожди {remaining} сек. и попробуй ещё раз.'}]
 
             a25 = user.met.get('a25') or {}
             team = (a25.get('cmd') or '').strip()
@@ -709,6 +732,8 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
 
             captains = sorted(get_a25_captain_uids(users))
             actions = [{'peer_id': int(c), 'message': notify_text} for c in captains if int(c) != int(uid)]
+
+            CAPTAIN_CALL_COOLDOWN_UNTIL[int(uid)] = time.time() + CAPTAIN_CALL_COOLDOWN_SECONDS
 
             ack = {'peer_id': uid, 'message': f'Принято! Разослал другим капитанам ({len(actions)}).'}
             return [ack, *actions]
