@@ -198,6 +198,56 @@ a24_third_part = '''
 
 '''.lstrip()
 
+# --- A25: призыв капитанов поиграть ---
+CAPTAIN_CALL_LABEL = 'ПРИЗВАТЬ ПОИГРАТЬ'
+
+
+def is_a25_captain(user: User, uid: int) -> bool:
+    # Captain for A25 is detected by comparing stored captain uid (met['a25']['cid']) with the sender uid.
+    try:
+        a25 = user.met.get('a25') if isinstance(user.met, dict) else None
+        if not isinstance(a25, dict):
+            return False
+        cid = a25.get('cid', 0)
+        return int(cid) != 0 and int(cid) == int(uid)
+    except Exception:
+        return False
+
+
+def get_a25_captain_uids(users: UserList) -> set[int]:
+    # Collects all unique captain VK uids from A25 metadata.
+    result: set[int] = set()
+    for isu in users.keys():
+        u = users.get(isu)
+        if not u or not isinstance(u.met, dict):
+            continue
+        a25 = u.met.get('a25')
+        if not isinstance(a25, dict):
+            continue
+        cid = a25.get('cid', 0)
+        try:
+            cid_int = int(cid)
+        except Exception:
+            cid_int = 0
+        if cid_int > 0:
+            result.add(cid_int)
+    return result
+
+
+def get_a25_current_stage(a25: dict) -> int | None:
+    # Returns 1..3 for first not-completed stage, or None if all stages are completed.
+    try:
+        if not a25.get('wr1', False):
+            return 1
+        if not a25.get('wr2', False):
+            return 2
+        if not a25.get('wr3', False):
+            return 3
+        return None
+    except Exception:
+        return 1
+
+
 
 def flat_info2text() -> dict[str]:
     """
@@ -583,7 +633,7 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
 
         # --- SUPPORT CONVERSATION HANDLING ---
         # Skips further processing if the user is currently ignored AND not attempting to call admin
-        if ignored.is_ignored(uid) and 'админ' not in msg.lower():
+        if ignored.is_ignored(uid) and 'админ' not in msg.lower() and 'призвать поиграть' not in msg.lower():
             return
 
         # handling messages, that initiating or ending a support request
@@ -626,6 +676,44 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
                 ]
             ]
 
+        # --- A25 CAPTAINS: призвать других капитанов поиграть ---
+        # Кнопка/команда: "ПРИЗВАТЬ ПОИГРАТЬ" (можно и текстом).
+        user = None
+        if uid in users.uid_to_isu:
+            isu = users.uid_to_isu[uid]
+            user = users.get(isu)
+
+        if 'призвать поиграть' in msg.lower():
+            if user is None or not isinstance(user.met, dict) or 'a25' not in user.met:
+                return [{'peer_id': uid, 'message': 'Эта команда доступна только капитанам команд Майнокиады.'}]
+
+            if not is_a25_captain(user, uid):
+                return [{'peer_id': uid, 'message': 'Эта команда доступна только капитанам команд Майнокиады.'}]
+
+            a25 = user.met.get('a25') or {}
+            team = (a25.get('cmd') or '').strip()
+            if not team or team == '-':
+                return [{'peer_id': uid, 'message': 'Не вижу название твоей команды в базе. Напиши: АДМИН'}]
+
+            stage = get_a25_current_stage(a25)
+            if stage is None:
+                return [{'peer_id': uid, 'message': 'Похоже, у вашей команды уже отмечены все режимы. Если это ошибка — напиши: АДМИН'}]
+
+            stage_text = {1: 'первый режим', 2: 'второй режим', 3: 'третий режим'}.get(stage, f'режим {stage}')
+
+            notify_text = (
+                f'Капитан команды "{team}" призывает поиграть!\n'
+                f'Текущий режим: {stage_text}.\n'
+                f'Нужны игроки от вашей команды.'
+            )
+
+            captains = sorted(get_a25_captain_uids(users))
+            actions = [{'peer_id': int(c), 'message': notify_text} for c in captains if int(c) != int(uid)]
+
+            ack = {'peer_id': uid, 'message': f'Принято! Разослал другим капитанам ({len(actions)}).'}
+            return [ack, *actions]
+
+
         is_member = vk_helper.vk_session.method(
             'groups.isMember',
             {'group_id': self.group_id, 'user_id': uid}
@@ -636,13 +724,19 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
         # 1) If user participates in A25 -> show A25 info
         # 2) If not member -> send old subscribe prompt (info_message)
         # 3) Otherwise -> show welcome message about A25 with registration link
-        user = None
-        if uid in users.uid_to_isu:
-            isu = users.uid_to_isu[uid]
-            user = users.get(isu)
+        # (user may already be resolved above for captain-only commands)
+        if 'user' not in locals() or user is None:
+            user = None
+            if uid in users.uid_to_isu:
+                isu = users.uid_to_isu[uid]
+                user = users.get(isu)
 
+        keyboard_out = None
         if user is not None and 'a25' in user.met.keys():
             tts = format_message(a25_message, user)
+            if is_a25_captain(user, uid):
+                buttons = [{'label': CAPTAIN_CALL_LABEL, 'payload': {'type': 'callplay'}, 'color': 'positive'}]
+                keyboard_out = create_standard_keyboard(buttons)
         elif not is_member:
             tts = info_message
         else:
@@ -682,7 +776,10 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
         return [{'peer_id': uid, 'message': tts, 'conversation_message_id': cuid}]
 
     # Default return for processed private messages
-    return [{
+    action = {
         'peer_id': uid,
         'message': tts
-    }]
+    }
+    if 'keyboard_out' in locals() and keyboard_out is not None:
+        action['keyboard'] = keyboard_out
+    return [action]
