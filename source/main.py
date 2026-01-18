@@ -4,6 +4,7 @@ from utils import IgnoredList, initialize
 from utils.log import *
 from bot import *
 import requests
+import re
 
 
 class Main:
