@@ -603,6 +603,9 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
             payload_type = payload_obj.get('type')
 
     callplay_trigger = (payload_type == 'callplay') or ('призвать поиграть' in msg.lower())
+    # Support flow can be triggered either by typing "АДМИН" or by pressing the keyboard buttons
+    # that send payload {"type":"callmanager"}/{"type":"uncallmanager"}.
+    admin_trigger = ('админ' in msg.lower()) or (payload_type in ('callmanager', 'uncallmanager'))
 
     # --- PRIVATE MESSAGES HANDLER ---
     # This block handles messages sent directly to the bot, not in group chats.
@@ -650,11 +653,11 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
 
         # --- SUPPORT CONVERSATION HANDLING ---
         # Skips further processing if the user is currently ignored AND not attempting to call admin
-        if ignored.is_ignored(uid) and 'админ' not in msg.lower() and not callplay_trigger:
+        if ignored.is_ignored(uid) and not admin_trigger and not callplay_trigger:
             return
 
         # handling messages, that initiating or ending a support request
-        if 'админ' in msg.lower():
+        if admin_trigger:
             link = f'https://vk.com/gim{self.group_id}?sel={uid}'
             buttons = [{'label': 'прямая ссылка', 'payload': {'type': 'userlink'}, 'link': link}]
             link_keyboard = create_link_keyboard(buttons)
