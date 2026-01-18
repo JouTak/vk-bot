@@ -725,12 +725,12 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
             if stage is None:
                 return [{'peer_id': uid, 'message': 'Похоже, у вашей команды уже отмечены все режимы. Если это ошибка — напиши: АДМИН'}]
 
-            stage_text = {1: 'первый режим', 2: 'второй режим', 3: 'третий режим'}.get(stage, f'режим {stage}')
+            stage_text = {1: 'Splatoon', 2: 'CreakyWars', 3: 'TheWalls'}.get(stage, f'режим {stage}')
 
             notify_text = (
-                f'Капитан команды "{team}" призывает поиграть!\n'
+                f'Капитан команды "{team}" призывает вас сыграть!\n'
                 f'Текущий режим: {stage_text}.\n'
-                f'Нужны игроки от вашей команды.'
+                f'Нужны игроки на сервере craft.itmo.ru.'
             )
 
             captains = sorted(get_a25_captain_uids(users))
