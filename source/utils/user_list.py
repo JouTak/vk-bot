@@ -38,7 +38,7 @@ class User:
         's25': {'tsp': int, 'nck': str, 'wr1': s2b, 'rr1': str, 'wr2': s2b, 'rr2': str, 'fnl': str},
         'y25': {'tsp': int, 'nck': str, 'nmb': str, 'bed': s2b, 'way': int, 'car': str, 'liv': str, 'ugo': int},
         'a25': {'fio': str, 'sts': s2b, 'uid': int, 'nck': str, 'cmd': str, 'cid': int, 'cap': str, 'kbr': str,
-                'wr1': s2b, 'wr2': s2b, 'wr3': s2b, 'brs': s2b}})
+                'wr1': s2b, 'stg2': str, 'wr2': s2b, 'wr3': s2b, 'brs': s2b}})
 
     # Checks for parsing validity: text to int and text to bool validators (checkers) (t2ic = Text to Int Checker)
     t2ic = str.isdigit
@@ -49,7 +49,7 @@ class User:
         's25': {'tsp': t2ic, 'nck': bool, 'wr1': t2bc, 'rr1': t2ic, 'wr2': t2bc, 'rr2': t2ic, 'fnl': t2ic},
         'y25': {'tsp': t2ic, 'nck': bool, 'nmb': bool, 'bed': t2bc, 'way': t2ic, 'car': bool, 'liv': bool, 'ugo': t2ic},
         'a25': {'fio': bool, 'sts': t2bc, 'uid': t2ic, 'nck': bool, 'cmd': bool, 'cid': t2ic, 'cap': bool, 'kbr': bool,
-                'wr1': t2bc, 'wr2': t2bc, 'wr3': t2bc, 'brs': t2bc}})
+                'wr1': t2bc, 'stg2': bool, 'wr2': t2bc, 'wr3': t2bc, 'brs': t2bc}})
 
     # bool to text
     b2t = lambda b: 'Да' if b else 'Нет'
@@ -67,7 +67,7 @@ class User:
         's25': {'tsp': t2s, 'nck': opt, 'wr1': b2t, 'rr1': opt, 'wr2': b2t, 'rr2': opt, 'fnl': opt},
         'y25': {'tsp': t2s, 'nck': opt, 'nmb': opt, 'bed': b2t, 'way': w2t, 'car': opt, 'liv': opt, 'ugo': u2t},
         'a25': {'fio': opt, 'sts': b2t, 'uid': opt, 'nck': opt, 'cmd': opt, 'cid': opt, 'cap': opt, 'kbr': kbr2t,
-                'wr1': b2t, 'wr2': b2t, 'wr3': b2t, 'brs': b2t}})
+                'wr1': b2t, 'stg2': opt, 'wr2': b2t, 'wr3': b2t, 'brs': b2t}})
 
     # (False, True) -> ('0', '1')
     b2s = lambda b: '1' if b else '0'
@@ -344,7 +344,7 @@ def inject_a25(vk_helper):
     """Injects A25 data from ./subscribers/a25.txt into ./subscribers/users.txt.
 
     TSV header (tabs):
-        ису	фио	наш	вк	ник	команда	кэп команды	Киберарена	раунд1?	раунд2?	раунд3?	[баллы?]
+        ису	фио	наш	вк	ник	команда	кэп команды	Киберарена	раунд1?	stage	раунд2?	раунд3?	[баллы?]
 
     Compatibility:
     - "баллы?" column is optional.
@@ -375,12 +375,34 @@ def inject_a25(vk_helper):
     if not raw_lines:
         warn('A25 inject skipped: a25.txt is empty')
         return
+    # Detect header and map columns (supports optional "Киберарена", "баллы?" and stage for 2nd round)
+    header_cols = [c.strip() for c in raw_lines[0].split('	')]
+    header_lower = [c.lower() for c in header_cols] if header_cols else []
+    has_header = bool(header_cols and header_cols[0].lower() == 'ису')
 
-    # Detect header and whether "Киберарена" column exists
-    expects_kbr = False
-    first_cols = [c.strip() for c in raw_lines[0].split('	')]
-    if first_cols and first_cols[0].lower() == 'ису':
-        expects_kbr = any('киберарена' in (c or '').lower() for c in first_cols)
+    def find_col_contains(*needles: str):
+        if not has_header:
+            return None
+        for i, name in enumerate(header_lower):
+            for needle in needles:
+                if needle and needle in name:
+                    return i
+        return None
+
+    idx_fio = find_col_contains('фио')
+    idx_sts = find_col_contains('наш')
+    idx_vk = find_col_contains('вк')
+    idx_nick = find_col_contains('ник')
+    idx_team = find_col_contains('команда')
+    idx_cap = find_col_contains('кэп', 'кеп', 'капитан')
+    idx_kbr = find_col_contains('киберарена')
+    idx_r1 = find_col_contains('раунд1')
+    idx_stage2 = find_col_contains('stage', 'стейдж', 'этап')  # stored as a25.stg2
+    idx_r2 = find_col_contains('раунд2')
+    idx_r3 = find_col_contains('раунд3')
+    idx_brs = find_col_contains('баллы')
+
+    expects_kbr = idx_kbr is not None
 
     def parse_yes(value: str) -> bool:
         x = (value or '').strip().lower()
@@ -446,10 +468,13 @@ def inject_a25(vk_helper):
         if not is_vk_ref(s):
             return ''
         return clean_vk_link(s)
-
-    # Parse rows, normalize into 12 columns:
-    # [isu, fio, sts_raw, vk_link, nick, team, cap_raw, kbr_raw, r1, r2, r3, brs]
+    # Parse rows, normalize into 13 columns (tabs):
+    # [isu, fio, sts_raw, vk_link, nick, team, cap_raw, kbr_raw, r1, stg2, r2, r3, brs]
     rows: list[list[str]] = []
+
+    def get_col(cols: list[str], idx):
+        return cols[idx].strip() if (idx is not None and idx < len(cols)) else ''
+
     for line in raw_lines:
         cols = [c.strip() for c in line.split('	')]
 
@@ -457,35 +482,65 @@ def inject_a25(vk_helper):
         if cols and cols[0].lower() == 'ису':
             continue
 
-        # New format: expects_kbr=True => min 11 columns (no brs), or 12 (with brs)
-        if expects_kbr:
+        if has_header:
+            # Header-based parsing (tolerant to optional/moved columns)
+            isu_s = get_col(cols, 0)
+            fio = get_col(cols, idx_fio)
+            sts_raw = get_col(cols, idx_sts)
+            vk_link = get_col(cols, idx_vk)
+            nick = get_col(cols, idx_nick)
+            team = get_col(cols, idx_team)
+            cap_raw = get_col(cols, idx_cap)
+            kbr_raw = get_col(cols, idx_kbr)
+            r1 = get_col(cols, idx_r1)
+            stg2 = get_col(cols, idx_stage2)
+            r2 = get_col(cols, idx_r2)
+            r3 = get_col(cols, idx_r3)
+            brs = get_col(cols, idx_brs)
+
+            # Minimum sanity: need at least vk link or nick or team
+            if not (vk_link or nick or team or isu_s):
+                continue
+
+            rows.append([isu_s, fio, sts_raw, vk_link, nick, team, cap_raw, kbr_raw, r1, stg2, r2, r3, brs])
+            continue
+
+        # Fallback positional parsing (legacy files without header)
+        # Expected legacy formats:
+        # - With kbr: [isu,fio,sts,vk,nick,team,cap,kbr,r1,r2,r3,(brs?)]
+        # - Without kbr: [isu,fio,sts,vk,nick,team,cap,r1,r2,r3,(brs?)]
+
+        legacy_has_kbr = False
+        if len(cols) >= 12:
+            legacy_has_kbr = True
+        elif len(cols) >= 11:
+            c7 = (cols[7] or '').strip().lower() if len(cols) > 7 else ''
+            if c7 and c7 not in ('да', 'нет', 'yes', 'no', 'true', 'false', '0', '1', '+', '-'):
+                legacy_has_kbr = True
+
+        if legacy_has_kbr:
             if len(cols) < 11:
                 warn('A25 inject: skipping row with missing columns:', line)
                 continue
             if len(cols) == 11:
                 cols.append('')  # brs
-            if len(cols) > 12:
-                cols = cols[:12]
+            cols = cols[:12]
             while len(cols) < 12:
                 cols.append('')
-            rows.append(cols)
+            isu_s, fio, sts_raw, vk_link, nick, team, cap_raw, kbr_raw, r1, r2, r3, brs = cols
+            rows.append([isu_s, fio, sts_raw, vk_link, nick, team, cap_raw, kbr_raw, r1, '', r2, r3, brs])
             continue
 
-        # Old format (no "Киберарена"): min 10 columns (no brs), or 11 (with brs)
         if len(cols) < 10:
             warn('A25 inject: skipping row with missing columns:', line)
             continue
         if len(cols) == 10:
             cols.append('')  # brs
-        # Convert old -> new by inserting empty kbr after cap
-        # old: [isu,fio,sts,vk,nick,team,cap,r1,r2,r3,brs]
-        # new: [isu,fio,sts,vk,nick,team,cap,kbr='',r1,r2,r3,brs]
-        cols = cols[:7] + [''] + cols[7:]
-        if len(cols) > 12:
-            cols = cols[:12]
-        while len(cols) < 12:
+        cols = cols[:11]
+        while len(cols) < 11:
             cols.append('')
-        rows.append(cols)
+        isu_s, fio, sts_raw, vk_link, nick, team, cap_raw, r1, r2, r3, brs = cols
+        rows.append([isu_s, fio, sts_raw, vk_link, nick, team, cap_raw, '', r1, '', r2, r3, brs])
 
     if not rows:
         warn('A25 inject skipped: no valid rows')
@@ -567,7 +622,7 @@ def inject_a25(vk_helper):
 
     # Inject
     for cols, uid, cid in zip(rows, resolved_uids, resolved_cids):
-        isu_s, fio, sts_raw, vk_link, nick, team, cap_raw, kbr_raw, r1, r2, r3, brs = cols
+        isu_s, fio, sts_raw, vk_link, nick, team, cap_raw, kbr_raw, r1, stg2_raw, r2, r3, brs = cols
 
         isu_int = parse_isu_value(isu_s)
         uid_int = uid
@@ -601,6 +656,7 @@ def inject_a25(vk_helper):
             'cap': str(cap_text),
             'kbr': str(kbr_raw).strip(),
             'wr1': parse_yes(r1),
+            'stg2': str(stg2_raw).strip(),
             'wr2': parse_yes(r2),
             'wr3': parse_yes(r3),
             'brs': parse_yes(brs),

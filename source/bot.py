@@ -254,6 +254,65 @@ def get_a25_current_stage(a25: dict) -> int | None:
 
 
 
+def get_a25_round2_match_key(a25: dict) -> str:
+    """Returns match grouping key for A25 second round (e.g., 'stage_1').
+
+    Stored by injector as met['a25']['stg2'], but we also accept a few fallbacks.
+    """
+    try:
+        for key in ('stg2', 'stage2', 'stage', 'stg'):
+            v = (a25.get(key) or '').strip()
+            if v and v != '-':
+                return v
+        return ''
+    except Exception:
+        return ''
+
+
+def get_a25_stage2_captain_uids_for_match(users: UserList, match_key: str) -> set[int]:
+    """Captains who are currently on stage 2 and belong to the same match_key.
+
+    Conditions:
+      - is captain (u.uid == cid)
+      - passed to stage 2 (wr1 == True)
+      - has not completed stage 2 yet (current stage == 2)
+      - stg2 == match_key
+    """
+    result: set[int] = set()
+    match_key = (match_key or '').strip()
+    if not match_key:
+        return result
+    for isu in users.keys():
+        u = users.get(isu)
+        if not u or not isinstance(getattr(u, 'met', None), dict):
+            continue
+        a25 = u.met.get('a25')
+        if not isinstance(a25, dict):
+            continue
+        cid = a25.get('cid', 0)
+        try:
+            cid_int = int(cid)
+        except Exception:
+            cid_int = 0
+        if cid_int <= 0:
+            continue
+        try:
+            uid_int = int(getattr(u, 'uid', 0))
+        except Exception:
+            uid_int = 0
+        if uid_int != cid_int:
+            continue
+        if not a25.get('wr1', False):
+            continue
+        if get_a25_current_stage(a25) != 2:
+            continue
+        if get_a25_round2_match_key(a25) != match_key:
+            continue
+        result.add(cid_int)
+    return result
+
+
+
 def flat_info2text() -> dict[str]:
     """
    Builds a flattened dictionary mapping user info keys and nested metadata keys
@@ -482,6 +541,10 @@ def flat_info(info: User.info2text) -> dict[str]:
         elif event == 's25':
             result['met_s25_h10'] = info[5][event]['rr1'] != 0
         for key in tokens[5][n]:
+            # Some metadata fields are optional depending on the spreadsheet export / injector version.
+            if key in ('kbr', 'stg2'):
+                result[f'met_{event}_{key}'] = info[5][event].get(key, '')
+                continue
             result[f'met_{event}_{key}'] = info[5][event][key]
     return result
 
@@ -603,9 +666,6 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
             payload_type = payload_obj.get('type')
 
     callplay_trigger = (payload_type == 'callplay') or ('призвать поиграть' in msg.lower())
-    # Support flow can be triggered either by typing "АДМИН" or by pressing the keyboard buttons
-    # that send payload {"type":"callmanager"}/{"type":"uncallmanager"}.
-    admin_trigger = ('админ' in msg.lower()) or (payload_type in ('callmanager', 'uncallmanager'))
 
     # --- PRIVATE MESSAGES HANDLER ---
     # This block handles messages sent directly to the bot, not in group chats.
@@ -653,11 +713,11 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
 
         # --- SUPPORT CONVERSATION HANDLING ---
         # Skips further processing if the user is currently ignored AND not attempting to call admin
-        if ignored.is_ignored(uid) and not admin_trigger and not callplay_trigger:
+        if ignored.is_ignored(uid) and 'админ' not in msg.lower() and not callplay_trigger:
             return
 
         # handling messages, that initiating or ending a support request
-        if admin_trigger:
+        if 'админ' in msg.lower():
             link = f'https://vk.com/gim{self.group_id}?sel={uid}'
             buttons = [{'label': 'прямая ссылка', 'payload': {'type': 'userlink'}, 'link': link}]
             link_keyboard = create_link_keyboard(buttons)
@@ -725,20 +785,32 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
             if stage is None:
                 return [{'peer_id': uid, 'message': 'Похоже, у вашей команды уже отмечены все режимы. Если это ошибка — напиши: АДМИН'}]
 
-            stage_text = {1: 'Splatoon', 2: 'CreakyWars', 3: 'TheWalls'}.get(stage, f'режим {stage}')
+            stage_text = {1: 'первый режим', 2: 'второй режим', 3: 'третий режим'}.get(stage, f'режим {stage}')
 
+            # Stage 2 is split into matches by stg2 (e.g., stage_1/stage_2).
+            match_key = ''
+            captains: list[int]
+            if stage == 2:
+                match_key = get_a25_round2_match_key(a25)
+                if not match_key:
+                    return [{'peer_id': uid, 'message': 'Не вижу stage для вашего матча второго этапа. Напиши: АДМИН'}]
+                captains = sorted(get_a25_stage2_captain_uids_for_match(users, match_key))
+            else:
+                captains = sorted(get_a25_captain_uids(users))
+
+            match_line = f'\nМатч второго этапа: {match_key}.' if match_key else ''
             notify_text = (
-                f'Капитан команды "{team}" призывает вас сыграть!\n'
-                f'Текущий режим: {stage_text}.\n'
-                f'Нужны игроки на сервере craft.itmo.ru.'
+                f'Капитан команды "{team}" призывает поиграть!\n'
+                f'Текущий режим: {stage_text}.{match_line}\n'
+                f'Нужны игроки от вашей команды.'
             )
 
-            captains = sorted(get_a25_captain_uids(users))
             actions = [{'peer_id': int(c), 'message': notify_text} for c in captains if int(c) != int(uid)]
 
             CAPTAIN_CALL_COOLDOWN_UNTIL[int(uid)] = time.time() + CAPTAIN_CALL_COOLDOWN_SECONDS
 
-            ack = {'peer_id': uid, 'message': f'Принято! Разослал другим капитанам ({len(actions)}).'}
+            ack_text = f'Принято! Разослал капитанам вашего матча ({len(actions)}).' if match_key else f'Принято! Разослал другим капитанам ({len(actions)}).'
+            ack = {'peer_id': uid, 'message': ack_text}
             return [ack, *actions]
 
 
