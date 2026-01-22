@@ -73,7 +73,7 @@ a25_message = '''
 
 Капитан:
 {met_a25_cap}
-
+{a25_stage_info}
 Часы халявы на киберарене: {met_a25_kbr}
 Подробнее про компьютерный клуб KRONBARS ARENA, где ты можешь бесплатно поиграть до конца турнира: https://vk.ru/wall-217494619_158
 
@@ -219,6 +219,30 @@ def is_a25_captain(user: User, uid: int) -> bool:
         return False
 
 
+def build_a25_stage_info(user: User) -> str:
+    """Returns a formatted stage line for A25 participants who passed round 1.
+
+    If round1 is not passed -> empty string.
+    If round1 is passed but stage is empty -> shows '[НЕ НАЗНАЧЕН]'.
+    """
+    try:
+        if user is None or not isinstance(user.met, dict):
+            return ''
+        a25 = user.met.get('a25')
+        if not isinstance(a25, dict):
+            return ''
+        # Show stage info only for those who passed round 1
+        if not bool(a25.get('wr1')):
+            return ''
+        stg = (a25.get('stg') or '').strip()
+        if not stg or stg == '-':
+            stg = '[НЕ НАЗНАЧЕН]'
+        return f"\nТвой турнирный матч (stage): {stg}\n"
+    except Exception:
+        return ''
+
+
+
 def get_a25_captain_uids(users: UserList) -> set[int]:
     # Collects all unique captain VK uids from A25 metadata.
     result: set[int] = set()
@@ -251,65 +275,6 @@ def get_a25_current_stage(a25: dict) -> int | None:
         return None
     except Exception:
         return 1
-
-
-
-def get_a25_round2_match_key(a25: dict) -> str:
-    """Returns match grouping key for A25 second round (e.g., 'stage_1').
-
-    Stored by injector as met['a25']['stg2'], but we also accept a few fallbacks.
-    """
-    try:
-        for key in ('stg2', 'stage2', 'stage', 'stg'):
-            v = (a25.get(key) or '').strip()
-            if v and v != '-':
-                return v
-        return ''
-    except Exception:
-        return ''
-
-
-def get_a25_stage2_captain_uids_for_match(users: UserList, match_key: str) -> set[int]:
-    """Captains who are currently on stage 2 and belong to the same match_key.
-
-    Conditions:
-      - is captain (u.uid == cid)
-      - passed to stage 2 (wr1 == True)
-      - has not completed stage 2 yet (current stage == 2)
-      - stg2 == match_key
-    """
-    result: set[int] = set()
-    match_key = (match_key or '').strip()
-    if not match_key:
-        return result
-    for isu in users.keys():
-        u = users.get(isu)
-        if not u or not isinstance(getattr(u, 'met', None), dict):
-            continue
-        a25 = u.met.get('a25')
-        if not isinstance(a25, dict):
-            continue
-        cid = a25.get('cid', 0)
-        try:
-            cid_int = int(cid)
-        except Exception:
-            cid_int = 0
-        if cid_int <= 0:
-            continue
-        try:
-            uid_int = int(getattr(u, 'uid', 0))
-        except Exception:
-            uid_int = 0
-        if uid_int != cid_int:
-            continue
-        if not a25.get('wr1', False):
-            continue
-        if get_a25_current_stage(a25) != 2:
-            continue
-        if get_a25_round2_match_key(a25) != match_key:
-            continue
-        result.add(cid_int)
-    return result
 
 
 
@@ -541,10 +506,6 @@ def flat_info(info: User.info2text) -> dict[str]:
         elif event == 's25':
             result['met_s25_h10'] = info[5][event]['rr1'] != 0
         for key in tokens[5][n]:
-            # Some metadata fields are optional depending on the spreadsheet export / injector version.
-            if key in ('kbr', 'stg2'):
-                result[f'met_{event}_{key}'] = info[5][event].get(key, '')
-                continue
             result[f'met_{event}_{key}'] = info[5][event][key]
     return result
 
@@ -665,8 +626,7 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
         if isinstance(payload_obj, dict):
             payload_type = payload_obj.get('type')
 
-    call_admin_trigger = ('админ' in msg.lower()) or (payload_type in ('callmanager', 'uncallmanager'))
-    callplay_trigger = False  # disabled (was: payload_type=='callplay' or text trigger)
+    callplay_trigger = (payload_type == 'callplay') or ('призвать поиграть' in msg.lower())
 
     # --- PRIVATE MESSAGES HANDLER ---
     # This block handles messages sent directly to the bot, not in group chats.
@@ -714,11 +674,11 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
 
         # --- SUPPORT CONVERSATION HANDLING ---
         # Skips further processing if the user is currently ignored AND not attempting to call admin
-        if ignored.is_ignored(uid) and not call_admin_trigger:
+        if ignored.is_ignored(uid) and 'админ' not in msg.lower() and not callplay_trigger:
             return
 
         # handling messages, that initiating or ending a support request
-        if call_admin_trigger:
+        if 'админ' in msg.lower():
             link = f'https://vk.com/gim{self.group_id}?sel={uid}'
             buttons = [{'label': 'прямая ссылка', 'payload': {'type': 'userlink'}, 'link': link}]
             link_keyboard = create_link_keyboard(buttons)
@@ -757,67 +717,51 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
                 ]
             ]
 
-                # --- A25 CAPTAINS: призвать других капитанов поиграть ---
-        # Функционал "ПРИЗВАТЬ ПОИГРАТЬ" временно отключён по запросу.
-        # (Код оставлен закомментированным для возможного возвращения позже.)
-        #
-        #         # Кнопка/команда: "ПРИЗВАТЬ ПОИГРАТЬ" (можно и текстом).
-        #         user = None
-        #         if uid in users.uid_to_isu:
-        #             isu = users.uid_to_isu[uid]
-        #             user = users.get(isu)
-        # 
-        #         if callplay_trigger:
-        #             if user is None or not isinstance(user.met, dict) or 'a25' not in user.met:
-        #                 return [{'peer_id': uid, 'message': 'Эта команда доступна только капитанам команд Майнокиады.'}]
-        # 
-        #             if not is_a25_captain(user, uid):
-        #                 return [{'peer_id': uid, 'message': 'Эта команда доступна только капитанам команд Майнокиады.'}]
-        # 
-        #             now = time.time()
-        #             until = CAPTAIN_CALL_COOLDOWN_UNTIL.get(int(uid), 0)
-        #             if until > now:
-        #                 remaining = int(until - now + 0.999)
-        #                 return [{'peer_id': uid, 'message': f'Слишком часто. Подожди {remaining} сек. и попробуй ещё раз.'}]
-        # 
-        #             a25 = user.met.get('a25') or {}
-        #             team = (a25.get('cmd') or '').strip()
-        #             if not team or team == '-':
-        #                 return [{'peer_id': uid, 'message': 'Не вижу название твоей команды в базе. Напиши: АДМИН'}]
-        # 
-        #             stage = get_a25_current_stage(a25)
-        #             if stage is None:
-        #                 return [{'peer_id': uid, 'message': 'Похоже, у вашей команды уже отмечены все режимы. Если это ошибка — напиши: АДМИН'}]
-        # 
-        #             stage_text = {1: 'первый режим', 2: 'второй режим', 3: 'третий режим'}.get(stage, f'режим {stage}')
-        # 
-        #             # Stage 2 is split into matches by stg2 (e.g., stage_1/stage_2).
-        #             match_key = ''
-        #             captains: list[int]
-        #             if stage == 2:
-        #                 match_key = get_a25_round2_match_key(a25)
-        #                 if not match_key:
-        #                     return [{'peer_id': uid, 'message': 'Не вижу stage для вашего матча второго этапа. Напиши: АДМИН'}]
-        #                 captains = sorted(get_a25_stage2_captain_uids_for_match(users, match_key))
-        #             else:
-        #                 captains = sorted(get_a25_captain_uids(users))
-        # 
-        #             match_line = f'\nМатч второго этапа: {match_key}.' if match_key else ''
-        #             notify_text = (
-        #                 f'Капитан команды "{team}" призывает поиграть!\n'
-        #                 f'Текущий режим: {stage_text}.{match_line}\n'
-        #                 f'Нужны игроки от вашей команды.'
-        #             )
-        # 
-        #             actions = [{'peer_id': int(c), 'message': notify_text} for c in captains if int(c) != int(uid)]
-        # 
-        #             CAPTAIN_CALL_COOLDOWN_UNTIL[int(uid)] = time.time() + CAPTAIN_CALL_COOLDOWN_SECONDS
-        # 
-        #             ack_text = f'Принято! Разослал капитанам вашего матча ({len(actions)}).' if match_key else f'Принято! Разослал другим капитанам ({len(actions)}).'
-        #             ack = {'peer_id': uid, 'message': ack_text}
-        #             return [ack, *actions]
-        # 
-        # 
+        # --- A25 CAPTAINS: призвать других капитанов поиграть ---
+        # Кнопка/команда: "ПРИЗВАТЬ ПОИГРАТЬ" (можно и текстом).
+        user = None
+        if uid in users.uid_to_isu:
+            isu = users.uid_to_isu[uid]
+            user = users.get(isu)
+
+        if callplay_trigger:
+            if user is None or not isinstance(user.met, dict) or 'a25' not in user.met:
+                return [{'peer_id': uid, 'message': 'Эта команда доступна только капитанам команд Майнокиады.'}]
+
+            if not is_a25_captain(user, uid):
+                return [{'peer_id': uid, 'message': 'Эта команда доступна только капитанам команд Майнокиады.'}]
+
+            now = time.time()
+            until = CAPTAIN_CALL_COOLDOWN_UNTIL.get(int(uid), 0)
+            if until > now:
+                remaining = int(until - now + 0.999)
+                return [{'peer_id': uid, 'message': f'Слишком часто. Подожди {remaining} сек. и попробуй ещё раз.'}]
+
+            a25 = user.met.get('a25') or {}
+            team = (a25.get('cmd') or '').strip()
+            if not team or team == '-':
+                return [{'peer_id': uid, 'message': 'Не вижу название твоей команды в базе. Напиши: АДМИН'}]
+
+            stage = get_a25_current_stage(a25)
+            if stage is None:
+                return [{'peer_id': uid, 'message': 'Похоже, у вашей команды уже отмечены все режимы. Если это ошибка — напиши: АДМИН'}]
+
+            stage_text = {1: 'первый режим', 2: 'второй режим', 3: 'третий режим'}.get(stage, f'режим {stage}')
+
+            notify_text = (
+                f'Капитан команды "{team}" призывает поиграть!\n'
+                f'Текущий режим: {stage_text}.\n'
+                f'Нужны игроки от вашей команды.'
+            )
+
+            captains = sorted(get_a25_captain_uids(users))
+            actions = [{'peer_id': int(c), 'message': notify_text} for c in captains if int(c) != int(uid)]
+
+            CAPTAIN_CALL_COOLDOWN_UNTIL[int(uid)] = time.time() + CAPTAIN_CALL_COOLDOWN_SECONDS
+
+            ack = {'peer_id': uid, 'message': f'Принято! Разослал другим капитанам ({len(actions)}).'}
+            return [ack, *actions]
+
 
         is_member = vk_helper.vk_session.method(
             'groups.isMember',
@@ -838,27 +782,14 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
 
         keyboard_out = None
         if user is not None and 'a25' in user.met.keys():
-            tts = format_message(a25_message, user)
-            # Справочная информация: stage второго раунда (показываем только тем, кто прошёл раунд 1)
-            try:
-                a25 = user.met.get('a25') or {}
-                if a25.get('wr1') is True:
-                    stg2 = (a25.get('stg2') or '').strip()
-                    if stg2 and stg2 != '-':
-                        tts += f"\n\nStage второго раунда: {stg2}"
-            except Exception:
-                pass
+            tts = format_message(a25_message, user, a25_stage_info=build_a25_stage_info(user))
+            if is_a25_captain(user, uid):
+                buttons = [{'label': CAPTAIN_CALL_LABEL, 'payload': {'type': 'callplay'}, 'color': 'positive'}]
+                keyboard_out = create_standard_keyboard(buttons)
         elif not is_member:
             tts = info_message
         else:
             tts = a25_welcome_message
-
-        # Кнопка обращения к админам (для всех, в ЛС)
-        if ignored.is_ignored(uid):
-            buttons = [{'label': 'СПАСИБО АДМИН', 'payload': {'type': 'uncallmanager'}, 'color': 'negative'}]
-        else:
-            buttons = [{'label': 'ПОЗВАТЬ АДМИНА', 'payload': {'type': 'callmanager'}, 'color': 'positive'}]
-        keyboard_out = create_standard_keyboard(buttons)
 
     # --- CHAT MESSAGES HANDLER ---
     # This block is for messages received in group chats.
