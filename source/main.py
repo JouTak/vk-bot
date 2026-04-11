@@ -1,6 +1,7 @@
 from vk_api.bot_longpoll import VkBotLongPoll, VkBotEventType
 import traceback
 from utils import IgnoredList, initialize
+from utils.db.db import init_engine
 from utils.log import *
 from bot import *
 import requests
@@ -9,6 +10,9 @@ import requests
 class Main:
     def __init__(self):
         self.token, self.group_id = initialize()
+
+        # Initialize DB engine (DATABASE_URL from env/.env)
+        init_engine()
 
         self.vk_session = vk_api.VkApi(token=self.token)
         self.VK = VKHelper(self.vk_session, self.group_id)

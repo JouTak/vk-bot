@@ -1,7 +1,12 @@
 # -*- coding: utf-8 -*-
 from utils.query_helper import MinecraftServerQuery
 from utils.vk_helper import *
-from utils.user_list import *
+from utils.storage.user_store import User, UserList
+# NOTE: legacy file-based user_list module is kept in repo but should not be imported after DB migration.
+# Using db-backed UserList from utils.storage.user_store instead.
+users_path = ""
+warnings = []
+inject_a25 = lambda *args, **kwargs: None
 
 # DB: isu, uid, fio, grp, nck, {a24: {...}, s25: {...}, ...}
 
@@ -443,8 +448,11 @@ def sender(self, condition: str, msg: str) -> list[dict]:
     result = []
     for isu in users.keys():
         user = users.get(isu)
-        uid = user.uid
-        if uid == '0':
+        if not user:
+            continue
+        uid = int(user.uid)
+        # skip invalid/system uids (legacy semantics)
+        if 0 <= uid <= 1:
             continue
         if eval_condition(user.info, condition) is True:
             result.append({'peer_id': uid, 'message': format_message(msg, user)})
@@ -525,6 +533,11 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
             elif msgs[0] == 'reload':  # Forces a reload of the user list from storage
                 return [{'peer_id': uid, 'message': 'Success' if self.users.load() else 'Failed'}]
             elif msgs[0] == 'sender':  # Dispatches a custom message to a group of users based on a condition
+                # Refresh DB-backed user cache (uid_to_isu) before sending
+                try:
+                    self.users.load()
+                except Exception:
+                    pass
                 if len(msgs) > 2:  # Extracts the condition and the message text for the sender function
                     result = sender(self, msgs[1], msg.removeprefix(msgs[0]).strip().removeprefix(msgs[1]).strip())
                     count = self.handle_actions(result)  # Executes the sending actions

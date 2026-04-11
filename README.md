@@ -1,69 +1,96 @@
-# ITMOcraftBOT
-![Static Badge](https://img.shields.io/badge/JouTak-vk)
-![GitHub top language](https://img.shields.io/github/languages/top/JouTak/vk-bot)
+# ITMOcraftBOT (VK Bot)
+VK bot for vk.com/itmocraft. Users are stored in **MySQL/MariaDB** (SQLAlchemy), not in a plain text file.
 
-VK bot (vk.com/itmocraft)
+## Requirements
+- Python 3.10+
+- MySQL/MariaDB
+- Real terminal (TTY) for interactive console tools
 
-HOWTO:
-1) git clone
-2) pip install -r source/requirements.py (installing requirements)
-3) python setup.py (asking for token)
-4) python main.py (running bot itself)
-
-For admins:
-How to use sender?
+## Install
+```bash
+pip install -r source/requirements.txt
 ```
-sender [some_logic] <message>
 
-& - and
-| - or
--> - in
-!> - not in
-== - equals
-!= - not equals
->> - greater than
->= - greater than or equals
-<< - less than
-<= - less than or equals
-
-Формат БД:
-isu, uid, fio, grp, nck, met: {
-s24: {tsp, nck, lr1, wr1, wr2, nyt, fnl},
-s25: {tsp, nck, wr1, rr1, wr2, rr2, fnl},
-y25: {tsp, nck, sts, nmb, why, jtk, gms, lgc, bed, way, car, wsh, liv, ugo}}
-isu — ИСУ (спец номера от 0 до 99999, если не из ИТМО)
-uid — ссылка ВК, если ещё не обработана, иначе VK id
-fio — ФИО
-grp — group, группа ('', если не из ИТМО)
-nck — nick, никнейм в Майнкрафте
-met — словарь с мета-данными об ивентах
-
-tsp — timestamp, время заполнения формы в формате unix timestamp
-wrN — win round N, выиграл ли первый раунд
-lrN — loose round N, истратил ли все попытки (одновременно и этим может и выиграть (wr1==1))
-rrN — round record N, наилучший результат в раунде
-nyt — not yet — ещё не играл в финале
-fnl — играл ли в финале (s24), либо какое место в нём занял (s25)
-
-sts — status, статус в ИТМО (является индексом из ('Действующий студент', 'Выпускник / отчисляш', 'Сотрудник', 'Не из ИТМО'))
-nmb — number, номер телефона
-why — мотивация поехать
-jtk — JouTak, играл ли на JouTak
-gms — Mini Games, играл ли в Mini Games
-lgc — Legacy, играл ли на Legacy
-bed — планирует ли взять бельё
-way — способ, каким чел добирается (индекс из ('На бесплатном трансфере от ГК', 'Своим ходом (электричка)', 'Своим ходом (на машине)'))
-car — номер машины, если добирается на машине, иначе '-'
-wsh — wish, с кем чел предпочитает жить
-liv — с кем чел живёт
-ugo — you go, поедет ли чел
-
-
-&, |, ->, !>, ==, !=, >>, >=, <<, <= - logic
-tsp, uid, nck, grp, fio, fst, wr1, h10, rr1 - parameters
-s24, s25, a - sets
-
-
--> and !> only with parameters and sets (uid->s24)
-other logic only with parameters and value (nck==enderdissa)
+## Configuration
+Create `.env` (gitignored) or export env vars:
+```env
+BOT_TOKEN=...
+GROUP_ID=...
+DATABASE_URL=mysql+pymysql://user:pass@127.0.0.1:3306/vk_bot?charset=utf8mb4
 ```
+
+## Run bot
+```bash
+python -m source.main
+```
+
+## Maintenance console
+```bash
+python -m source.utils.tools.console
+```
+
+What’s inside:
+- **Users DB** — find/add/update/delete users
+- **Import users.txt -> DB** — import legacy `source/subscribers/users.txt` into DB (+ creates/updates Fix panel)
+- **Reset DB** — drop bot tables (double confirm)
+- **Fix panel** — review/fix flagged rows (`users_raw_lines`) + apply to mark row as fixed
+- **DB stats** — compact summary + top fix reasons
+
+### Import (users.txt -> DB)
+```bash
+python -m source.utils.tools.cli.migrate_from_txt
+```
+
+Rules:
+- Rows are upserted into normalized tables (`users` + event tables).
+- Rows that need attention are additionally stored in `users_raw_lines` and appear in Fix panel (examples: uid=0/1, unusual grp, invalid nck, invalid met_json).
+- `verify_import` checks that DB state matches the classification rules.
+
+### Fix panel
+Picker:
+```bash
+python -m source.utils.tools.cli.raw_pick
+```
+
+Editor:
+```bash
+python -m source.utils.tools.cli.raw_edit <raw_id>
+```
+
+A row disappears from Fix panel only after it becomes valid for current rules and is marked as `status=ok`.
+
+### Verify import
+```bash
+python -m source.utils.tools.cli.verify_import
+```
+
+## Sender (admin broadcast)
+Sender is an admin command handled by the bot (see `source/bot.py`).
+
+Syntax:
+```text
+sender <condition> <message>
+```
+
+Operators:
+- `&` — AND
+- `|` — OR
+- `->` — key exists
+- `!>` — key does NOT exist
+- `==`, `!=`, `>>`, `>=`, `<<`, `<=` — comparisons
+
+Fields:
+- Base: `isu`, `uid`, `fio`, `grp`, `nck`
+- Met fields: `met.<event>.<key>` (events like `a24`, `s25`, `y25`, `a25`)
+
+Example:
+```text
+sender met.y25.ugo==2 Привет! Ты едешь в Ягодное.
+```
+
+Note:
+- Users with `uid` 0/1 are skipped by sender (legacy semantics).
+
+## Repo hygiene / secrets
+- `.env` is gitignored.
+- `source/subscribers/` is gitignored (local legacy data).
