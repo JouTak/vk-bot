@@ -1,6 +1,9 @@
-vk_api
+vk_api>=2.0.0
 requests>=2.32.3
 pyyaml
-vk-api
 loguru>=0.7.3
 mcipc>=2.3.0
+sqlalchemy>=2.0.0
+pymysql>=1.1.0
+python-dotenv>=1.0.0
+cryptography>=42.0.0

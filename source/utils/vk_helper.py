@@ -99,6 +99,11 @@ class VKHelper:
         Returns:
             list[int]: A list of resolved user IDs (0 if not resolved).
         """
+        for i, link in enumerate(links):
+            start = link.rfind('/') + 1
+            if start == -1:  # Adjust if slash not found
+                start = link.find('@') + 1
+            links[i] = link[start:]
         parts = [f'API.utils.resolveScreenName({{"screen_name": "{link}"}})' for link in links]
         code = f'return [{",".join(parts)}];'
         response = self.vk_session.method("execute", {"code": code})

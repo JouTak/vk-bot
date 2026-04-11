@@ -1,4 +1,7 @@
-import os
+from __future__ import annotations
+
+from .db.db import session_scope
+from .db.repositories import IgnoredRepository
 
 
 class IgnoredList:
@@ -6,42 +9,39 @@ class IgnoredList:
         self.ignored = set()
 
     def add(self, uid):
-        if uid not in self.ignored:
-            self.ignored.add(uid)
-            return f'Пользователь {uid} добавлен в игнор.'
-        else:
-            return f'Пользователь {uid} уже в игноре.'
+        with session_scope() as s:
+            repo = IgnoredRepository(s)
+            if repo.add(int(uid)):
+                self.ignored.add(int(uid))
+                return f"Пользователь {uid} добавлен в игнор."
+            return f"Пользователь {uid} уже в игноре."
 
     def remove(self, uid):
-        if uid in self.ignored:
-            self.ignored.remove(uid)
-            return f'Пользователь {uid} удалён из игнора.'
-        else:
-            return f'Пользователь {uid} не найден в списке игнорируемых.'
+        with session_scope() as s:
+            repo = IgnoredRepository(s)
+            if repo.remove(int(uid)):
+                self.ignored.discard(int(uid))
+                return f"Пользователь {uid} удалён из игнора."
+            return f"Пользователь {uid} не найден в списке игнорируемых."
 
     def is_ignored(self, uid):
-        return uid in self.ignored
+        with session_scope() as s:
+            repo = IgnoredRepository(s)
+            return repo.is_ignored(int(uid))
 
     def clear(self):
+        with session_scope() as s:
+            repo = IgnoredRepository(s)
+            repo.clear()
         self.ignored.clear()
-        return 'Список игнорируемых пользователей очищен.'
+        return "Список игнорируемых пользователей очищен."
 
     def save_to_file(self):
-        try:
-
-            with open('./subscribers/ignored.txt', 'w+', encoding='UTF-8') as file:
-                file.write('\n'.join(map(str, self.ignored)))
-            return f'Список игнорируемых сохранён.'
-        except Exception as e:
-            return f'Ошибка при сохранении: {e}', True
+        # compatibility no-op
+        return "Список игнорируемых сохранён."
 
     def load_from_file(self):
-        try:
-            if not os.path.exists('./subscribers/ignored.txt'):
-                with open('./subscribers/ignored.txt', 'w', encoding='UTF-8') as file:
-                    file.write('')
-            with open('./subscribers/ignored.txt', 'r', encoding='UTF-8') as file:
-                self.ignored = set(map(lambda x: int(x.strip()), file.readlines()))
-            return f'Список игнорируемых загружен.'
-        except Exception as e:
-            return f'Ошибка при загрузке: {e}', True
+        with session_scope() as s:
+            repo = IgnoredRepository(s)
+            self.ignored = repo.list_all()
+        return "Список игнорируемых загружен."
