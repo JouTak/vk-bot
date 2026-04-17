@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+import json
+import time
 from utils.query_helper import MinecraftServerQuery
 from utils.vk_helper import *
 from utils.storage.user_store import User, UserList
@@ -12,17 +14,25 @@ inject_a25 = lambda *args, **kwargs: None
 
 spartakiada_subs_path = './subscribers/spartakiada{}.txt'
 
-admin = [297002785, 275052029, 325899178, 229488682]
+admin = [297002785, 325899178, 229488682, 304032635]
 
 itmocraft_ip = 'craft.itmo.ru'
 joutak_ip = 'mc.joutak.ru'
 joutak_link = 'https://joutak.ru'
 form_link = 'https://forms.yandex.ru/u/6501f64f43f74f18a8da28de/'
+a25_reg_link = 'https://itmo.events/events/116180'
 telegram_link = 't.me/itmocraft'
 discord_link = 'https://discord.gg/YVj5tckahA'
 vk_link = 'https://vk.com/widget_community.php?act=a_subscribe_box&oid=-217494619&state=1|ITMOcraft'
 
-info_message = (
+# --- ВАЖНО: как раньше — сообщение для неподписанных ---
+info_message = \
+    'Привет! Для получения информации о серверах ИТМОкрафта подпишитесь:\n' \
+    f'[{vk_link}. Подписаться]\n\n' \
+    'После подписки отправь ещё одно сообщение. Только в случае возникновения проблем пиши "АДМИН"'
+
+# --- Это было старым hi_message (у тебя сейчас называлось info_message) ---
+hi_message = (
     f'Добро пожаловать в клуб любителей Майнкрафта ITMOcraft! Наш клуб — комьюнити итмошников, которым нравится играть '
     f'в майнкрафт во всех его проявлениях: Выживание, моды, мини-игры: если во что-то можно играть, '
     f'мы создаём для этого условия. Недавно мы получили от университета ещё большие мощности, '
@@ -41,24 +51,41 @@ info_message = (
     f'Если есть вопросы, в том числе по спартакиаде, пиши "АДМИН"!\n'
     f'\n'
     f'P.P.S.: У нас скоро начнётся осенняя Спартакиада, если хочешь, можешь зарегистрироваться: '
-    f'[Зве, вставь сюда ссылку на регу]'
+    f'{a25_reg_link}'
+)
+
+a25_welcome_message = (
+    "Привет! \n\n"
+    "Сейчас идёт третий сезон Майнокиады по Майнкрафту!\n"
+    "Хочешь участвовать — зарегистрируйся по ссылке:\n"
+    f"{a25_reg_link}\n\n"
+    "После регистрации бот покажет твою команду и данные.\n"
+    "Если ты уже зарегистрировался, но бот ничего не показывает — подожди, в нескольких рабочих часов информация точно должна появиться. "
+    "Если она не появилась, напиши в ответ: АДМИН"
 )
 
 a25_message = '''
-Вот твои данные за осеннюю Спартакиаду по Майнкрафту 2025!
+Вот твои данные за третий сезон Майнокиады ITMOcraft!
 
 ИСУ:
 {isu}
 
 Ник:
-{nck}
+{met_a25_nck}
 
 Команда:
 {met_a25_cmd}
 
+Капитан:
+{met_a25_cap}
+{a25_stage_info}
+Часы халявы на киберарене: {met_a25_kbr}
+Подробнее про компьютерный клуб KRONBARS ARENA, где ты можешь бесплатно поиграть до конца турнира: https://vk.ru/wall-217494619_158
+
 Обязательно проверь все данные, только в случае несоответствий или важных вопросов напиши в ответ "АДМИН"
-Читай о нас подробнее на сайте https://joutak.ru/minigames и других разделах
-(Сообщение тестовое, будет дополняться)
+Присоединяйся и следи за информацией в чате https://t.me/itmocraftchat!
+
+P.S. Сообщение будет дополняться твоими данными по мере участия в играх
 '''.strip()
 
 y25_message = '''
@@ -177,6 +204,83 @@ a24_third_part = '''
 {met_a24_fnl}
 
 '''.lstrip()
+
+# --- A25: призыв капитанов поиграть ---
+CAPTAIN_CALL_LABEL = 'ПРИЗВАТЬ ПОИГРАТЬ'
+CAPTAIN_CALL_COOLDOWN_SECONDS = 120
+CAPTAIN_CALL_COOLDOWN_UNTIL: dict[int, float] = {}
+
+
+
+def is_a25_captain(user: User, uid: int) -> bool:
+    # Captain for A25 is detected by comparing stored captain uid (met['a25']['cid']) with the sender uid.
+    try:
+        a25 = user.met.get('a25') if isinstance(user.met, dict) else None
+        if not isinstance(a25, dict):
+            return False
+        cid = a25.get('cid', 0)
+        return int(cid) != 0 and int(cid) == int(uid)
+    except Exception:
+        return False
+
+
+def build_a25_stage_info(user: User) -> str:
+    """Returns a formatted stage line for A25 participants who passed round 1.
+
+    If round1 is not passed -> empty string.
+    If round1 is passed but stage is empty -> shows '[НЕ НАЗНАЧЕН]'.
+    """
+    try:
+        if user is None or not isinstance(user.met, dict):
+            return ''
+        a25 = user.met.get('a25')
+        if not isinstance(a25, dict):
+            return ''
+        # Show stage info only for those who passed round 1
+        if not bool(a25.get('wr1')):
+            return ''
+        stg = (a25.get('stg') or '').strip()
+        if not stg or stg == '-':
+            stg = '[НЕ НАЗНАЧЕН]'
+        return f"\nТвой турнирный матч (stage): {stg}\n"
+    except Exception:
+        return ''
+
+
+
+def get_a25_captain_uids(users: UserList) -> set[int]:
+    # Collects all unique captain VK uids from A25 metadata.
+    result: set[int] = set()
+    for isu in users.keys():
+        u = users.get(isu)
+        if not u or not isinstance(u.met, dict):
+            continue
+        a25 = u.met.get('a25')
+        if not isinstance(a25, dict):
+            continue
+        cid = a25.get('cid', 0)
+        try:
+            cid_int = int(cid)
+        except Exception:
+            cid_int = 0
+        if cid_int > 0:
+            result.add(cid_int)
+    return result
+
+
+def get_a25_current_stage(a25: dict) -> int | None:
+    # Returns 1..3 for first not-completed stage, or None if all stages are completed.
+    try:
+        if not a25.get('wr1', False):
+            return 1
+        if not a25.get('wr2', False):
+            return 2
+        if not a25.get('wr3', False):
+            return 3
+        return None
+    except Exception:
+        return 1
+
 
 
 def flat_info2text() -> dict[str]:
@@ -517,17 +621,26 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
     username = user_get['last_name']
 
     msg: str = event.message.text
+    msg = (event.object['message'].get('text') or '')
     msgs = msg.split()  # Split message into words for command parsing
-    if not msg:
-        # If the message text is empty, no further processing needed for this path.
-        # Consider if other logic (e.g., handling attachments) is required here.
-        return
+
+    payload_raw = event.object['message'].get('payload')
+    payload_type = None
+    if payload_raw:
+        try:
+            payload_obj = json.loads(payload_raw) if isinstance(payload_raw, str) else payload_raw
+        except Exception:
+            payload_obj = None
+        if isinstance(payload_obj, dict):
+            payload_type = payload_obj.get('type')
+
+    callplay_trigger = (payload_type == 'callplay') or ('призвать поиграть' in msg.lower())
 
     # --- PRIVATE MESSAGES HANDLER ---
     # This block handles messages sent directly to the bot, not in group chats.
     if not event.from_chat:
-        # ADMIN COMMANDS
-        if uid in admin:
+        # ADMIN COMMANDS (важно: не падаем на пустом тексте/стикере)
+        if uid in admin and msgs:
             if msgs[0] == 'stop':  # Shuts down the bot process (typically leads to container restart)
                 exit()
             elif msgs[0] == 'reload':  # Forces a reload of the user list from storage
@@ -551,7 +664,7 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
                     'message': tts
                 }]
             elif msgs[0] == 'add_users':  # Adds specified user IDs as 'dummy' users to the database
-                errors = dict[str: str]()
+                errors = dict[str, str]()  # FIX: было dict[str: str]() -> SyntaxError
                 for i in set(msgs[1:]):
                     try:
                         if int(i) in users.uid_to_isu.keys():
@@ -574,7 +687,7 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
 
         # --- SUPPORT CONVERSATION HANDLING ---
         # Skips further processing if the user is currently ignored AND not attempting to call admin
-        if ignored.is_ignored(uid) and 'админ' not in msg.lower():
+        if ignored.is_ignored(uid) and 'админ' not in msg.lower() and not callplay_trigger:
             return
 
         # handling messages, that initiating or ending a support request
@@ -617,32 +730,79 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
                 ]
             ]
 
-        # --- DEFAULT MESSAGE RESPONSE LOGIC ---
-        # Determines the bot's response based on user's group membership and metadata
-        if vk_helper.vk_session.method('groups.isMember', {'group_id': self.group_id, 'user_id': uid}) == 0:
-            tts = info_message  # User is not a member of our group
-        elif uid in users.uid_to_isu:
+        # --- A25 CAPTAINS: призвать других капитанов поиграть ---
+        # Кнопка/команда: "ПРИЗВАТЬ ПОИГРАТЬ" (можно и текстом).
+        user = None
+        if uid in users.uid_to_isu:
             isu = users.uid_to_isu[uid]
             user = users.get(isu)
-            # Check specific metadata keys to tailor the response
-            if 'a25' in user.met.keys():
-                tts = format_message(a25_message, user)
-            elif 'y25' in user.met.keys() and user.met['y25']['ugo'] != 0:
-                tts = format_message(y25_message, user,
-                                     part2=(
-                                         format_message(y25_second_part, user) if user.met['y25']['way'] == 2 else ''))
-            elif 's25' in user.met.keys():
-                tts = format_message(s25_message, user,
-                                     part2=(format_message(s25_second_part, user) if user.met['s25']['wr1'] else ''),
-                                     part3=(format_message(s25_third_part, user) if user.met['s25']['wr2'] else ''))
-            elif 'a24' in user.met.keys():
-                tts = format_message(a24_message, user,
-                                     part2=format_message(a24_second_part, user) if user.met['a24']['wr1'] else '',
-                                     part3=format_message(a24_third_part, user) if user.met['a24']['wr2'] else '')
-            else:
-                tts = info_message  # No specific metadata matched
+
+        if callplay_trigger:
+            if user is None or not isinstance(user.met, dict) or 'a25' not in user.met:
+                return [{'peer_id': uid, 'message': 'Эта команда доступна только капитанам команд Майнокиады.'}]
+
+            if not is_a25_captain(user, uid):
+                return [{'peer_id': uid, 'message': 'Эта команда доступна только капитанам команд Майнокиады.'}]
+
+            now = time.time()
+            until = CAPTAIN_CALL_COOLDOWN_UNTIL.get(int(uid), 0)
+            if until > now:
+                remaining = int(until - now + 0.999)
+                return [{'peer_id': uid, 'message': f'Слишком часто. Подожди {remaining} сек. и попробуй ещё раз.'}]
+
+            a25 = user.met.get('a25') or {}
+            team = (a25.get('cmd') or '').strip()
+            if not team or team == '-':
+                return [{'peer_id': uid, 'message': 'Не вижу название твоей команды в базе. Напиши: АДМИН'}]
+
+            stage = get_a25_current_stage(a25)
+            if stage is None:
+                return [{'peer_id': uid, 'message': 'Похоже, у вашей команды уже отмечены все режимы. Если это ошибка — напиши: АДМИН'}]
+
+            stage_text = {1: 'первый режим', 2: 'второй режим', 3: 'третий режим'}.get(stage, f'режим {stage}')
+
+            notify_text = (
+                f'Капитан команды "{team}" призывает поиграть!\n'
+                f'Текущий режим: {stage_text}.\n'
+                f'Нужны игроки от вашей команды.'
+            )
+
+            captains = sorted(get_a25_captain_uids(users))
+            actions = [{'peer_id': int(c), 'message': notify_text} for c in captains if int(c) != int(uid)]
+
+            CAPTAIN_CALL_COOLDOWN_UNTIL[int(uid)] = time.time() + CAPTAIN_CALL_COOLDOWN_SECONDS
+
+            ack = {'peer_id': uid, 'message': f'Принято! Разослал другим капитанам ({len(actions)}).'}
+            return [ack, *actions]
+
+
+        is_member = vk_helper.vk_session.method(
+            'groups.isMember',
+            {'group_id': self.group_id, 'user_id': uid}
+        ) != 0
+
+        # --- DEFAULT MESSAGE RESPONSE LOGIC ---
+        # Priority:
+        # 1) If user participates in A25 -> show A25 info
+        # 2) If not member -> send old subscribe prompt (info_message)
+        # 3) Otherwise -> show welcome message about A25 with registration link
+        # (user may already be resolved above for captain-only commands)
+        if 'user' not in locals() or user is None:
+            user = None
+            if uid in users.uid_to_isu:
+                isu = users.uid_to_isu[uid]
+                user = users.get(isu)
+
+        keyboard_out = None
+        if user is not None and 'a25' in user.met.keys():
+            tts = format_message(a25_message, user, a25_stage_info=build_a25_stage_info(user))
+            if is_a25_captain(user, uid):
+                buttons = [{'label': CAPTAIN_CALL_LABEL, 'payload': {'type': 'callplay'}, 'color': 'positive'}]
+                keyboard_out = create_standard_keyboard(buttons)
+        elif not is_member:
+            tts = info_message
         else:
-            tts = info_message  # User not found in the database
+            tts = a25_welcome_message
 
     # --- CHAT MESSAGES HANDLER ---
     # This block is for messages received in group chats.
@@ -662,7 +822,7 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
         uid = event.object['message']['peer_id']
         cuid = event.object['message'].get('conversation_message_id')
 
-        if msgs[0].lstrip('/') == 'ping':
+        if msgs and msgs[0].lstrip('/') == 'ping':
             mc = MinecraftServerQuery()
             try:
                 players, version = mc.get_dummy_info()
@@ -678,7 +838,10 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
         return [{'peer_id': uid, 'message': tts, 'conversation_message_id': cuid}]
 
     # Default return for processed private messages
-    return [{
+    action = {
         'peer_id': uid,
         'message': tts
-    }]
+    }
+    if 'keyboard_out' in locals() and keyboard_out is not None:
+        action['keyboard'] = keyboard_out
+    return [action]

@@ -5,6 +5,7 @@ from utils.db.db import init_engine
 from utils.log import *
 from bot import *
 import requests
+import re
 
 
 class Main:

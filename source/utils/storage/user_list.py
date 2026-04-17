@@ -1,5 +1,6 @@
 from utils.json_worker import *
 from datetime import datetime
+import re
 
 users_path = './subscribers/users.txt'
 warnings = []
@@ -36,7 +37,7 @@ class User:
         'a24': {'tsp': int, 'nck': str, 'lr1': s2b, 'wr1': s2b, 'wr2': s2b, 'nyt': s2b, 'fnl': s2b},
         's25': {'tsp': int, 'nck': str, 'wr1': s2b, 'rr1': str, 'wr2': s2b, 'rr2': str, 'fnl': str},
         'y25': {'tsp': int, 'nck': str, 'nmb': str, 'bed': s2b, 'way': int, 'car': str, 'liv': str, 'ugo': int},
-        'a25': {'fio': str, 'sts': s2b, 'uid': int, 'nck': str, 'cmd': str, 'cid': int,
+        'a25': {'fio': str, 'sts': s2b, 'uid': int, 'nck': str, 'cmd': str, 'cid': int, 'cap': str, 'kbr': str, 'stg': str,
                 'wr1': s2b, 'wr2': s2b, 'wr3': s2b, 'brs': s2b}})
 
     # Checks for parsing validity: text to int and text to bool validators (checkers) (t2ic = Text to Int Checker)
@@ -47,7 +48,7 @@ class User:
         'a24': {'tsp': t2ic, 'nck': bool, 'lr1': t2bc, 'wr1': t2bc, 'wr2': t2bc, 'nyt': t2bc, 'fnl': t2bc},
         's25': {'tsp': t2ic, 'nck': bool, 'wr1': t2bc, 'rr1': t2ic, 'wr2': t2bc, 'rr2': t2ic, 'fnl': t2ic},
         'y25': {'tsp': t2ic, 'nck': bool, 'nmb': bool, 'bed': t2bc, 'way': t2ic, 'car': bool, 'liv': bool, 'ugo': t2ic},
-        'a25': {'fio': bool, 'sts': t2bc, 'uid': t2ic, 'nck': bool, 'cmd': bool, 'cid': t2ic,
+        'a25': {'fio': bool, 'sts': t2bc, 'uid': t2ic, 'nck': bool, 'cmd': bool, 'cid': t2ic, 'cap': bool, 'kbr': bool, 'stg': bool,
                 'wr1': t2bc, 'wr2': t2bc, 'wr3': t2bc, 'brs': t2bc}})
 
     # bool to text
@@ -56,6 +57,8 @@ class User:
     w2t = ('На бесплатном трансфере от ГК', 'Своим ходом (электричка)', 'Своим ходом (на машине)').__getitem__
     # String display helper: converts falsy to '[НЕТ ДАННЫХ]' (opt = optional)
     opt = lambda x: x if (x and x != '-') else '[НЕТ ДАННЫХ]'
+    # Cyberarena hours: empty -> 'не отыграны', otherwise show text as-is
+    kbr2t = lambda x: x if (x and x != '-') else 'не отыграны'
     # Converts 'ugo' status integer codes to textual descriptions
     u2t = ('Нет.', 'Да, ты прошёл отбор, ждём оплату!', 'Оплата дошла до нас, ты едешь!').__getitem__
     # Functions to convert user info fields to text representations, including nested metadata
@@ -63,7 +66,7 @@ class User:
         'a24': {'tsp': t2s, 'nck': opt, 'lr1': b2t, 'wr1': b2t, 'wr2': b2t, 'nyt': b2t, 'fnl': b2t},
         's25': {'tsp': t2s, 'nck': opt, 'wr1': b2t, 'rr1': opt, 'wr2': b2t, 'rr2': opt, 'fnl': opt},
         'y25': {'tsp': t2s, 'nck': opt, 'nmb': opt, 'bed': b2t, 'way': w2t, 'car': opt, 'liv': opt, 'ugo': u2t},
-        'a25': {'fio': opt, 'sts': b2t, 'uid': opt, 'nck': opt, 'cmd': opt, 'cid': opt,
+        'a25': {'fio': opt, 'sts': b2t, 'uid': opt, 'nck': opt, 'cmd': opt, 'cid': opt, 'cap': opt, 'kbr': kbr2t, 'stg': opt,
                 'wr1': b2t, 'wr2': b2t, 'wr3': b2t, 'brs': b2t}})
 
     # (False, True) -> ('0', '1')
@@ -338,54 +341,368 @@ class UserList:
 
 
 def inject_a25(vk_helper):
-    with open('./subscribers/a25.txt', 'r', encoding='UTF-8') as file:
-        # ису    фио    наш    вк    ник    команда    кэп    команды    раунд1?    раунд2?    раунд3?    баллы?
-        data = [i.split('\t') for i in file.read().strip('\n').split('\n')]
+    """Injects A25 data from ./subscribers/a25.txt into ./subscribers/users.txt.
 
-    with open('./subscribers/users.txt', 'r', encoding='UTF-8') as file:
-        all_users = [i.split('\t') for i in file.read().strip().split('\n') if i]
-        isus = [int(i[0]) for i in all_users if i[0] and all(j.isdigit() for j in i[0])]
-        uid2isu = {int(i[1]): int(i[0]) for i in all_users if i[1] not in '01'}
+    TSV header (tabs):
+        ису	фио	наш	вк	ник	команда	кэп команды	Киберарена	раунд1?	stage	раунд2?	раунд3?	[баллы?]
 
-    to_add = list[list[str]]()  # [[user_info], ...]
-    to_inject = list[tuple[int, list[str]]]()  # [(user_index, [user_info]), ...]
+    Compatibility:
+    - "баллы?" column is optional.
+    - Older a25.txt without "Киберарена" is also supported.
 
-    uids = list[tuple[str, list[str]]]()  # [(vk_link, [user_info]), ...]
-    for user in data:
-        if user[0].isdigit() and int(user[0]) in isus:
-            user_index = isus.index(int(user[0]))
-            to_inject.append((user_index, user[1:]))
+    Field rules:
+    - "Киберарена": free text; empty means "не отыграны" (display is handled by kbr2t).
+    - "кэп команды":
+        * if value is a marker (captain/капитан/кэп/кеп) -> this row is the captain for its team;
+        * else if it looks like a VK reference (link/screen-name/id123) -> explicit captain reference.
+
+    If a25.txt is missing or empty, injection is skipped (bot keeps running).
+    """
+    import os
+    import json
+
+    a25_path = './subscribers/a25.txt'
+    users_path = './subscribers/users.txt'
+
+    if not os.path.exists(a25_path):
+        warn(f"A25 inject skipped: file not found: {a25_path}")
+        return
+
+    with open(a25_path, 'r', encoding='UTF-8') as f:
+        raw = f.read().replace('\r\n', '\n').replace('\r', '\n')
+
+    raw_lines = [ln for ln in raw.split('\n') if ln.strip()]
+    if not raw_lines:
+        warn('A25 inject skipped: a25.txt is empty')
+        return
+
+    # Detect header and optional columns
+    expects_kbr = False
+    expects_stg = False
+    first_cols = [c.strip() for c in raw_lines[0].split('	')]
+    if first_cols and first_cols[0].lower() == 'ису':
+        expects_kbr = any('киберарена' in (c or '').lower() for c in first_cols)
+        expects_stg = any(('stage' in (c or '').lower()) or ('стейдж' in (c or '').lower()) or ('этап' in (c or '').lower())
+                          for c in first_cols)
+    def parse_yes(value: str) -> bool:
+        x = (value or '').strip().lower()
+        return x in ('да', 'yes', 'true', '1', '+')
+
+    def parse_is_internal(value: str) -> bool:
+        """Returns True for internal participants, False for external."""
+        x = (value or '').strip().lower()
+        if not x:
+            return True
+        if x in ('внешний человек', 'внешний', 'external'):
+            return False
+        if '@' in x:
+            return True
+        return True
+
+    def parse_isu_value(value: str):
+        """Returns int ISU for positive numeric value, else None."""
+        s = (value or '').strip()
+        if not s or not s.lstrip('-').isdigit():
+            return None
+        try:
+            v = int(s)
+        except Exception:
+            return None
+        return v if v > 0 else None
+
+    def clean_vk_link(s: str) -> str:
+        s = (s or '').strip()
+        if not s:
+            return ''
+        s = s.replace('https://vk.com/', '').replace('http://vk.com/', '')
+        s = s.replace('https://vk.ru/', '').replace('http://vk.ru/', '')
+        s = s.replace('https://m.vk.com/', '').replace('http://m.vk.com/', '')
+        s = s.replace('https://m.vk.ru/', '').replace('http://m.vk.ru/', '')
+        s = s.lstrip('@')
+        return s.strip()
+
+    def is_vk_ref(s: str) -> bool:
+        s = (s or '').strip()
+        if not s:
+            return False
+        ls = s.lower()
+        if 'vk.com' in ls or 'vk.ru' in ls:
+            return True
+        if ls.startswith('id') and ls[2:].isdigit():
+            return True
+        # screen-name-like: letters/digits/underscore, at least 2 chars
+        if re.match(r'^[a-zA-Z0-9_.]{2,}$', s):
+            return True
+        return False
+
+    def is_captain_marker(s: str) -> bool:
+        x = (s or '').strip().lower()
+        return x in ('captain', 'капитан', 'кэп', 'кеп')
+
+    def clean_captain_ref(s: str) -> str:
+        s = (s or '').strip()
+        if not s:
+            return ''
+        if is_captain_marker(s):
+            return ''
+        if not is_vk_ref(s):
+            return ''
+        return clean_vk_link(s)
+
+    # Parse rows, normalize into 13 columns:
+    # [isu, fio, sts_raw, vk_link, nick, team, cap_raw, kbr_raw, r1, stg, r2, r3, brs]
+    rows: list[list[str]] = []
+    for line in raw_lines:
+        cols = [c.strip() for c in line.split('	')]
+
+        # skip header
+        if cols and cols[0].lower() == 'ису':
+            continue
+
+        # New formats with "Киберарена"
+        if expects_kbr:
+            if expects_stg:
+                # [isu,fio,sts,vk,nick,team,cap,kbr,r1,stg,r2,r3,(brs?)]
+                if len(cols) < 12:
+                    warn('A25 inject: skipping row with missing columns:', line)
+                    continue
+                if len(cols) == 12:
+                    cols.append('')  # brs
+                if len(cols) > 13:
+                    cols = cols[:13]
+                while len(cols) < 13:
+                    cols.append('')
+                rows.append(cols)
+                continue
+
+            # No stage column in file -> insert empty stage after r1
+            # current: [isu,fio,sts,vk,nick,team,cap,kbr,r1,r2,r3,(brs?)]
+            if len(cols) < 11:
+                warn('A25 inject: skipping row with missing columns:', line)
+                continue
+            if len(cols) == 11:
+                cols.append('')  # brs
+            if len(cols) > 12:
+                cols = cols[:12]
+            while len(cols) < 12:
+                cols.append('')
+            cols = cols[:9] + [''] + cols[9:]  # stg
+            if len(cols) > 13:
+                cols = cols[:13]
+            while len(cols) < 13:
+                cols.append('')
+            rows.append(cols)
+            continue
+
+        # Formats without "Киберарена"
+        if expects_stg:
+            # [isu,fio,sts,vk,nick,team,cap,r1,stg,r2,r3,(brs?)] -> insert empty kbr after cap
+            if len(cols) < 11:
+                warn('A25 inject: skipping row with missing columns:', line)
+                continue
+            if len(cols) == 11:
+                cols.append('')  # brs
+            if len(cols) > 12:
+                cols = cols[:12]
+            while len(cols) < 12:
+                cols.append('')
+            cols = cols[:7] + [''] + cols[7:]  # kbr
+            if len(cols) > 13:
+                cols = cols[:13]
+            while len(cols) < 13:
+                cols.append('')
+            rows.append(cols)
+            continue
+
+        # Old format (no "Киберарена", no stage):
+        # [isu,fio,sts,vk,nick,team,cap,r1,r2,r3,(brs?)]
+        if len(cols) < 10:
+            warn('A25 inject: skipping row with missing columns:', line)
+            continue
+        if len(cols) == 10:
+            cols.append('')  # brs
+        # Insert empty kbr after cap, then empty stage after r1
+        cols = cols[:7] + [''] + cols[7:]  # kbr
+        cols = cols[:9] + [''] + cols[9:]  # stg
+        if len(cols) > 13:
+            cols = cols[:13]
+        while len(cols) < 13:
+            cols.append('')
+        rows.append(cols)
+
+    if not rows:
+        warn('A25 inject skipped: no valid rows')
+        return
+
+    # Read existing users.txt
+    all_users: list[list[str]] = []
+    if os.path.exists(users_path):
+        with open(users_path, 'r', encoding='UTF-8') as f:
+            content = f.read().replace('\r\n', '\n').replace('\r', '\n').strip()
+            if content:
+                all_users = [i.split('	') for i in content.split('\n') if i]
+
+    # Ensure each row has at least 6 columns: isu, uid, fio, grp, nck, met
+    for i in range(len(all_users)):
+        while len(all_users[i]) < 6:
+            all_users[i].append('-')
+
+    # Build indexes
+    isu_to_index: dict[int, int] = {}
+    uid_to_index: dict[int, int] = {}
+    for idx, row in enumerate(all_users):
+        try:
+            isu = int(row[0]) if str(row[0]).lstrip('-').isdigit() else None
+        except Exception:
+            isu = None
+        try:
+            uid = int(row[1]) if str(row[1]).isdigit() else None
+        except Exception:
+            uid = None
+        if isu is not None:
+            isu_to_index[isu] = idx
+        if uid is not None and uid not in (0, 1):
+            uid_to_index[uid] = idx
+
+    # Resolve VK uids and captain uids (preserve order, skip empty refs)
+    vk_links = [clean_vk_link(r[3]) for r in rows]
+    cap_links = [clean_captain_ref(r[6]) for r in rows]
+
+    def resolve_links(links: list[str]) -> list[int]:
+        out = [0] * len(links)
+        idxs = [i for i, lnk in enumerate(links) if lnk]
+        if not idxs:
+            return out
+        resolved = vk_helper.links_to_uids([links[i] for i in idxs])
+        for i, val in zip(idxs, resolved):
+            try:
+                out[i] = int(val) if str(val).isdigit() else 0
+            except Exception:
+                out[i] = 0
+        return out
+
+    resolved_uids = resolve_links(vk_links)
+    resolved_cids = resolve_links(cap_links)
+
+    # Build mappings for team captain
+    uid_to_nick: dict[int, str] = {}
+    team_to_cid: dict[str, int] = {}
+    team_to_cap: dict[str, str] = {}
+
+    for cols, uid in zip(rows, resolved_uids):
+        team = (cols[5] or '').strip()
+        nick = (cols[4] or '').strip()
+        cap_raw = (cols[6] or '').strip()
+        if uid not in (0, 1) and nick:
+            uid_to_nick[uid] = nick
+        if team and is_captain_marker(cap_raw) and uid not in (0, 1):
+            team_to_cid[team] = uid
+            team_to_cap[team] = nick
+
+    # Fallback captains by explicit links (only for teams without marker)
+    for cols, cid in zip(rows, resolved_cids):
+        team = (cols[5] or '').strip()
+        if not team or team in team_to_cid:
+            continue
+        if cid not in (0, 1):
+            team_to_cid[team] = cid
+            team_to_cap[team] = uid_to_nick.get(cid, '')
+
+    # Inject
+    for cols, uid, cid in zip(rows, resolved_uids, resolved_cids):
+        isu_s, fio, sts_raw, vk_link, nick, team, cap_raw, kbr_raw, r1, stg, r2, r3, brs = cols
+
+        isu_int = parse_isu_value(isu_s)
+        uid_int = uid
+
+        # Decide captain uid: prefer team mapping, then explicit per-row link
+        team_key = (team or '').strip()
+        cid_int = 0
+        if team_key and team_key in team_to_cid:
+            cid_int = team_to_cid[team_key]
+        elif cid not in (0, 1):
+            cid_int = cid
+
+        # Decide captain nick
+        cap_text = ''
+        if team_key and team_key in team_to_cap and team_to_cap[team_key]:
+            cap_text = team_to_cap[team_key]
+        elif cid_int not in (0, 1):
+            cap_text = uid_to_nick.get(cid_int, '')
+
+        # If this row itself is captain-marker, show self nick even if mapping not built
+        if not cap_text and is_captain_marker(cap_raw):
+            cap_text = (nick or '').strip()
+
+        info = {
+            'fio': str(fio),
+            'sts': parse_is_internal(sts_raw),
+            'uid': int(uid_int),
+            'nck': str(nick),
+            'cmd': str(team),
+            'cid': int(cid_int),
+            'cap': str(cap_text),
+            'kbr': str(kbr_raw).strip(),
+            'stg': str(stg).strip(),
+            'wr1': parse_yes(r1),
+            'wr2': parse_yes(r2),
+            'wr3': parse_yes(r3),
+            'brs': parse_yes(brs),
+        }
+
+        target_index = None
+        if isu_int is not None and isu_int in isu_to_index:
+            target_index = isu_to_index[isu_int]
+        elif uid_int not in (0, 1) and uid_int in uid_to_index:
+            target_index = uid_to_index[uid_int]
+
+        if target_index is not None:
+            u = all_users[target_index]
+            if isu_int is not None:
+                u[0] = str(isu_int)
+            if uid_int not in (0, 1):
+                u[1] = str(uid_int)
+            if fio:
+                u[2] = fio
+            if nick:
+                u[4] = nick
+
+            try:
+                met = json.loads(u[5]) if u[5] and u[5] != '-' else {}
+                if not isinstance(met, dict):
+                    met = {}
+            except Exception:
+                met = {}
+
+            met['a25'] = info
+            u[5] = json.dumps(met, ensure_ascii=False)
         else:
-            uids.append((user[3], user))
+            # Append new record: assign special ISU if missing
+            if isu_int is None:
+                special = 1000000
+                used = set()
+                for row in all_users:
+                    try:
+                        used.add(int(row[0]))
+                    except Exception:
+                        pass
+                while special in used:
+                    special += 1
+                isu_int = special
 
-    for part in [uids[i:i + 25] for i in range(0, len(uids), 25)]:
-        links = [i[0] for i in part]
-        users = [i[1] for i in part]
-        for uid, user in zip(vk_helper.links_to_uids(links), users):
-            if uid in uid2isu.keys():
-                to_inject.append((isus.index(uid2isu[uid]), user[1:]))
-            else:
-                to_add.append(user)
+            new_user = [
+                str(isu_int),
+                str(uid_int),
+                fio or '-',
+                '-',
+                nick or '-',
+                json.dumps({'a25': info}, ensure_ascii=False)
+            ]
+            all_users.append(new_user)
+            idx = len(all_users) - 1
+            isu_to_index[int(isu_int)] = idx
+            if uid_int not in (0, 1):
+                uid_to_index[int(uid_int)] = idx
 
-    keys = ('fio', 'sts', 'uid', 'nck', 'cmd', 'cid', 'wr1', 'wr2', 'wr3', 'brs')
-    funs = (str, lambda x: x == 'Внешний человек', int, str, str, int,
-            lambda x: x != 'Да', lambda x: x != 'Да', lambda x: x != 'Да', lambda x: x != 'Да')
-    for part in [to_inject[i:i + 25] for i in range(0, len(to_inject), 25)]:
-        uids = vk_helper.links_to_uids([i[1][2] for i in part])
-        cids = vk_helper.links_to_uids([i[1][5] for i in part])
-        for index, user in [(i[0], [*i[1][:2], uid, *i[1][3:5], cid, *i[1][6:]]) for i, uid, cid in zip(part, uids, cids)]:
-            # fio, sts, uid, nck, cmd, cid, wr1, wr2, wr3, brs
-            info = {i: f(j) for i, j, f in zip(keys, user, funs)}
-            all_users[index] = all_users[index][:-1] + [json.dumps({**json.loads(all_users[index][-1]), 'a25': info}, ensure_ascii=False)]
-
-    for part in [to_add[i:i + 25] for i in range(0, len(to_add), 25)]:
-        uids = vk_helper.links_to_uids([i[3] for i in part])
-        cids = vk_helper.links_to_uids([i[4] for i in part])
-        for raw_info in [[*i[:3], uid, *i[4:6], cid, *i[7:]] for i, uid, cid in zip(part, uids, cids)]:
-            # isu, uid, fio, grp, nck, met
-            info = {i: f(j) for i, j, f in zip(keys, raw_info[1:], funs)}
-            user = ['-', raw_info[3], raw_info[1], '-', raw_info[4], json.dumps({'a25': info}, ensure_ascii=False)]
-            all_users.append(list(map(str, user)))
-
-    with open('./subscribers/users.txt', 'w', encoding='UTF-8') as file:
-        file.write('\n'.join('\t'.join(map(str, i)) for i in all_users if i and i[0] != '0'))
+    with open(users_path, 'w', encoding='UTF-8') as f:
+        f.write('\n'.join('\t'.join(map(str, i)) for i in all_users if i and i[0] != '0'))

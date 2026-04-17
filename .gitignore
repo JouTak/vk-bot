@@ -40,6 +40,8 @@ dump*.sql
 # IDEs
 .idea/
 .vscode/
+/.idea/*
+/.vscode/*
 
 # OS
 .DS_Store
@@ -48,6 +50,7 @@ Thumbs.db
 # --- Project-specific ---
 # local subscribers data / exports
 source/subscribers/
+/data/subscribers
 
 # misc local helper artifacts
 entrypoint.sh
