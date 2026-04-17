@@ -511,24 +511,38 @@ def flat_info(info: User.info2text) -> dict[str]:
         elif event == 's25':
             result['met_s25_h10'] = info[5][event]['rr1'] != 0
         for key in tokens[5][n]:
+            # Older/newer DB snapshots may miss some keys for a given event -> keep bot stable.
+            if key not in info[5][event]:
+                continue
             result[f'met_{event}_{key}'] = info[5][event][key]
     return result
 
 
 def format_message(msg: str, user: User.info2text, **additional) -> str:
     """
-    Formats a message by replacing placeholders with user info values processed by
-    a dict mapping field names to formatting functions applied to user info before formatting.
+    Formats a message by replacing placeholders with user info values.
 
-    Args:
-        msg (str): Message template with placeholders.
-        user (User.info2text): User info object.
-        **additional: Extra values for formatting.
-
-    Returns:
-        str: Formatted message string.
+    Important:
+    - `flat_info(user.info)` may contain keys for which there is no formatter in `User.flat_i2t`
+      (e.g. new metadata fields after schema changes).
+    - Message templates may reference fields that are missing in user.info.
+    To keep bot stable, unknown/missing fields are rendered as empty string.
     """
-    return msg.format(**{key: User.flat_i2t[key](value) for key, value in flat_info(user.info).items()}, **additional)
+    flat = flat_info(user.info)
+    mapping: dict[str, str] = {}
+    for key, value in flat.items():
+        fmt = User.flat_i2t.get(key)
+        if fmt is None:
+            # no formatter for this field (new/unknown key) -> best-effort str()
+            mapping[key] = str(value)
+        else:
+            mapping[key] = fmt(value)
+
+    class _SafeDict(dict):
+        def __missing__(self, k):
+            return ""
+
+    return msg.format_map(_SafeDict(mapping | additional))
 
 
 def sender(self, condition: str, msg: str) -> list[dict]:
