@@ -1,9 +1,16 @@
 # -*- coding: utf-8 -*-
 import json
+import os
 import time
 from utils.query_helper import MinecraftServerQuery
 from utils.vk_helper import *
-from utils.user_list import *
+from utils.storage.user_store import User, UserList
+from source.utils.tools.cli.migrate_from_txt import run_migration
+# NOTE: legacy file-based user_list module is kept in repo but should not be imported after DB migration.
+# Using db-backed UserList from utils.storage.user_store instead.
+users_path = ""
+warnings = []
+inject_a25 = lambda *args, **kwargs: None
 
 # DB: isu, uid, fio, grp, nck, {a24: {...}, s25: {...}, ...}
 
@@ -207,6 +214,13 @@ CAPTAIN_CALL_COOLDOWN_UNTIL: dict[int, float] = {}
 
 
 
+
+
+def is_migration_enabled() -> bool:
+    value = (os.getenv('ENABLE_MIGRATION') or '').strip().lower()
+    return value in ('1', 'true', 'yes', 'on')
+
+
 def is_a25_captain(user: User, uid: int) -> bool:
     # Captain for A25 is detected by comparing stored captain uid (met['a25']['cid']) with the sender uid.
     try:
@@ -217,6 +231,7 @@ def is_a25_captain(user: User, uid: int) -> bool:
         return int(cid) != 0 and int(cid) == int(uid)
     except Exception:
         return False
+
 
 
 def build_a25_stage_info(user: User) -> str:
@@ -261,6 +276,7 @@ def get_a25_captain_uids(users: UserList) -> set[int]:
         if cid_int > 0:
             result.add(cid_int)
     return result
+
 
 
 def get_a25_current_stage(a25: dict) -> int | None:
@@ -330,19 +346,15 @@ def check_condition(cond: str, errors: list = None) -> str | None:
     if is_first is True:
         errors = []
 
-    # Check for tokens in the first token group (e.g., logical operators)
     if any(token in cond for token in tokens[0]):
         for token in tokens[0]:
             if token in cond:
-                # Recursively validate each sub-condition separated by this token
                 for c in cond.split(token):
                     check_condition(c, errors)
-        # If this is the top-level call, return 'ok' or error messages
         if is_first is True:
             return 'ok' if len(errors) == 0 else '\n'.join(errors)
         return
 
-    # Check for tokens in the second token group (e.g., metadata identifiers)
     elif any(token in cond for token in tokens[1]):
         for token in tokens[1]:
             if token in cond:
@@ -351,17 +363,14 @@ def check_condition(cond: str, errors: list = None) -> str | None:
                     errors.append(f'A | too many args in "{cond}"')
                 if len(c) < 2:
                     errors.append(f'B | not enough args in "{cond}"')
-                # Recursively check first part of condition
                 if c[0] not in tokens[4]:
                     check_condition(c[0], errors)
-                # Validate second part of the condition
                 if c[1] != 'met':
                     errors.append(f'C | token "{c[1]}" in "{cond}" is unknown')
         if is_first is True:
             return 'ok' if len(errors) == 0 else '\n'.join(errors)
         return
 
-    # Check for tokens in the third token group (e.g., comparison operators)
     elif any(token in cond for token in tokens[2]):
         for token in tokens[2]:
             if token in cond:
@@ -370,13 +379,10 @@ def check_condition(cond: str, errors: list = None) -> str | None:
                     errors.append('D | too many args in ' + cond)
                 if len(c) < 2:
                     errors.append('E | not enough args in ' + cond)
-                # Recursively validate left part of condition
                 check_condition(c[0], errors)
                 t = c[0].split('.')
-                # Validate that base token exists in accepted tokens
                 if t[0] not in tokens[3]:
                     errors.append(f'F | token "{t[0]}" in "{cond}" is unknown')
-                # Validate argument types depending on token structure
                 if len(t) == 1 and c[0] in tokens[2] and not User.text2info_check[tokens[2].index(c[0])](c[1]):
                     errors.append(f'G | token "{c[1]}" in "{cond}" has wrong type')
                 elif len(t) == 3 and t[0] == 'met' and t[1] in tokens[4] and t[2] in tokens[5][tokens[4].index(t[1])]:
@@ -386,11 +392,9 @@ def check_condition(cond: str, errors: list = None) -> str | None:
             return 'ok' if len(errors) == 0 else '\n'.join(errors)
         return
 
-    # Handle conditions with dots (likely nested metadata references)
     elif '.' in cond:
         c = cond.split('.')
         if c[0] == 'met':
-            # Check presence of nested tokens
             if len(c) == 2:
                 errors.append(f'I | token "{c[1]}" in "{cond}" is unknown')
             elif len(c) == 3:
@@ -406,11 +410,9 @@ def check_condition(cond: str, errors: list = None) -> str | None:
             return 'N | not enough conditions'
         return
 
-    # Condition token not recognized in any token list
     elif cond not in tokens[3]:
         errors.append(f'O | token "{cond}" is unknown')
     else:
-        # Final check if at top-level with no errors but no token match
         if is_first is True:
             return 'P | no matches with any token' if len(errors) == 0 else '\n'.join(errors)
         return
@@ -419,81 +421,39 @@ def check_condition(cond: str, errors: list = None) -> str | None:
 def eval_condition(user: tuple, cond: str) -> bool:
     """
       Evaluates a complex boolean condition string against a user's information.
-
-      The condition string supports logical operators ('|' for OR, '&' for AND)
-      and specific checks for the presence or absence of metadata keys.
-      It can also compare user's data fields against specified values using
-      comparison operators (implicitly derived from `tokens[2]`).
-
-      Condition types:
-          - `A | B`: True if condition A OR condition B is true.
-          - `A & B`: True if condition A AND condition B is true.
-          - `key->`: True if 'key' exists in user's metadata (`user[5]`).
-          - `key!>`: True if 'key' does NOT exist in user's metadata (`user[5]`).
-          - `field_name.sub_field_name[comparison_op] value`: Compares a user's data field
-            (e.g., 'met.event.property == "value"') after type conversion.
-
-      Args:
-          user (tuple): A tuple representing the user's information, typically
-                        parsed from `User.info2text` format.
-                        Expected structure: `user[5]` contains metadata keys.
-          cond (str): The condition string to evaluate.
-
-      Returns:
-          bool: True if the condition evaluates to true for the given user, False otherwise.
       """
     if '|' in cond:
         return any(eval_condition(user, i) for i in cond.split('|'))
     if '&' in cond:
         return all(eval_condition(user, i) for i in cond.split('&'))
     if '->' in cond:
-        # Return True if the key (before '->') exists in user[5] (metadata dictionary)
         c = cond.split('->')
         return c[0] in user[5].keys()
     if '!>' in cond:
-        # Return True if the key (before '!>') does NOT exist in user[5]
         c = cond.split('!>')
         return c[0] not in user[5].keys()
-    # Check if one of the comparison tokens (e.g. '==', '!=', '>>', etc.) is in the condition string
     for n, token in enumerate(tokens[2]):
         if token in cond:
-            c = cond.split(token)  # Split condition on the comparison operator
-            i = c[0].split('.')  # Extract possible nested keys
-            # Find index of the main field in tokens[3] to get user's corresponding value and formatter
+            c = cond.split(token)
+            i = c[0].split('.')
             index = tokens[3].index(i[0])
             v = user[index]
             f = User.text2info[index]
             if i[0] == 'met':
-                # For 'met' fields (nested metadata), verify keys existence stepwise
                 if i[1] not in v.keys():
                     return False
                 if i[2] not in v[i[1]].keys():
                     return False
                 v = v[i[1]][i[2]]
                 f = f[i[1]][i[2]]
-            # Define tuple of predicate functions corresponding to tokens[2] order
             predicate = (v.__eq__, v.__ne__, v.__gt__, v.__ge__, v.__lt__, v.__le__)
             return predicate[n](f(c[1]))
-    # If condition could not be parsed or matched, return False by default
     return False
 
 
 def flat_info(info: User.info2text) -> dict[str]:
     """
     Flattens a structured user info object into a single-level dictionary for easier access.
-
-    This function processes specific fields from the `info` object and its nested 'metadata' dictionary.
-    It extracts direct info fields and transforms metadata event data into
-    flat keys (e.g., 'met_a24_rr1').
-
-    Args:
-        info (User.info2text): The structured user information object.
-                               Expected structure: tuple/list where index 3 contains
-                               direct info fields and index 5 contains metadata events.
-
-    Returns:
-        dict[str]: A dictionary where keys are flattened string representations
-                   of user info fields and their corresponding values.
     """
     result = {}
     for n, key in enumerate(tokens[3][:-1]):
@@ -506,40 +466,33 @@ def flat_info(info: User.info2text) -> dict[str]:
         elif event == 's25':
             result['met_s25_h10'] = info[5][event]['rr1'] != 0
         for key in tokens[5][n]:
+            if key not in info[5][event]:
+                continue
             result[f'met_{event}_{key}'] = info[5][event][key]
     return result
 
 
 def format_message(msg: str, user: User.info2text, **additional) -> str:
     """
-    Formats a message by replacing placeholders with user info values processed by
-    a dict mapping field names to formatting functions applied to user info before formatting.
-
-    Args:
-        msg (str): Message template with placeholders.
-        user (User.info2text): User info object.
-        **additional: Extra values for formatting.
-
-    Returns:
-        str: Formatted message string.
+    Formats a message by replacing placeholders with user info values.
     """
-    return msg.format(**{key: User.flat_i2t[key](value) for key, value in flat_info(user.info).items()}, **additional)
+    flat = flat_info(user.info)
+    mapping: dict[str, str] = {}
+    for key, value in flat.items():
+        fmt = User.flat_i2t.get(key)
+        if fmt is None:
+            mapping[key] = str(value)
+        else:
+            mapping[key] = fmt(value)
+
+    class _SafeDict(dict):
+        def __missing__(self, k):
+            return ""
+
+    return msg.format_map(_SafeDict(mapping | additional))
 
 
 def sender(self, condition: str, msg: str) -> list[dict]:
-    """
-     Sends a formatted message to all users matching a specified condition.
-
-     Parameters:
-         condition (str): The condition string to evaluate for each user (must be valid for eval_condition).
-         msg (str): The message template to format and send.
-
-     Returns:
-         list[dict]: A list of dictionaries for each recipient, each containing:
-             - 'peer_id': the user ID to send the message to,
-             - 'message': the formatted message string.
-         If the condition check fails, returns a list of error messages for all admins.
-     """
     check = check_condition(condition)
     if check_condition(condition) != 'ok':
         return [{'peer_id': uid, 'message': 'Condition issue:\n' + check} for uid in admin]
@@ -547,8 +500,10 @@ def sender(self, condition: str, msg: str) -> list[dict]:
     result = []
     for isu in users.keys():
         user = users.get(isu)
-        uid = user.uid
-        if uid == '0':
+        if not user:
+            continue
+        uid = int(user.uid)
+        if 0 <= uid <= 1:
             continue
         if eval_condition(user.info, condition) is True:
             result.append({'peer_id': uid, 'message': format_message(msg, user)})
@@ -556,11 +511,6 @@ def sender(self, condition: str, msg: str) -> list[dict]:
 
 
 def process_message_event(self, event, vk_helper) -> list[dict] | None:
-    """
-    NOTE: This function is currently not used.
-
-    Processes a new message_event (callback button) from a user.
-    """
     pl = event.object.get('payload')
     tts = ''
     sender = int(pl['sender'])
@@ -573,48 +523,17 @@ def process_message_event(self, event, vk_helper) -> list[dict] | None:
 
 
 def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
-    """
-    Handles a new incoming message from a user.
-
-    Depending on the message type (private or chat), user ID, and message content, performs different actions:
-        - Private messages:
-            - Admin commands such as 'stop', 'reload', 'sender', and 'add_users'.
-            - Support request handling with an ignore list mechanism.
-            - Checks if the user is a member of the group.
-            - Formats and sends messages based on user-specific metadata.
-
-        - Chat messages:
-            - Currently no implemented logic (reserved for future features).
-
-    Args:
-        event: The event object containing message information.
-        vk_helper: Helper object for VK API interactions.
-        ignored: Object managing the list of ignored users.
-
-    Returns:
-        list[dict] | None:
-           A list of dictionaries with parameters for sending messages
-           (including 'peer_id', 'message', and optionally 'keyboard' and 'attachment'),
-           or None if no reply is needed.
-
-    Notes:
-        - The 'stop' command terminates the script.
-        - The 'reload' command reloads the user list.
-        - The 'sender' command dispatches messages to groups of users.
-        - The 'add_users' command adds dummy users to the database.
-    """
     users: UserList = self.users
     uid = event.message.from_id
 
-    # Retrieve user's first and last name from VK API for personalized responses
     user_get = vk_helper.vk.users.get(user_ids=uid)
-    user_get = user_get[0]  # The API returns a list, even for a single user_id
+    user_get = user_get[0]
     uname = user_get['first_name']
     username = user_get['last_name']
 
     msg: str = event.message.text
     msg = (event.object['message'].get('text') or '')
-    msgs = msg.split()  # Split message into words for command parsing
+    msgs = msg.split()
 
     payload_raw = event.object['message'].get('payload')
     payload_type = None
@@ -628,19 +547,45 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
 
     callplay_trigger = (payload_type == 'callplay') or ('призвать поиграть' in msg.lower())
 
-    # --- PRIVATE MESSAGES HANDLER ---
-    # This block handles messages sent directly to the bot, not in group chats.
     if not event.from_chat:
-        # ADMIN COMMANDS (важно: не падаем на пустом тексте/стикере)
         if uid in admin and msgs:
-            if msgs[0] == 'stop':  # Shuts down the bot process (typically leads to container restart)
+            if msgs[0] == 'stop':
                 exit()
-            elif msgs[0] == 'reload':  # Forces a reload of the user list from storage
+            elif msgs[0] == 'reload':
                 return [{'peer_id': uid, 'message': 'Success' if self.users.load() else 'Failed'}]
-            elif msgs[0] == 'sender':  # Dispatches a custom message to a group of users based on a condition
-                if len(msgs) > 2:  # Extracts the condition and the message text for the sender function
+            elif msgs[0] == 'migrate':
+                if not is_migration_enabled():
+                    return [{
+                        'peer_id': uid,
+                        'message': 'Миграция отключена. Установи ENABLE_MIGRATION=1 и перезапусти бота.'
+                    }]
+                users_txt = msg.removeprefix(msgs[0]).strip() or None
+                try:
+                    stats = run_migration(users_txt=users_txt)
+                    try:
+                        self.users.load()
+                    except Exception:
+                        pass
+                    return [{
+                        'peer_id': uid,
+                        'message': (
+                            'Миграция завершена.\n'
+                            f'Файл: {stats["users_txt"]}\n'
+                            f'Импортировано: {stats["imported"]}\n'
+                            f'Валидных строк в файле: {stats["file_valid"]}\n'
+                            f'Строк в DB users: {stats["db_rows"]}'
+                        )
+                    }]
+                except Exception as e:
+                    return [{'peer_id': uid, 'message': f'Ошибка миграции:\n{e}'}]
+            elif msgs[0] == 'sender':
+                try:
+                    self.users.load()
+                except Exception:
+                    pass
+                if len(msgs) > 2:
                     result = sender(self, msgs[1], msg.removeprefix(msgs[0]).strip().removeprefix(msgs[1]).strip())
-                    count = self.handle_actions(result)  # Executes the sending actions
+                    count = self.handle_actions(result)
                     tts = f'Готово. Всего разослано {count} сообщений'
                 elif len(msgs) == 2:
                     tts = 'Нет сообщения'
@@ -650,21 +595,20 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
                     'peer_id': uid,
                     'message': tts
                 }]
-            elif msgs[0] == 'add_users':  # Adds specified user IDs as 'dummy' users to the database
-                errors = dict[str, str]()  # FIX: было dict[str: str]() -> SyntaxError
+            elif msgs[0] == 'add_users':
+                errors = dict[str, str]()
                 for i in set(msgs[1:]):
                     try:
                         if int(i) in users.uid_to_isu.keys():
                             raise Exception(f'User {i} is already in database')
-                        users.add((-1, int(i), '', '', '', {}))  # Add user with default empty metadata
+                        users.add((-1, int(i), '', '', '', {}))
                     except Exception as e:
                         errors[i] = str(e)
-                if errors:  # Formats error messages for the admin
+                if errors:
                     tts = '\n'.join(f'Ошибка при добавлении "{key}":\n{errors[key]}\n' for key in errors.keys())
                 else:
                     tts = 'Успешный успех!'
 
-                # Save changes to the user list only if any users were successfully added
                 if len(set(msgs)) - len(errors.keys()) - 1 != 0:
                     users.save()
                 return [{
@@ -672,17 +616,13 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
                     'message': f'{tts}\n{len(set(msgs)) - len(errors.keys()) - 1} пользователей были успешно добавлены!'
                 }]
 
-        # --- SUPPORT CONVERSATION HANDLING ---
-        # Skips further processing if the user is currently ignored AND not attempting to call admin
         if ignored.is_ignored(uid) and 'админ' not in msg.lower() and not callplay_trigger:
             return
 
-        # handling messages, that initiating or ending a support request
         if 'админ' in msg.lower():
             link = f'https://vk.com/gim{self.group_id}?sel={uid}'
             buttons = [{'label': 'прямая ссылка', 'payload': {'type': 'userlink'}, 'link': link}]
             link_keyboard = create_link_keyboard(buttons)
-            # User was ignored, now wants to cancel the call to admin
             if ignored.is_ignored(uid):
                 self.info(ignored.remove(uid))
                 self.info(ignored.save_to_file())
@@ -690,7 +630,6 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
                 atts = f'{uname} {username} больше не вызывает!'
                 buttons = [{'label': 'ПОЗВАТЬ АДМИНА', 'payload': {'type': 'callmanager'}, 'color': 'positive'}]
                 keyboard = create_standard_keyboard(buttons)
-            # User is calling for admin support
             else:
                 self.info(ignored.add(uid))
                 self.info(ignored.save_to_file())
@@ -699,7 +638,6 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
                 atts = f'{uname} {username} вызывает!'
                 buttons = [{'label': 'СПАСИБО АДМИН', 'payload': {'type': 'uncallmanager'}, 'color': 'negative'}]
                 keyboard = create_standard_keyboard(buttons)
-            # Return messages for both the user and all admins
             return [
                 {
                     'peer_id': uid,
@@ -717,8 +655,6 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
                 ]
             ]
 
-        # --- A25 CAPTAINS: призвать других капитанов поиграть ---
-        # Кнопка/команда: "ПРИЗВАТЬ ПОИГРАТЬ" (можно и текстом).
         user = None
         if uid in users.uid_to_isu:
             isu = users.uid_to_isu[uid]
@@ -762,18 +698,11 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
             ack = {'peer_id': uid, 'message': f'Принято! Разослал другим капитанам ({len(actions)}).'}
             return [ack, *actions]
 
-
         is_member = vk_helper.vk_session.method(
             'groups.isMember',
             {'group_id': self.group_id, 'user_id': uid}
         ) != 0
 
-        # --- DEFAULT MESSAGE RESPONSE LOGIC ---
-        # Priority:
-        # 1) If user participates in A25 -> show A25 info
-        # 2) If not member -> send old subscribe prompt (info_message)
-        # 3) Otherwise -> show welcome message about A25 with registration link
-        # (user may already be resolved above for captain-only commands)
         if 'user' not in locals() or user is None:
             user = None
             if uid in users.uid_to_isu:
@@ -791,20 +720,12 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
         else:
             tts = a25_welcome_message
 
-    # --- CHAT MESSAGES HANDLER ---
-    # This block is for messages received in group chats.
     else:
         is_ping = False
         msg = event.object['message']['text']
         if not msg:
             return
         msgs = msg.split()
-        # if '@club230160029' in msgs[0]:
-        #     is_ping = True
-        #     msgs.pop(0)
-        #     msg = msg[msg.index(']') + 2:]
-        # elif '@club230160029' in msg:
-        #     is_ping = True
 
         uid = event.object['message']['peer_id']
         cuid = event.object['message'].get('conversation_message_id')
@@ -824,7 +745,6 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
             return
         return [{'peer_id': uid, 'message': tts, 'conversation_message_id': cuid}]
 
-    # Default return for processed private messages
     action = {
         'peer_id': uid,
         'message': tts

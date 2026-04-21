@@ -1,7 +1,62 @@
-source/subscribers
-source/__pycache__
-source/.idea/
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+
+# virtualenvs
+.venv/
+venv/
+ENV/
+env/
+.conda/
+
+# packaging
+build/
+dist/
+*.egg-info/
+
+# logs
+*.log
+py.log
 source/py.log
-entrypoint.sh
+
+# cache / test artifacts
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# DB / local runtime artifacts
+*.sqlite3
+*.db
+dump.sql
+dump*.sql
+
+# dotenv / secrets
+.env
+.env.*
+
+# IDEs
+.idea/
+.vscode/
 /.idea/*
+/.vscode/*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# --- Project-specific ---
+# local subscribers data / exports
+source/subscribers/
 /data/subscribers
+
+# misc local helper artifacts
+entrypoint.sh
+project_bundle.py
+project_bundle.txt
+
+# local/secret configs sometimes used in prod
+*.pem
+*.key
