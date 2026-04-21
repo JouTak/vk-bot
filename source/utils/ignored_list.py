@@ -1,48 +1,64 @@
 from __future__ import annotations
-"""
-Ignored list storage.
-
-Current source of truth: DB (IgnoredRepository).
-Legacy compatibility: optional ignored.txt file (used by some deployments/scripts).
-
-We keep both:
-- read legacy file -> sync into DB
-- save writes legacy file from in-memory set
-"""
 
 import os
 from pathlib import Path
 
-from .db.db import session_scope
+from .db.db import is_database_enabled, session_scope
 from .db.repositories import IgnoredRepository
 
 
 class IgnoredList:
     def __init__(self):
         self.ignored: set[int] = set()
+        self._db_enabled = is_database_enabled()
 
     def add(self, uid):
+        uid = int(uid)
+        if not self._db_enabled:
+            if uid in self.ignored:
+                return f"Пользователь {uid} уже в игноре."
+            self.ignored.add(uid)
+            self.save_to_file()
+            return f"Пользователь {uid} добавлен в игнор."
+
         with session_scope() as s:
             repo = IgnoredRepository(s)
-            if repo.add(int(uid)):
-                self.ignored.add(int(uid))
+            if repo.add(uid):
+                self.ignored.add(uid)
                 return f"Пользователь {uid} добавлен в игнор."
             return f"Пользователь {uid} уже в игноре."
 
     def remove(self, uid):
+        uid = int(uid)
+        if not self._db_enabled:
+            if uid in self.ignored:
+                self.ignored.discard(uid)
+                self.save_to_file()
+                return f"Пользователь {uid} удалён из игнора."
+            return f"Пользователь {uid} не найден в списке игнорируемых."
+
         with session_scope() as s:
             repo = IgnoredRepository(s)
-            if repo.remove(int(uid)):
-                self.ignored.discard(int(uid))
+            if repo.remove(uid):
+                self.ignored.discard(uid)
                 return f"Пользователь {uid} удалён из игнора."
             return f"Пользователь {uid} не найден в списке игнорируемых."
 
     def is_ignored(self, uid):
+        uid = int(uid)
+        if not self._db_enabled:
+            return uid in self.ignored
+
         with session_scope() as s:
             repo = IgnoredRepository(s)
-            return repo.is_ignored(int(uid))
+            return repo.is_ignored(uid)
 
     def clear(self):
+        if not self._db_enabled:
+            self.ignored.clear()
+            self.save_to_file()
+            return "Список игнорируемых пользователей очищен."
+
         with session_scope() as s:
             repo = IgnoredRepository(s)
             repo.clear()
@@ -50,7 +66,7 @@ class IgnoredList:
         return "Список игнорируемых пользователей очищен."
 
     def save_to_file(self):
-        path = Path(os.getenv("IGNORED_TXT_PATH", "/app/data/subscribers/ignored.txt"))
+        path = Path(os.getenv("IGNORED_TXT_PATH", "./subscribers/ignored.txt"))
         try:
             path.parent.mkdir(parents=True, exist_ok=True)
             with path.open("w", encoding="utf-8") as f:
@@ -60,7 +76,7 @@ class IgnoredList:
             return f"Ошибка при сохранении: {e}", True
 
     def load_from_file(self):
-        path = Path(os.getenv("IGNORED_TXT_PATH", "/app/data/subscribers/ignored.txt"))
+        path = Path(os.getenv("IGNORED_TXT_PATH", "./subscribers/ignored.txt"))
         try:
             path.parent.mkdir(parents=True, exist_ok=True)
             if not path.exists():
@@ -74,10 +90,11 @@ class IgnoredList:
                 except ValueError:
                     continue
 
-            # Update memory from legacy
             self.ignored = set(ids)
 
-            # Sync DB (best effort), then prefer DB values
+            if not self._db_enabled:
+                return "Список игнорируемых загружен."
+
             with session_scope() as s:
                 repo = IgnoredRepository(s)
                 for uid in ids:

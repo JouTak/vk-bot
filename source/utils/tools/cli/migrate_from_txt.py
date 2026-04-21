@@ -14,19 +14,15 @@ def main() -> None:
     parser.add_argument("--users-txt", dest="users_txt", default=None)
     args = parser.parse_args()
 
-    init_engine(args.db_url)
-
-    engine = get_engine()
+    init_engine(args.db_url, force=True)
+    engine = get_engine(force=True)
     Base.metadata.create_all(engine)
 
-    # Default legacy file location is in the project root: source/subscribers/users.txt
     users_txt = args.users_txt or os.path.join("source", "subscribers", "users.txt")
     users_txt = os.path.normpath(users_txt)
 
-    # First import legacy file
     imported = import_users_txt_to_db(users_txt)
 
-    # Then show quick stats (file rows vs DB rows) to detect skipped/broken lines
     try:
         import sqlalchemy as sa
         from source.utils.db.db import session_scope

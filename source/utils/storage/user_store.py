@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import json
+import os
 from datetime import datetime
+from pathlib import Path
 from typing import Any
 
-from ..db.db import session_scope, session_scope_flush
+from ..db.db import is_database_enabled, session_scope
 from ..db.repositories import UserRepository, UserDTO
 from ..db.models import UsersRawLineModel
 
@@ -18,18 +20,8 @@ def t2s(timestamp: int) -> str:
 
 
 class User:
-    """
-    Backward-compatible user wrapper used by bot logic.
-    Stores info as tuple: (isu, uid, fio, grp, nck, met).
-
-    Contains legacy conversion helpers used by bot.py for condition parsing/formatting.
-    """
     info_type = tuple[int, int, str, str, str, dict[str, dict[str, str | int | bool]]]
-
-    # ('0','1')->bool
     s2b = staticmethod(lambda s: s == "1")
-
-    # parsers for condition evaluation (text -> typed)
     text2info = (
         int,
         int,
@@ -54,8 +46,6 @@ class User:
             },
         },
     )
-
-    # validators for check_condition (text -> valid?)
     t2ic = staticmethod(str.isdigit)
     t2bc = staticmethod(["0", "1"].__contains__)
     text2info_check = (
@@ -82,16 +72,12 @@ class User:
             },
         },
     )
-
-    # display helpers
     b2t = staticmethod(lambda b: "Да" if b else "Нет")
     w2t = staticmethod(
         ("На бесплатном трансфере от ГК", "Своим ходом (электричка)", "Своим ходом (на машине)").__getitem__
     )
     opt = staticmethod(lambda x: x if (x and x != "-") else "[НЕТ ДАННЫХ]")
     u2t = staticmethod(("Нет.", "Да, ты прошёл отбор, ждём оплату!", "Оплата дошла до нас, ты едешь!").__getitem__)
-
-    # info -> text formatters (used by bot.format_message)
     info2text = (
         str,
         str,
@@ -116,11 +102,8 @@ class User:
             },
         },
     )
-
-    # keys
+    db2save = (str, str, str, str, str, lambda x: json.dumps(x, ensure_ascii=False))
     keys = ("isu", "uid", "fio", "grp", "nck", "met")
-
-    # these are filled by bot.py flat_info2text()
     flat_i2t: dict[str, Any] = {}
 
     def __init__(self, info: info_type) -> None:
@@ -136,72 +119,132 @@ class User:
 
 
 class UserList:
-    """
-    SQLAlchemy/MySQL-backed replacement for old file-based UserList.
-    Keeps external interface used by bot.py/main.py: get(), add(), keys(), load(), save(), uid_to_isu.
-    """
-
-    def __init__(self, _path_unused: str, vk_helper) -> None:
+    def __init__(self, path: str, vk_helper) -> None:
         self.vk_helper = vk_helper
         self.uid_to_isu: dict[int, int] = {}
         self._loaded = False
+        self._db_enabled = is_database_enabled()
+        self.path = path or os.getenv("USERS_TXT_PATH", "./subscribers/users.txt")
+        self.db: dict[int, User] = {}
+        self.errors: list[tuple[str, ...]] = []
+        self.max_special_isu = 0
+        self.used_specials_isus: set[int] = set()
         self.load()
 
     def load(self) -> bool:
-        # build uid_to_isu map from DB
-        with session_scope() as s:
-            repo = UserRepository(s)
-            isus = repo.list_all_isus()
-            self.uid_to_isu = {}
-            for isu in isus:
-                user = repo.get(isu)
-                if user and not (0 <= int(user.uid) <= 1):
-                    self.uid_to_isu[int(user.uid)] = int(isu)
+        if self._db_enabled:
+            with session_scope() as s:
+                repo = UserRepository(s)
+                isus = repo.list_all_isus()
+                self.uid_to_isu = {}
+                for isu in isus:
+                    user = repo.get(isu)
+                    if user and not (0 <= int(user.uid) <= 1):
+                        self.uid_to_isu[int(user.uid)] = int(isu)
+            self._loaded = True
+            return True
+
+        path = Path(self.path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        if not path.exists():
+            path.write_text("", encoding="utf-8")
+
+        self.db.clear()
+        self.errors.clear()
+        self.uid_to_isu.clear()
+        self.used_specials_isus.clear()
+        self.max_special_isu = 0
+
+        for raw_line in path.read_text(encoding="utf-8").splitlines():
+            line = raw_line.strip()
+            if not line:
+                continue
+            parts = raw_line.split("\t")
+            if len(parts) != 6:
+                self.errors.append(tuple(parts))
+                continue
+            try:
+                isu = int(parts[0])
+                uid = int(parts[1])
+                met = json.loads(parts[5]) if parts[5] else {}
+                if not isinstance(met, dict):
+                    raise ValueError("met is not dict")
+            except Exception:
+                self.errors.append(tuple(parts))
+                continue
+
+            if not 100000 <= isu <= 999999:
+                self.used_specials_isus.add(isu)
+
+            user = User((isu, uid, parts[2], parts[3], parts[4], met))
+            self.db[isu] = user
+            if not (0 <= uid <= 1):
+                self.uid_to_isu[uid] = isu
+
         self._loaded = True
         return True
 
     def save(self) -> bool:
-        # no-op (DB is transactional). keep for compatibility.
+        if self._db_enabled:
+            return True
+
+        path = Path(self.path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        to_save = []
+        for isu in self.db.keys():
+            to_save.append("\t".join(f(i) for f, i in zip(User.db2save, self.db[isu].info)))
+        to_save.extend("\t".join(parts) for parts in self.errors if parts)
+        to_save.sort(key=lambda x: int(x.split("\t")[0]) if x.split("\t")[0].lstrip("-").isdigit() else -1)
+        path.write_text("\n".join([i for i in to_save if i and i[0] != "0"]), encoding="utf-8")
         return True
 
     def keys(self):
-        with session_scope() as s:
-            repo = UserRepository(s)
-            return repo.list_all_isus()
+        if self._db_enabled:
+            with session_scope() as s:
+                repo = UserRepository(s)
+                return repo.list_all_isus()
+        return self.db.keys()
 
     def get(self, isu: int) -> User | None:
-        with session_scope() as s:
-            repo = UserRepository(s)
-            dto = repo.get(isu)
-            if not dto:
-                return None
-            return User((dto.isu, dto.uid, dto.fio, dto.grp, dto.nck, dto.met))
+        if self._db_enabled:
+            with session_scope() as s:
+                repo = UserRepository(s)
+                dto = repo.get(isu)
+                if not dto:
+                    return None
+                return User((dto.isu, dto.uid, dto.fio, dto.grp, dto.nck, dto.met))
+        return self.db[isu] if isu in self.db else None
 
     def add(self, info: User.info_type) -> User:
-        isu, uid, fio, grp, nck, met = info
-        with session_scope() as s:
-            repo = UserRepository(s)
-            if isu == -1:
-                dto = repo.add_with_auto_isu(uid=int(uid), fio=fio, grp=grp, nck=nck, met=met or {})
-            else:
-                dto = UserDTO(isu=int(isu), uid=int(uid), fio=fio or "", grp=grp or "", nck=nck or "", met=met or {})
-                repo.upsert(dto)
-            if not (0 <= int(dto.uid) <= 1):
-                self.uid_to_isu[int(dto.uid)] = int(dto.isu)
-            return User((dto.isu, dto.uid, dto.fio, dto.grp, dto.nck, dto.met))
+        if self._db_enabled:
+            isu, uid, fio, grp, nck, met = info
+            with session_scope() as s:
+                repo = UserRepository(s)
+                if isu == -1:
+                    dto = repo.add_with_auto_isu(uid=int(uid), fio=fio, grp=grp, nck=nck, met=met or {})
+                else:
+                    dto = UserDTO(isu=int(isu), uid=int(uid), fio=fio or "", grp=grp or "", nck=nck or "", met=met or {})
+                    repo.upsert(dto)
+                if not (0 <= int(dto.uid) <= 1):
+                    self.uid_to_isu[int(dto.uid)] = int(dto.isu)
+                return User((dto.isu, dto.uid, dto.fio, dto.grp, dto.nck, dto.met))
+
+        if info[0] == -1:
+            info = tuple([self.get_new_special_isu()] + list(info[1:]))
+        user = User(info)
+        self.db[info[0]] = user
+        if not (0 <= info[1] <= 1):
+            self.uid_to_isu[info[1]] = info[0]
+        return user
+
+    def get_new_special_isu(self) -> int:
+        while self.max_special_isu in self.used_specials_isus:
+            self.max_special_isu += 1
+        self.used_specials_isus.add(self.max_special_isu)
+        return self.max_special_isu
 
 
 def import_users_txt_to_db(users_txt_path: str) -> int:
-    """
-    Full-fidelity importer for legacy ./subscribers/users.txt.
-
-    Goal:
-      - migrate as much as possible into normalized tables (users + event tables)
-      - ONLY lines that cannot be normalized are stored in users_raw_lines for manual fixing
-      - after manual fixing, those lines can be re-imported into normalized tables
-
-    Returns: number of successfully upserted normalized users.
-    """
     imported = 0
 
     with open(users_txt_path, "r", encoding="UTF-8") as f:
@@ -210,7 +253,6 @@ def import_users_txt_to_db(users_txt_path: str) -> int:
     for line_no, raw in enumerate(lines, start=1):
         parts = raw.split("\t")
 
-        # Best-effort parsed fields for raw table (only used if normalization fails).
         parsed_isu: int | None = None
         parsed_uid: int | None = None
         parsed_fio = ""
@@ -231,7 +273,6 @@ def import_users_txt_to_db(users_txt_path: str) -> int:
         else:
             err = f"bad_columns:{len(parts)}"
 
-        # Try normalized import first. Store into users_raw_lines ONLY if it fails.
         try:
             isu = int(parts[0]) if len(parts) > 0 and parts[0].isdigit() else None
             uid = int(parts[1]) if len(parts) > 1 and parts[1].lstrip("-").isdigit() else None
@@ -240,24 +281,18 @@ def import_users_txt_to_db(users_txt_path: str) -> int:
             if isu is None:
                 raise ValueError("isu_not_int")
             if uid is None:
-                # uid is required by DB schema (NOT NULL), so we can't upsert this row into users.
                 raise ValueError("uid_not_int")
 
-            # Collect "soft issues" which must go to fix panel but should NOT block upsert into `users`.
-            # (Except invalid/missing ISU, which is the only hard blocker by your rule.)
             soft_issues: list[str] = []
 
-            # uid: 0/1 are allowed to be stored in users, but should be fixed eventually.
             if 0 <= int(uid) <= 1:
                 soft_issues.append("uid_invalid_0_1")
 
-            # grp: 1 uppercase latin letter + 4 digits (e.g. M3201). Empty allowed.
             grp = (parts[3] or "").strip()
             if grp:
                 if len(grp) != 5 or not ("A" <= grp[0] <= "Z") or not grp[1:].isdigit():
                     soft_issues.append("grp_invalid_format")
 
-            # nck: prefer [A-Za-z0-9_] and no spaces.
             nck = (parts[4] or "").strip()
             if nck:
                 if " " in nck:
@@ -348,10 +383,8 @@ def import_users_txt_to_db(users_txt_path: str) -> int:
 
             imported += 1
 
-            # Additionally keep "soft issue" rows in users_raw_lines for Fix panel,
-            # even though they are already stored in normalized tables.
             if soft_issues:
-                err = soft_issues[0]  # keep single code (matches current raw_fixes/db_stats expectations)
+                err = soft_issues[0]
                 with session_scope() as s:
                     raw_row = (
                         s.query(UsersRawLineModel)
@@ -374,10 +407,8 @@ def import_users_txt_to_db(users_txt_path: str) -> int:
 
             continue
         except Exception as e:
-            # fall through to raw table
             err = str(e)
 
-        # Store only failed rows into raw table (idempotent by line_no+raw_line)
         with session_scope() as s:
             raw_row = (
                 s.query(UsersRawLineModel)
@@ -397,6 +428,5 @@ def import_users_txt_to_db(users_txt_path: str) -> int:
             raw_row.met_json = parsed_met_json
             raw_row.status = "error"
             raw_row.error = err
-
 
     return imported
