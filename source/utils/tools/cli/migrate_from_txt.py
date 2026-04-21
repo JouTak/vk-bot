@@ -8,20 +8,18 @@ from source.utils.db.models import Base
 from source.utils.storage.user_store import import_users_txt_to_db
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--db-url", dest="db_url", default=None)
-    parser.add_argument("--users-txt", dest="users_txt", default=None)
-    args = parser.parse_args()
-
-    init_engine(args.db_url, force=True)
+def run_migration(db_url: str | None = None, users_txt: str | None = None) -> dict[str, int | str]:
+    init_engine(db_url, force=True)
     engine = get_engine(force=True)
     Base.metadata.create_all(engine)
 
-    users_txt = args.users_txt or os.path.join("source", "subscribers", "users.txt")
+    users_txt = users_txt or os.path.join("source", "subscribers", "users.txt")
     users_txt = os.path.normpath(users_txt)
 
     imported = import_users_txt_to_db(users_txt)
+
+    file_valid = 0
+    db_rows = 0
 
     try:
         import sqlalchemy as sa
@@ -29,7 +27,6 @@ def main() -> None:
         from source.utils.db.models import UserModel
 
         with open(users_txt, "r", encoding="utf-8") as f:
-            file_valid = 0
             for ln in f:
                 ln = ln.strip()
                 if not ln:
@@ -44,12 +41,28 @@ def main() -> None:
 
         with session_scope() as s:
             db_rows = int(s.execute(sa.select(sa.func.count()).select_from(UserModel)).scalar_one())
-
-        print(f"Imported: {imported}")
-        print(f"File valid rows (legacy semantics): {file_valid}")
-        print(f"DB rows in users: {db_rows}")
     except Exception:
-        print(f"Imported: {imported}")
+        pass
+
+    return {
+        "imported": int(imported),
+        "file_valid": int(file_valid),
+        "db_rows": int(db_rows),
+        "users_txt": users_txt,
+    }
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--db-url", dest="db_url", default=None)
+    parser.add_argument("--users-txt", dest="users_txt", default=None)
+    args = parser.parse_args()
+
+    stats = run_migration(db_url=args.db_url, users_txt=args.users_txt)
+    print(f"Imported: {stats['imported']}")
+    print(f"File valid rows (legacy semantics): {stats['file_valid']}")
+    print(f"DB rows in users: {stats['db_rows']}")
+    print(f"Users txt: {stats['users_txt']}")
 
 
 if __name__ == "__main__":
