@@ -5,7 +5,6 @@ import time
 from utils.query_helper import MinecraftServerQuery
 from utils.vk_helper import *
 from utils.storage.user_store import User, UserList
-from source.utils.tools.cli.migrate_from_txt import run_migration
 # NOTE: legacy file-based user_list module is kept in repo but should not be imported after DB migration.
 # Using db-backed UserList from utils.storage.user_store instead.
 users_path = ""
@@ -214,6 +213,14 @@ CAPTAIN_CALL_COOLDOWN_UNTIL: dict[int, float] = {}
 
 
 
+
+
+def _run_migration_bridge(db_url: str | None = None, users_txt: str | None = None):
+    try:
+        from source.utils.tools.cli.migrate_from_txt import run_migration
+    except ModuleNotFoundError:
+        from utils.tools.cli.migrate_from_txt import run_migration
+    return run_migration(db_url=db_url, users_txt=users_txt)
 
 
 def is_migration_enabled() -> bool:
@@ -561,7 +568,7 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
                     }]
                 users_txt = msg.removeprefix(msgs[0]).strip() or None
                 try:
-                    stats = run_migration(users_txt=users_txt)
+                    stats = _run_migration_bridge(users_txt=users_txt)
                     try:
                         self.users.load()
                     except Exception:
