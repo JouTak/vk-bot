@@ -55,6 +55,16 @@ hi_message = (
     f'{a25_reg_link}'
 )
 
+y26_welcome_message = (
+    f'Привет! Добро пожаловать в чат-бот ITMOcraft\'а. Если есть вопросы, жми кнопку “ПОЗВАТЬ АДМИНА”.'
+    f'\n'
+    f'Сейчас у нас ведётся набор участников на выезд в Ягодное, все подробности в закреплённом посте. '
+    f'Зарегистрироваться можно здесь: https://itmo.events/events/118964'
+    f'\n'
+    f'\n'
+    f'Если ты уже зарегистрирован(а) на events, подожди одобрения заявки, мы свяжемся с тобой здесь!'
+)
+
 a25_welcome_message = (
     "Привет! \n\n"
     "Сейчас идёт третий сезон Майнокиады по Майнкрафту!\n"
@@ -667,43 +677,43 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
             isu = users.uid_to_isu[uid]
             user = users.get(isu)
 
-        if callplay_trigger:
-            if user is None or not isinstance(user.met, dict) or 'a25' not in user.met:
-                return [{'peer_id': uid, 'message': 'Эта команда доступна только капитанам команд Майнокиады.'}]
-
-            if not is_a25_captain(user, uid):
-                return [{'peer_id': uid, 'message': 'Эта команда доступна только капитанам команд Майнокиады.'}]
-
-            now = time.time()
-            until = CAPTAIN_CALL_COOLDOWN_UNTIL.get(int(uid), 0)
-            if until > now:
-                remaining = int(until - now + 0.999)
-                return [{'peer_id': uid, 'message': f'Слишком часто. Подожди {remaining} сек. и попробуй ещё раз.'}]
-
-            a25 = user.met.get('a25') or {}
-            team = (a25.get('cmd') or '').strip()
-            if not team or team == '-':
-                return [{'peer_id': uid, 'message': 'Не вижу название твоей команды в базе. Напиши: АДМИН'}]
-
-            stage = get_a25_current_stage(a25)
-            if stage is None:
-                return [{'peer_id': uid, 'message': 'Похоже, у вашей команды уже отмечены все режимы. Если это ошибка — напиши: АДМИН'}]
-
-            stage_text = {1: 'первый режим', 2: 'второй режим', 3: 'третий режим'}.get(stage, f'режим {stage}')
-
-            notify_text = (
-                f'Капитан команды "{team}" призывает поиграть!\n'
-                f'Текущий режим: {stage_text}.\n'
-                f'Нужны игроки от вашей команды.'
-            )
-
-            captains = sorted(get_a25_captain_uids(users))
-            actions = [{'peer_id': int(c), 'message': notify_text} for c in captains if int(c) != int(uid)]
-
-            CAPTAIN_CALL_COOLDOWN_UNTIL[int(uid)] = time.time() + CAPTAIN_CALL_COOLDOWN_SECONDS
-
-            ack = {'peer_id': uid, 'message': f'Принято! Разослал другим капитанам ({len(actions)}).'}
-            return [ack, *actions]
+        # if callplay_trigger:
+        #     if user is None or not isinstance(user.met, dict) or 'a25' not in user.met:
+        #         return [{'peer_id': uid, 'message': 'Эта команда доступна только капитанам команд Майнокиады.'}]
+        #
+        #     if not is_a25_captain(user, uid):
+        #         return [{'peer_id': uid, 'message': 'Эта команда доступна только капитанам команд Майнокиады.'}]
+        #
+        #     now = time.time()
+        #     until = CAPTAIN_CALL_COOLDOWN_UNTIL.get(int(uid), 0)
+        #     if until > now:
+        #         remaining = int(until - now + 0.999)
+        #         return [{'peer_id': uid, 'message': f'Слишком часто. Подожди {remaining} сек. и попробуй ещё раз.'}]
+        #
+        #     a25 = user.met.get('a25') or {}
+        #     team = (a25.get('cmd') or '').strip()
+        #     if not team or team == '-':
+        #         return [{'peer_id': uid, 'message': 'Не вижу название твоей команды в базе. Напиши: АДМИН'}]
+        #
+        #     stage = get_a25_current_stage(a25)
+        #     if stage is None:
+        #         return [{'peer_id': uid, 'message': 'Похоже, у вашей команды уже отмечены все режимы. Если это ошибка — напиши: АДМИН'}]
+        #
+        #     stage_text = {1: 'первый режим', 2: 'второй режим', 3: 'третий режим'}.get(stage, f'режим {stage}')
+        #
+        #     notify_text = (
+        #         f'Капитан команды "{team}" призывает поиграть!\n'
+        #         f'Текущий режим: {stage_text}.\n'
+        #         f'Нужны игроки от вашей команды.'
+        #     )
+        #
+        #     captains = sorted(get_a25_captain_uids(users))
+        #     actions = [{'peer_id': int(c), 'message': notify_text} for c in captains if int(c) != int(uid)]
+        #
+        #     CAPTAIN_CALL_COOLDOWN_UNTIL[int(uid)] = time.time() + CAPTAIN_CALL_COOLDOWN_SECONDS
+        #
+        #     ack = {'peer_id': uid, 'message': f'Принято! Разослал другим капитанам ({len(actions)}).'}
+        #     return [ack, *actions]
 
         is_member = vk_helper.vk_session.method(
             'groups.isMember',
@@ -717,15 +727,15 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
                 user = users.get(isu)
 
         keyboard_out = None
-        if user is not None and 'a25' in user.met.keys():
-            tts = format_message(a25_message, user, a25_stage_info=build_a25_stage_info(user))
-            if is_a25_captain(user, uid):
-                buttons = [{'label': CAPTAIN_CALL_LABEL, 'payload': {'type': 'callplay'}, 'color': 'positive'}]
-                keyboard_out = create_standard_keyboard(buttons)
-        elif not is_member:
+        # if user is not None and 'a25' in user.met.keys():
+        #     tts = format_message(a25_message, user, a25_stage_info=build_a25_stage_info(user))
+        #     if is_a25_captain(user, uid):
+        #         buttons = [{'label': CAPTAIN_CALL_LABEL, 'payload': {'type': 'callplay'}, 'color': 'positive'}]
+        #         keyboard_out = create_standard_keyboard(buttons)
+        if not is_member:
             tts = info_message
         else:
-            tts = a25_welcome_message
+            tts = y26_welcome_message
 
     else:
         is_ping = False
