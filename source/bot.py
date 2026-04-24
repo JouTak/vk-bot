@@ -56,7 +56,7 @@ hi_message = (
 )
 
 y26_welcome_message = (
-    f'Привет! Добро пожаловать в чат-бот ITMOcraft\'а. Если есть вопросы, жми кнопку “ПОЗВАТЬ АДМИНА”.'
+    f'Привет! Добро пожаловать в чат-бот ITMOcraft\'а. Если есть вопросы, напиши слово "АДМИН".'
     f'\n'
     f'Сейчас у нас ведётся набор участников на выезд в Ягодное, все подробности в закреплённом посте. '
     f'Зарегистрироваться можно здесь: https://itmo.events/events/118964'
@@ -736,6 +736,8 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
             tts = info_message
         else:
             tts = y26_welcome_message
+            buttons = [{'label': 'ПОЗВАТЬ АДМИНА', 'payload': {'type': 'callmanager'}, 'color': 'positive'}]
+            keyboard = create_standard_keyboard(buttons)
 
     else:
         is_ping = False
