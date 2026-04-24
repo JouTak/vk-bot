@@ -737,7 +737,7 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
         else:
             tts = y26_welcome_message
             buttons = [{'label': 'ПОЗВАТЬ АДМИНА', 'payload': {'type': 'callmanager'}, 'color': 'positive'}]
-            keyboard = create_standard_keyboard(buttons)
+            keyboard_out = create_standard_keyboard(buttons)
 
     else:
         is_ping = False
