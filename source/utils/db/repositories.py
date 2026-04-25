@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from typing import Any
 
@@ -10,6 +11,7 @@ from .models import (
     IgnoredUserModel,
     UserA24Model,
     UserA25Model,
+    UserEventModel,
     UserModel,
     UserS25Model,
     UserY25Model,
@@ -30,12 +32,55 @@ def _bool(v: Any) -> bool:
     return bool(v) if v is not None else False
 
 
-class UserRepository:
-    """
-    Stores base user fields in users table and event-specific metadata in separate 1:1 tables.
-    Public API keeps met as dict for backward compatibility with bot logic.
-    """
+def _to_int(v: Any, default: int = 0) -> int:
+    try:
+        if v is None:
+            return default
+        if isinstance(v, bool):
+            return int(v)
+        if isinstance(v, (int, float)):
+            return int(v)
+        if isinstance(v, str) and v.strip().lstrip("-").isdigit():
+            return int(v.strip())
+    except Exception:
+        pass
+    return default
 
+
+def _to_bool(v: Any, default: bool = False) -> bool:
+    if isinstance(v, bool):
+        return v
+    if isinstance(v, (int, float)):
+        return bool(int(v))
+    if isinstance(v, str):
+        value = v.strip().lower()
+        if value in {"1", "true", "yes", "y", "on", "да"}:
+            return True
+        if value in {"0", "false", "no", "n", "off", "нет"}:
+            return False
+    return default
+
+
+KNOWN_EVENT_KEYS = {"a24", "s25", "y25", "a25"}
+LEGACY_EVENT_KEY_ALIASES = {"s24": "a24"}
+
+
+def _canonical_event_key(key: str) -> str:
+    return LEGACY_EVENT_KEY_ALIASES.get(key, key)
+
+
+def _canonicalize_met(met: dict[str, Any]) -> dict[str, Any]:
+    result: dict[str, Any] = {}
+    for key, value in (met or {}).items():
+        if not isinstance(key, str):
+            continue
+        canonical = _canonical_event_key(key)
+        if canonical not in result:
+            result[canonical] = value
+    return result
+
+
+class UserRepository:
     def __init__(self, session: Session):
         self.session = session
 
@@ -45,6 +90,16 @@ class UserRepository:
             return None
 
         met: dict[str, Any] = {}
+
+        generic_events = self.session.execute(
+            select(UserEventModel).where(UserEventModel.isu == isu)
+        ).scalars().all()
+        for event in generic_events:
+            try:
+                parsed = json.loads(event.data_json) if event.data_json else {}
+            except Exception:
+                parsed = {}
+            met[_canonical_event_key(event.event_key)] = parsed
 
         a24 = self.session.get(UserA24Model, isu)
         if a24:
@@ -104,83 +159,100 @@ class UserRepository:
         row = self.session.execute(select(UserModel.isu).where(UserModel.uid == uid)).scalar_one_or_none()
         return int(row) if row is not None else None
 
-    def upsert(self, dto: UserDTO) -> None:
-        """
-        Upserts base user fields. For event tables:
-        - if dto.met contains event -> upsert corresponding row
-        - if dto.met does NOT contain event -> delete corresponding row (keeps state consistent)
+    def _upsert_a24(self, isu: int, value: Any) -> None:
+        m = value if isinstance(value, dict) else {}
+        row = self.session.get(UserA24Model, isu)
+        if row is None:
+            row = UserA24Model(isu=isu)
+            self.session.add(row)
+        row.tsp = _to_int(m.get("tsp", 0))
+        row.nck = str(m.get("nck", "") or "")
+        row.lr1 = _to_bool(m.get("lr1", False))
+        row.wr1 = _to_bool(m.get("wr1", False))
+        row.wr2 = _to_bool(m.get("wr2", False))
+        row.nyt = _to_bool(m.get("nyt", False))
+        row.fnl = _to_bool(m.get("fnl", False))
 
-        IMPORTANT: we flush() right after inserting/updating base users row so that
-        FK inserts into event tables work within the same transaction.
-        """
+    def migrate_legacy_event_aliases(self) -> int:
+        migrated = 0
+        for legacy_key, canonical_key in LEGACY_EVENT_KEY_ALIASES.items():
+            if canonical_key != "a24":
+                continue
+            rows = self.session.execute(
+                select(UserEventModel).where(UserEventModel.event_key == legacy_key)
+            ).scalars().all()
+            for row in rows:
+                try:
+                    data = json.loads(row.data_json) if row.data_json else {}
+                except Exception:
+                    data = {}
+                self._upsert_a24(row.isu, data)
+                self.session.delete(row)
+                migrated += 1
+        return migrated
+
+    def upsert(
+        self,
+        dto: UserDTO,
+        *,
+        merge_events: bool = True,
+        preserve_existing_base_if_has_a25: bool = True,
+    ) -> None:
+        raw_met = dto.met or {}
+        met = _canonicalize_met(raw_met)
+        legacy_alias_keys = [key for key in raw_met.keys() if isinstance(key, str) and _canonical_event_key(key) != key]
         u = self.session.get(UserModel, dto.isu)
+        has_existing_a25 = self.session.get(UserA25Model, dto.isu) is not None
+
         if u is None:
             u = UserModel(isu=dto.isu, uid=dto.uid, fio=dto.fio or "", grp=dto.grp or "", nck=dto.nck or "")
             self.session.add(u)
-        else:
+        elif not (preserve_existing_base_if_has_a25 and has_existing_a25 and "a25" not in met):
             u.uid = dto.uid
             u.fio = dto.fio or ""
             u.grp = dto.grp or ""
             u.nck = dto.nck or ""
 
-        # Ensure parent row exists in DB before inserting child rows
         self.session.flush()
 
-        met = dto.met or {}
-
-        # a24
         if "a24" in met:
-            m = met["a24"] or {}
-            row = self.session.get(UserA24Model, dto.isu)
-            if row is None:
-                row = UserA24Model(isu=dto.isu)
-                self.session.add(row)
-            row.tsp = int(m.get("tsp", 0) or 0)
-            row.nck = str(m.get("nck", "") or "")
-            row.lr1 = bool(m.get("lr1", False))
-            row.wr1 = bool(m.get("wr1", False))
-            row.wr2 = bool(m.get("wr2", False))
-            row.nyt = bool(m.get("nyt", False))
-            row.fnl = bool(m.get("fnl", False))
-        else:
+            self._upsert_a24(dto.isu, met["a24"])
+        elif not merge_events:
             self.session.execute(delete(UserA24Model).where(UserA24Model.isu == dto.isu))
 
-        # s25
         if "s25" in met:
             m = met["s25"] or {}
             row = self.session.get(UserS25Model, dto.isu)
             if row is None:
                 row = UserS25Model(isu=dto.isu)
                 self.session.add(row)
-            row.tsp = int(m.get("tsp", 0) or 0)
+            row.tsp = _to_int(m.get("tsp", 0))
             row.nck = str(m.get("nck", "") or "")
-            row.wr1 = bool(m.get("wr1", False))
-            row.rr1 = int(m.get("rr1", 0) or 0)
-            row.wr2 = bool(m.get("wr2", False))
-            row.rr2 = int(m.get("rr2", 0) or 0)
-            row.fnl = int(m.get("fnl", 0) or 0)
-        else:
+            row.wr1 = _to_bool(m.get("wr1", False))
+            row.rr1 = _to_int(m.get("rr1", 0))
+            row.wr2 = _to_bool(m.get("wr2", False))
+            row.rr2 = _to_int(m.get("rr2", 0))
+            row.fnl = _to_int(m.get("fnl", 0))
+        elif not merge_events:
             self.session.execute(delete(UserS25Model).where(UserS25Model.isu == dto.isu))
 
-        # y25
         if "y25" in met:
             m = met["y25"] or {}
             row = self.session.get(UserY25Model, dto.isu)
             if row is None:
                 row = UserY25Model(isu=dto.isu)
                 self.session.add(row)
-            row.tsp = int(m.get("tsp", 0) or 0)
+            row.tsp = _to_int(m.get("tsp", 0))
             row.nck = str(m.get("nck", "") or "")
             row.nmb = str(m.get("nmb", "") or "")
-            row.bed = bool(m.get("bed", False))
-            row.way = int(m.get("way", 0) or 0)
+            row.bed = _to_bool(m.get("bed", False))
+            row.way = _to_int(m.get("way", 0))
             row.car = str(m.get("car", "") or "")
             row.liv = str(m.get("liv", "") or "")
-            row.ugo = int(m.get("ugo", 0) or 0)
-        else:
+            row.ugo = _to_int(m.get("ugo", 0))
+        elif not merge_events:
             self.session.execute(delete(UserY25Model).where(UserY25Model.isu == dto.isu))
 
-        # a25
         if "a25" in met:
             m = met["a25"] or {}
             row = self.session.get(UserA25Model, dto.isu)
@@ -188,23 +260,46 @@ class UserRepository:
                 row = UserA25Model(isu=dto.isu)
                 self.session.add(row)
             row.fio = str(m.get("fio", "") or "")
-            row.sts = bool(m.get("sts", False))
-            row.uid = int(m.get("uid", 0) or 0)
+            row.sts = _to_bool(m.get("sts", False))
+            row.uid = _to_int(m.get("uid", 0))
             row.nck = str(m.get("nck", "") or "")
             row.cmd = str(m.get("cmd", "") or "")
-            row.cid = int(m.get("cid", 0) or 0)
-            row.wr1 = bool(m.get("wr1", False))
-            row.wr2 = bool(m.get("wr2", False))
-            row.wr3 = bool(m.get("wr3", False))
-            row.brs = bool(m.get("brs", False))
-        else:
+            row.cid = _to_int(m.get("cid", 0))
+            row.wr1 = _to_bool(m.get("wr1", False))
+            row.wr2 = _to_bool(m.get("wr2", False))
+            row.wr3 = _to_bool(m.get("wr3", False))
+            row.brs = _to_bool(m.get("brs", False))
+        elif not merge_events:
             self.session.execute(delete(UserA25Model).where(UserA25Model.isu == dto.isu))
 
+        for legacy_key in legacy_alias_keys:
+            self.session.execute(
+                delete(UserEventModel).where(
+                    UserEventModel.isu == dto.isu,
+                    UserEventModel.event_key == legacy_key,
+                )
+            )
+
+        generic_keys: set[str] = set()
+        for key, value in met.items():
+            if not isinstance(key, str) or key in KNOWN_EVENT_KEYS or not key or len(key) > 128:
+                continue
+            generic_keys.add(key)
+            row = self.session.get(UserEventModel, (dto.isu, key))
+            if row is None:
+                row = UserEventModel(isu=dto.isu, event_key=key)
+                self.session.add(row)
+            row.data_json = json.dumps(value if value is not None else {}, ensure_ascii=False)
+
+        if not merge_events:
+            self.session.execute(
+                delete(UserEventModel).where(
+                    UserEventModel.isu == dto.isu,
+                    UserEventModel.event_key.not_in(generic_keys),
+                )
+            )
+
     def _special_isu_taken(self) -> set[int]:
-        """
-        special_isu = any isu outside [100000..999999].
-        Need minimal free >=0 (legacy behavior).
-        """
         rows = self.session.execute(
             select(UserModel.isu).where(and_(UserModel.isu < 100000, UserModel.isu >= 0))
         ).scalars().all()
