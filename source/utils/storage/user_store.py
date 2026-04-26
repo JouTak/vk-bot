@@ -44,6 +44,17 @@ class User:
                 "wr3": s2b,
                 "brs": s2b,
             },
+            "y26": {
+                "fio": str,
+                "nck": str,
+                "nmb": str,
+                "bed": s2b,
+                "house": str,
+                "transport": str,
+                "money": s2b,
+                "cost": int,
+                "approve": s2b,
+            },
         },
     )
     t2ic = staticmethod(str.isdigit)
@@ -69,6 +80,17 @@ class User:
                 "wr2": t2bc,
                 "wr3": t2bc,
                 "brs": t2bc,
+            },
+            "y26": {
+                "fio": bool,
+                "nck": bool,
+                "nmb": bool,
+                "bed": t2bc,
+                "house": bool,
+                "transport": bool,
+                "money": t2bc,
+                "cost": t2ic,
+                "approve": t2bc,
             },
         },
     )
@@ -99,6 +121,17 @@ class User:
                 "wr2": b2t,
                 "wr3": b2t,
                 "brs": b2t,
+            },
+            "y26": {
+                "fio": opt,
+                "nck": opt,
+                "nmb": opt,
+                "bed": b2t,
+                "house": opt,
+                "transport": opt,
+                "money": b2t,
+                "cost": str,
+                "approve": b2t,
             },
         },
     )

@@ -65,6 +65,93 @@ y26_welcome_message = (
     f'Если ты уже зарегистрирован(а) на events, подожди одобрения заявки, мы свяжемся с тобой здесь!'
 )
 
+
+def format_y26_message(user: User) -> str:
+    """
+    Formats Y26 (Ягодное 2026) message with conditional paragraphs.
+    
+    If a field is empty/missing, the entire paragraph for that field is omitted.
+    """
+    y26 = user.met.get('y26', {})
+    if not y26:
+        return ''
+    
+    # Helper to format bool fields
+    def b2t(v) -> str:
+        if isinstance(v, bool):
+            return 'Да' if v else 'Нет'
+        if isinstance(v, str):
+            return 'Да' if v.lower() in ('1', 'true', 'yes', 'да') else 'Нет'
+        return 'Да' if v else 'Нет'
+    
+    # Get values with defaults
+    nck = (y26.get('nck') or '').strip()
+    number = (y26.get('nmb') or '').strip()
+    transport = (y26.get('transport') or '').strip()
+    bed = y26.get('bed', False)
+    house = (y26.get('house') or '').strip()
+    money = y26.get('money', False)
+    
+    # Build domik_mates
+    domik_mates = ''
+    if house and house.lower() not in ('', '-', 'пока пусто'):
+        try:
+            from utils.storage.inject_y26 import get_y26_domik_mates
+            domik_mates = get_y26_domik_mates(house, user.isu)
+        except Exception:
+            pass
+    
+    # Build message with conditional paragraphs
+    parts = ['Привет! Вот твои данные по выезду в Ягодное:']
+    
+    # Ник
+    if nck and nck != '-':
+        parts.append(f'\nТвой ник: {nck}')
+    
+    # Номер телефона
+    if number and number != '-':
+        parts.append(f'\nТвой номер телефона (чтобы мы могли оперативно с тобой связаться):\n{number}')
+    
+    # Как добираешься
+    if transport and transport != '-':
+        parts.append(f'\nКак добираешься до Ягодного:\n{transport}')
+        parts.append('Важно: если ты решил поехать самостоятельно, вызови админа!')
+    
+    # Берёшь ли бельё
+    parts.append(f'\nБерёшь ли ты в Ягодном постельное бельё: {b2t(bed)}')
+    
+    # Где живёшь
+    if house and house != '-' and house.lower() != 'пока пусто':
+        parts.append(f'\nГде ты живёшь:\n{house}')
+        
+        # С кем живёшь
+        if domik_mates:
+            parts.append(f'\nС кем ты живешь в этом домике:\n{domik_mates}')
+    
+    # Оплата
+    parts.append(f'\nПолучена ли оплата от тебя:\n{b2t(money)}')
+    
+    # Footer
+    parts.append('\nЧто-то не так? Вызывай админа!')
+    
+    return '\n'.join(parts)
+
+
+def is_y26_participant(user: User) -> bool:
+    """Check if user is a Y26 participant with approve=True."""
+    if user is None or not isinstance(user.met, dict):
+        return False
+    y26 = user.met.get('y26')
+    if not isinstance(y26, dict):
+        return False
+    approve = y26.get('approve', False)
+    if isinstance(approve, bool):
+        return approve
+    if isinstance(approve, str):
+        return approve.lower() in ('1', 'true', 'yes', 'да')
+    return bool(approve)
+
+
 a25_welcome_message = (
     "Привет! \n\n"
     "Сейчас идёт третий сезон Майнокиады по Майнкрафту!\n"
@@ -552,6 +639,10 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
     msg = (event.object['message'].get('text') or '')
     msgs = msg.split()
 
+    # Check for attachments
+    attachments = event.object['message'].get('attachments') or []
+    has_attachments = len(attachments) > 0
+
     payload_raw = event.object['message'].get('payload')
     payload_type = None
     if payload_raw:
@@ -635,6 +726,16 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
 
         if ignored.is_ignored(uid) and 'админ' not in msg.lower() and not callplay_trigger:
             return
+
+        # --- ATTACHMENT HANDLING ---
+        # If user sends an attachment without being in "ignored" (support) mode, warn them
+        if has_attachments and not ignored.is_ignored(uid) and 'админ' not in msg.lower():
+            return [{
+                'peer_id': uid,
+                'message': 'К сожалению, наш бот не обрабатывает вложения автоматически. '
+                           'Если ты прислал что-либо, что необходимо увидеть админам, '
+                           'сначала напиши боту "АДМИН", а затем отправляй любые документы!'
+            }]
 
         if 'админ' in msg.lower():
             link = f'https://vk.com/gim{self.group_id}?sel={uid}'
@@ -727,12 +828,12 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
                 user = users.get(isu)
 
         keyboard_out = None
-        # if user is not None and 'a25' in user.met.keys():
-        #     tts = format_message(a25_message, user, a25_stage_info=build_a25_stage_info(user))
-        #     if is_a25_captain(user, uid):
-        #         buttons = [{'label': CAPTAIN_CALL_LABEL, 'payload': {'type': 'callplay'}, 'color': 'positive'}]
-        #         keyboard_out = create_standard_keyboard(buttons)
-        if not is_member:
+        # Priority: Y26 participant with approve=True > non-member > welcome message
+        if user is not None and is_y26_participant(user):
+            tts = format_y26_message(user)
+            buttons = [{'label': 'ПОЗВАТЬ АДМИНА', 'payload': {'type': 'callmanager'}, 'color': 'positive'}]
+            keyboard_out = create_standard_keyboard(buttons)
+        elif not is_member:
             tts = info_message
         else:
             tts = y26_welcome_message
