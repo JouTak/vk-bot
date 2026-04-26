@@ -62,6 +62,8 @@ def _to_bool(v: Any, default: bool = False) -> bool:
 
 
 KNOWN_EVENT_KEYS = {"a24", "s25", "y25", "a25"}
+# Y26 stored via generic UserEventModel (event_key='y26', data_json=JSON blob)
+GENERIC_EVENT_KEYS = {"y26"}
 LEGACY_EVENT_KEY_ALIASES = {"s24": "a24"}
 
 
