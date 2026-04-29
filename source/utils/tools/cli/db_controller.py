@@ -581,7 +581,8 @@ def main() -> None:
                 met=met,
             )
             with session_scope() as s:
-                UserRepository(s).upsert(dto2)
+                # merge_events=False: if user removed an event from met, delete it from DB
+                UserRepository(s).upsert(dto2, merge_events=False)
             print("Updated")
             _pause()
             continue

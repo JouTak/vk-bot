@@ -95,6 +95,26 @@ class UserA25Model(Base):
     brs: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
 
+class UserY26Model(Base):
+    __tablename__ = "user_y26"
+
+    isu: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("users.isu", ondelete="CASCADE"),
+        primary_key=True,
+        autoincrement=False,
+    )
+    fio: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    nck: Mapped[str] = mapped_column(String(64), nullable=False, default="")
+    nmb: Mapped[str] = mapped_column(String(64), nullable=False, default="")  # phone number
+    bed: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)  # bedding
+    hse: Mapped[str] = mapped_column(String(128), nullable=False, default="")  # house
+    way: Mapped[str] = mapped_column(String(255), nullable=False, default="")  # transport
+    chk: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)  # payment received (check)
+    cst: Mapped[int] = mapped_column(Integer, nullable=False, default=0)  # cost
+    ugo: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)  # approved (you go)
+
+
 class UserEventModel(Base):
     __tablename__ = "user_events"
 

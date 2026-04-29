@@ -5,12 +5,12 @@ import os
 
 try:
     from source.utils.db.db import get_engine, init_engine, session_scope
-    from source.utils.db.models import Base, UserA24Model, UserA25Model, UserEventModel, UserModel, UserS25Model, UserY25Model
+    from source.utils.db.models import Base, UserA24Model, UserA25Model, UserY26Model, UserEventModel, UserModel, UserS25Model, UserY25Model
     from source.utils.db.repositories import UserRepository
     from source.utils.storage.user_store import import_users_txt_to_db
 except ModuleNotFoundError:
     from utils.db.db import get_engine, init_engine, session_scope
-    from utils.db.models import Base, UserA24Model, UserA25Model, UserEventModel, UserModel, UserS25Model, UserY25Model
+    from utils.db.models import Base, UserA24Model, UserA25Model, UserY26Model, UserEventModel, UserModel, UserS25Model, UserY25Model
     from utils.db.repositories import UserRepository
     from utils.storage.user_store import import_users_txt_to_db
 
@@ -44,6 +44,7 @@ def run_migration(db_url: str | None = None, users_txt: str | None = None) -> di
         "user_s25": 0,
         "user_y25": 0,
         "user_a25": 0,
+        "user_y26": 0,
         "user_events": 0,
         "users_txt": users_txt,
     }
@@ -69,6 +70,7 @@ def run_migration(db_url: str | None = None, users_txt: str | None = None) -> di
             stats["user_s25"] = _count_table(s, UserS25Model)
             stats["user_y25"] = _count_table(s, UserY25Model)
             stats["user_a25"] = _count_table(s, UserA25Model)
+            stats["user_y26"] = _count_table(s, UserY26Model)
             stats["user_events"] = _count_table(s, UserEventModel)
     except Exception:
         stats["file_valid"] = int(file_valid)
@@ -91,6 +93,7 @@ def main() -> None:
     print(f"Rows in user_s25: {stats['user_s25']}")
     print(f"Rows in user_y25: {stats['user_y25']}")
     print(f"Rows in user_a25: {stats['user_a25']}")
+    print(f"Rows in user_y26: {stats['user_y26']}")
     print(f"Rows in user_events: {stats['user_events']}")
     print(f"Users txt: {stats['users_txt']}")
 

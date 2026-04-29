@@ -28,6 +28,8 @@ def main() -> None:
         c.execute(text("DROP TABLE IF EXISTS user_s25"))
         c.execute(text("DROP TABLE IF EXISTS user_y25"))
         c.execute(text("DROP TABLE IF EXISTS user_a25"))
+        c.execute(text("DROP TABLE IF EXISTS user_y26"))
+        c.execute(text("DROP TABLE IF EXISTS user_events"))
         c.execute(text("DROP TABLE IF EXISTS ignored_users"))
         c.execute(text("DROP TABLE IF EXISTS kv_store"))
         c.execute(text("DROP TABLE IF EXISTS users_raw_lines"))

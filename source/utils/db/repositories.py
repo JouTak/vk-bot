@@ -15,6 +15,7 @@ from .models import (
     UserModel,
     UserS25Model,
     UserY25Model,
+    UserY26Model,
 )
 
 
@@ -61,7 +62,7 @@ def _to_bool(v: Any, default: bool = False) -> bool:
     return default
 
 
-KNOWN_EVENT_KEYS = {"a24", "s25", "y25", "a25"}
+KNOWN_EVENT_KEYS = {"a24", "s25", "y25", "a25", "y26"}
 LEGACY_EVENT_KEY_ALIASES = {"s24": "a24"}
 
 
@@ -151,6 +152,20 @@ class UserRepository:
                 "wr2": _bool(a25.wr2),
                 "wr3": _bool(a25.wr3),
                 "brs": _bool(a25.brs),
+            }
+
+        y26 = self.session.get(UserY26Model, isu)
+        if y26:
+            met["y26"] = {
+                "fio": y26.fio,
+                "nck": y26.nck,
+                "nmb": y26.nmb,
+                "bed": _bool(y26.bed),
+                "hse": y26.hse,
+                "way": y26.way,
+                "chk": _bool(y26.chk),
+                "cst": int(y26.cst),
+                "ugo": _bool(y26.ugo),
             }
 
         return UserDTO(isu=u.isu, uid=u.uid, fio=u.fio, grp=u.grp, nck=u.nck, met=met)
@@ -271,6 +286,24 @@ class UserRepository:
             row.brs = _to_bool(m.get("brs", False))
         elif not merge_events:
             self.session.execute(delete(UserA25Model).where(UserA25Model.isu == dto.isu))
+
+        if "y26" in met:
+            m = met["y26"] or {}
+            row = self.session.get(UserY26Model, dto.isu)
+            if row is None:
+                row = UserY26Model(isu=dto.isu)
+                self.session.add(row)
+            row.fio = str(m.get("fio", "") or "")
+            row.nck = str(m.get("nck", "") or "")
+            row.nmb = str(m.get("nmb", "") or "")
+            row.bed = _to_bool(m.get("bed", False))
+            row.hse = str(m.get("hse", "") or "")
+            row.way = str(m.get("way", "") or "")
+            row.chk = _to_bool(m.get("chk", False))
+            row.cst = _to_int(m.get("cst", 0))
+            row.ugo = _to_bool(m.get("ugo", False))
+        elif not merge_events:
+            self.session.execute(delete(UserY26Model).where(UserY26Model.isu == dto.isu))
 
         for legacy_key in legacy_alias_keys:
             self.session.execute(
