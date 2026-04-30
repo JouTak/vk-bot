@@ -104,15 +104,16 @@ class UserY26Model(Base):
         primary_key=True,
         autoincrement=False,
     )
+    uid: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)  # VK uid (0=missing, 1=unresolved)
     fio: Mapped[str] = mapped_column(String(255), nullable=False, default="")
     nck: Mapped[str] = mapped_column(String(64), nullable=False, default="")
     nmb: Mapped[str] = mapped_column(String(64), nullable=False, default="")  # phone number
     bed: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)  # bedding
     hse: Mapped[str] = mapped_column(String(128), nullable=False, default="")  # house
     way: Mapped[str] = mapped_column(String(255), nullable=False, default="")  # transport
-    chk: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)  # payment received (check)
+    chk: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)  # payment received
     cst: Mapped[int] = mapped_column(Integer, nullable=False, default=0)  # cost
-    ugo: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)  # approved (you go)
+    ugo: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)  # approved
 
 
 class UserEventModel(Base):

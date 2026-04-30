@@ -660,7 +660,18 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
             if msgs[0] == 'stop':
                 exit()
             elif msgs[0] == 'reload':
-                return [{'peer_id': uid, 'message': 'Success' if self.users.load() else 'Failed'}]
+                # Reload users and re-inject Y26 data
+                try:
+                    from utils.storage.inject_y26 import inject_y26
+                    y26_stats = inject_y26(self.VK)
+                    y26_msg = f"Y26: {y26_stats.get('upserted', 0)} upserted"
+                    if y26_stats.get('errors'):
+                        y26_msg += f", {len(y26_stats['errors'])} errors"
+                except Exception as e:
+                    y26_msg = f"Y26 error: {e}"
+                
+                users_ok = self.users.load()
+                return [{'peer_id': uid, 'message': f"Users: {'Success' if users_ok else 'Failed'}\n{y26_msg}"}]
             elif msgs[0] == 'migrate':
                 if not is_migration_enabled():
                     return [{

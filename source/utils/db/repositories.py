@@ -157,6 +157,7 @@ class UserRepository:
         y26 = self.session.get(UserY26Model, isu)
         if y26:
             met["y26"] = {
+                "uid": int(y26.uid),
                 "fio": y26.fio,
                 "nck": y26.nck,
                 "nmb": y26.nmb,
@@ -293,6 +294,7 @@ class UserRepository:
             if row is None:
                 row = UserY26Model(isu=dto.isu)
                 self.session.add(row)
+            row.uid = _to_int(m.get("uid", 0))
             row.fio = str(m.get("fio", "") or "")
             row.nck = str(m.get("nck", "") or "")
             row.nmb = str(m.get("nmb", "") or "")
