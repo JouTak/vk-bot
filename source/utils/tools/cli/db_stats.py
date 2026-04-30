@@ -7,6 +7,7 @@ from source.utils.db.models import (
     IgnoredUserModel,
     UserA24Model,
     UserA25Model,
+    UserY26Model,
     UserModel,
     UserS25Model,
     UserY25Model,

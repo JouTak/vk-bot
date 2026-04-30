@@ -44,6 +44,17 @@ class User:
                 "wr3": s2b,
                 "brs": s2b,
             },
+            "y26": {
+                "fio": str,
+                "nck": str,
+                "nmb": str,
+                "bed": s2b,
+                "hse": str,
+                "way": str,
+                "chk": s2b,
+                "cst": int,
+                "ugo": s2b,
+            },
         },
     )
     t2ic = staticmethod(str.isdigit)
@@ -69,6 +80,17 @@ class User:
                 "wr2": t2bc,
                 "wr3": t2bc,
                 "brs": t2bc,
+            },
+            "y26": {
+                "fio": bool,
+                "nck": bool,
+                "nmb": bool,
+                "bed": t2bc,
+                "hse": bool,
+                "way": bool,
+                "chk": t2bc,
+                "cst": t2ic,
+                "ugo": t2bc,
             },
         },
     )
@@ -99,6 +121,17 @@ class User:
                 "wr2": b2t,
                 "wr3": b2t,
                 "brs": b2t,
+            },
+            "y26": {
+                "fio": opt,
+                "nck": opt,
+                "nmb": opt,
+                "bed": b2t,
+                "hse": opt,
+                "way": opt,
+                "chk": b2t,
+                "cst": str,
+                "ugo": b2t,
             },
         },
     )
@@ -333,7 +366,7 @@ def import_users_txt_to_db(users_txt_path: str) -> int:
                         return False
                 return default
 
-            for key in ("a24", "s25", "y25", "a25"):
+            for key in ("a24", "s25", "y25", "a25", "y26"):
                 if key not in met or not isinstance(met.get(key), dict):
                     continue
                 m = met[key]
@@ -365,6 +398,14 @@ def import_users_txt_to_db(users_txt_path: str) -> int:
                         if i in m:
                             m[i] = to_int(m.get(i, 0))
                     for b in ("sts", "wr1", "wr2", "wr3", "brs"):
+                        if b in m:
+                            m[b] = to_bool(m.get(b, False))
+
+                if key == "y26":
+                    # Only new 3-letter keys are supported
+                    if "cst" in m:
+                        m["cst"] = to_int(m.get("cst", 0))
+                    for b in ("bed", "chk", "ugo"):
                         if b in m:
                             m[b] = to_bool(m.get(b, False))
 

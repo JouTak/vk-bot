@@ -15,6 +15,18 @@ class Main:
         # Initialize DB engine (DATABASE_URL from env/.env)
         init_engine()
 
+        # Inject Y26 event data from TSV (if file exists)
+        try:
+            from utils.storage.inject_y26 import inject_y26
+            stats = inject_y26()
+            if stats.get("file_found"):
+                print(f"[Y26] Injected: {stats.get('upserted', 0)}, skipped: {stats.get('skipped', 0)}")
+            if stats.get("errors"):
+                for err in stats["errors"]:
+                    print(f"[Y26] {err}")
+        except Exception as e:
+            print(f"[Y26] Injection error: {e}")
+
         self.vk_session = vk_api.VkApi(token=self.token)
         self.VK = VKHelper(self.vk_session, self.group_id)
         self.info, self.warn, self.error = log()

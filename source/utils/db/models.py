@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import Any
-
 from sqlalchemy import BigInteger, Boolean, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from sqlalchemy.sql import func
@@ -19,7 +17,6 @@ class UserModel(Base):
     fio: Mapped[str] = mapped_column(String(255), nullable=False, default="")
     grp: Mapped[str] = mapped_column(String(64), nullable=False, default="")
     nck: Mapped[str] = mapped_column(String(64), nullable=False, default="")
-
 
 
 class UserA24Model(Base):
@@ -98,6 +95,39 @@ class UserA25Model(Base):
     brs: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
 
+class UserY26Model(Base):
+    __tablename__ = "user_y26"
+
+    isu: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("users.isu", ondelete="CASCADE"),
+        primary_key=True,
+        autoincrement=False,
+    )
+    fio: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    nck: Mapped[str] = mapped_column(String(64), nullable=False, default="")
+    nmb: Mapped[str] = mapped_column(String(64), nullable=False, default="")  # phone number
+    bed: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)  # bedding
+    hse: Mapped[str] = mapped_column(String(128), nullable=False, default="")  # house
+    way: Mapped[str] = mapped_column(String(255), nullable=False, default="")  # transport
+    chk: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)  # payment received (check)
+    cst: Mapped[int] = mapped_column(Integer, nullable=False, default=0)  # cost
+    ugo: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)  # approved (you go)
+
+
+class UserEventModel(Base):
+    __tablename__ = "user_events"
+
+    isu: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("users.isu", ondelete="CASCADE"),
+        primary_key=True,
+        autoincrement=False,
+    )
+    event_key: Mapped[str] = mapped_column(String(128), primary_key=True)
+    data_json: Mapped[str] = mapped_column(Text, nullable=False, default="{}")
+
+
 class IgnoredUserModel(Base):
     __tablename__ = "ignored_users"
 
@@ -105,26 +135,18 @@ class IgnoredUserModel(Base):
 
 
 class UsersRawLineModel(Base):
-    """
-    Stores raw lines from legacy users.txt for full-fidelity migration / auditing.
-
-    We store every parsed line here, even if it cannot be migrated into normalized tables.
-    """
     __tablename__ = "users_raw_lines"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    # 1-based line number in users.txt
     line_no: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
     raw_line: Mapped[str] = mapped_column(Text, nullable=False)
-    # optional parsed parts (best-effort)
     isu: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
     uid: Mapped[int | None] = mapped_column(BigInteger, nullable=True, index=True)
     fio: Mapped[str] = mapped_column(String(255), nullable=False, default="")
     grp: Mapped[str] = mapped_column(String(64), nullable=False, default="")
     nck: Mapped[str] = mapped_column(String(64), nullable=False, default="")
     met_json: Mapped[str] = mapped_column(Text, nullable=False, default="")
-    # migration result
-    status: Mapped[str] = mapped_column(String(32), nullable=False, default="raw")  # ok | skipped | error | raw
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="raw")
     error: Mapped[str] = mapped_column(Text, nullable=False, default="")
     created_at: Mapped[str] = mapped_column(
         String(32),
@@ -134,10 +156,6 @@ class UsersRawLineModel(Base):
 
 
 class KVStoreModel(Base):
-    """
-    Small key/value store for operational state (optional but handy for future).
-    Not used by current logic directly.
-    """
     __tablename__ = "kv_store"
 
     k: Mapped[str] = mapped_column(String(128), primary_key=True)
