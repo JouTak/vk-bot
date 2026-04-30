@@ -15,18 +15,6 @@ class Main:
         # Initialize DB engine (DATABASE_URL from env/.env)
         init_engine()
 
-        # Inject Y26 event data from TSV (if file exists)
-        try:
-            from utils.storage.inject_y26 import inject_y26
-            stats = inject_y26()
-            if stats.get("file_found"):
-                print(f"[Y26] Injected: {stats.get('upserted', 0)}, skipped: {stats.get('skipped', 0)}")
-            if stats.get("errors"):
-                for err in stats["errors"]:
-                    print(f"[Y26] {err}")
-        except Exception as e:
-            print(f"[Y26] Injection error: {e}")
-
         self.vk_session = vk_api.VkApi(token=self.token)
         self.VK = VKHelper(self.vk_session, self.group_id)
         self.info, self.warn, self.error = log()
@@ -34,6 +22,19 @@ class Main:
         self.ignored = IgnoredList()
         self.info(self.ignored.load_from_file())
         self.users = UserList(users_path, self.VK)
+
+        # Inject Y26 event data
+        try:
+            from utils.storage.inject_y26 import inject_y26
+            stats = inject_y26(self.VK)
+            source = stats.get("source", "none")
+            if source != "none":
+                print(f"[Y26] Source: {source}, upserted: {stats.get('upserted', 0)}, skipped: {stats.get('skipped', 0)}")
+            if stats.get("errors"):
+                for err in stats["errors"]:
+                    print(f"[Y26] {err}")
+        except Exception as e:
+            print(f"[Y26] Injection error: {e}")
 
         if warnings:
             self.warn('\n'.join(warnings))

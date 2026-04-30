@@ -45,6 +45,7 @@ class User:
                 "brs": s2b,
             },
             "y26": {
+                "uid": int,
                 "fio": str,
                 "nck": str,
                 "nmb": str,
@@ -82,6 +83,7 @@ class User:
                 "brs": t2bc,
             },
             "y26": {
+                "uid": t2ic,
                 "fio": bool,
                 "nck": bool,
                 "nmb": bool,
@@ -123,6 +125,7 @@ class User:
                 "brs": b2t,
             },
             "y26": {
+                "uid": str,
                 "fio": opt,
                 "nck": opt,
                 "nmb": opt,
