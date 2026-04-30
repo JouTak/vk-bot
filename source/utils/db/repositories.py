@@ -365,6 +365,15 @@ class UserRepository:
     def list_all_isus(self) -> list[int]:
         return [int(x) for x in self.session.execute(select(UserModel.isu)).scalars().all()]
 
+    def get_by_uid(self, uid: int) -> UserDTO | None:
+        """Find user by VK uid. Returns None if not found."""
+        row = self.session.execute(
+            select(UserModel).where(UserModel.uid == uid)
+        ).scalars().first()
+        if row is None:
+            return None
+        return self.get(row.isu)
+
 
 class IgnoredRepository:
     def __init__(self, session: Session):

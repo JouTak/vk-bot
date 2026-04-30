@@ -154,11 +154,16 @@ def inject_y26(vk_helper=None) -> dict[str, Any]:
         
         # Parse ISU
         isu_raw = get_col(col_isu)
-        if not isu_raw or not isu_raw.isdigit():
-            stats["errors"].append(f"Line {line_no}: invalid ISU '{isu_raw}'")
-            stats["skipped"] += 1
-            continue
-        isu = int(isu_raw)
+        is_external = isu_raw.lower() in ("внешний", "external", "ext")
+        
+        if not is_external:
+            if not isu_raw or not isu_raw.isdigit():
+                stats["errors"].append(f"Line {line_no}: invalid ISU '{isu_raw}'")
+                stats["skipped"] += 1
+                continue
+            isu = int(isu_raw)
+        else:
+            isu = None  # Will be assigned later
         
         # Parse VK ID
         uid_raw = get_col(col_uid)
@@ -189,24 +194,66 @@ def inject_y26(vk_helper=None) -> dict[str, Any]:
         try:
             with session_scope() as s:
                 repo = UserRepository(s)
-                existing = repo.get(isu)
                 
-                if existing:
-                    # Update existing user, add y26 to met
-                    new_met = dict(existing.met)
-                    new_met["y26"] = y26_data
-                    # Update main user uid if we have a valid one and existing doesn't
-                    new_uid = existing.uid
-                    if uid > 1 and existing.uid in (0, 1):
-                        new_uid = uid
-                    dto = UserDTO(isu=isu, uid=new_uid, fio=existing.fio, grp=existing.grp, nck=existing.nck, met=new_met)
-                    repo.upsert(dto)
+                # Handle external users (special ISU)
+                if is_external:
+                    # Try to find existing user by VK uid
+                    existing_by_uid = None
+                    if uid > 1:
+                        existing_by_uid = repo.get_by_uid(uid)
+                    
+                    if existing_by_uid:
+                        # Update existing external user
+                        isu = existing_by_uid.isu
+                        new_met = dict(existing_by_uid.met)
+                        new_met["y26"] = y26_data
+                        dto = UserDTO(
+                            isu=isu,
+                            uid=uid,
+                            fio=existing_by_uid.fio or y26_data.get("fio", ""),
+                            grp=existing_by_uid.grp,
+                            nck=existing_by_uid.nck or y26_data.get("nck", ""),
+                            met=new_met
+                        )
+                        repo.upsert(dto)
+                    else:
+                        # Create new external user with auto ISU
+                        dto = repo.add_with_auto_isu(
+                            uid=uid if uid > 1 else 0,
+                            fio=y26_data.get("fio", ""),
+                            grp="",
+                            nck=y26_data.get("nck", ""),
+                            met={"y26": y26_data}
+                        )
+                        isu = dto.isu
+                    stats["upserted"] += 1
                 else:
-                    # Create new user with y26 data
-                    dto = UserDTO(isu=isu, uid=uid if uid > 1 else 0, fio=y26_data.get("fio", ""), grp="", nck=y26_data.get("nck", ""), met={"y26": y26_data})
-                    repo.upsert(dto)
-                
-                stats["upserted"] += 1
+                    # Regular user with known ISU
+                    existing = repo.get(isu)
+                    
+                    if existing:
+                        # Update existing user, add y26 to met
+                        new_met = dict(existing.met)
+                        new_met["y26"] = y26_data
+                        # Update main user uid if we have a valid one and existing doesn't
+                        new_uid = existing.uid
+                        if uid > 1 and existing.uid in (0, 1):
+                            new_uid = uid
+                        dto = UserDTO(isu=isu, uid=new_uid, fio=existing.fio, grp=existing.grp, nck=existing.nck, met=new_met)
+                        repo.upsert(dto)
+                    else:
+                        # Create new user with y26 data
+                        dto = UserDTO(
+                            isu=isu,
+                            uid=uid if uid > 1 else 0,
+                            fio=y26_data.get("fio", ""),
+                            grp="",
+                            nck=y26_data.get("nck", ""),
+                            met={"y26": y26_data}
+                        )
+                        repo.upsert(dto)
+                    
+                    stats["upserted"] += 1
         except Exception as e:
             stats["errors"].append(f"Line {line_no}: DB error - {e}")
             stats["skipped"] += 1
