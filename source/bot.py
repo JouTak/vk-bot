@@ -609,7 +609,7 @@ def sender(self, condition: str, msg: str) -> list[dict]:
         uid = int(user.uid)
         if 0 <= uid <= 1:
             continue
-        if eval_condition(user.info, condition) is True:
+        if eval_condition(user.info, condition):
             result.append({'peer_id': uid, 'message': format_message(msg, user)})
     return result
 

@@ -86,7 +86,10 @@ class UserRepository:
         self.session = session
 
     def get(self, isu: int) -> UserDTO | None:
-        u = self.session.get(UserModel, isu)
+        # Use explicit query instead of session.get() to handle isu=0 correctly
+        u = self.session.execute(
+            select(UserModel).where(UserModel.isu == isu)
+        ).scalars().first()
         if not u:
             return None
 
@@ -363,7 +366,9 @@ class UserRepository:
         return dto
 
     def list_all_isus(self) -> list[int]:
-        return [int(x) for x in self.session.execute(select(UserModel.isu)).scalars().all()]
+        result = [int(x) for x in self.session.execute(select(UserModel.isu)).scalars().all()]
+        # Ensure isu=0 is not filtered out by any implicit bool conversion
+        return result
 
     def get_by_uid(self, uid: int) -> UserDTO | None:
         """Find user by VK uid. Returns None if not found."""
