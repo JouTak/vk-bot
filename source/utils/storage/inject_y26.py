@@ -68,7 +68,7 @@ def inject_y26(vk_helper=None) -> dict[str, Any]:
     """
     Read Y26 data from Google Sheets (or local TSV fallback) and inject into DB.
     
-    TSV columns: isu, uid, fio, nck, ugo, nmb, bed, hse, way, chk, cst
+    TSV columns: isu, uid, fio, nck, ugo, nmb, bed, liv, way, chk, cst
     
     Returns stats dict with counts.
     """
@@ -103,7 +103,7 @@ def inject_y26(vk_helper=None) -> dict[str, Any]:
     col_ugo = header_map.get("ugo")
     col_nmb = header_map.get("nmb")
     col_bed = header_map.get("bed")
-    col_hse = header_map.get("hse")
+    col_liv = header_map.get("liv")
     col_way = header_map.get("way")
     col_chk = header_map.get("chk")
     col_cst = header_map.get("cst")
@@ -183,7 +183,7 @@ def inject_y26(vk_helper=None) -> dict[str, Any]:
             "nck": get_col(col_nck),
             "nmb": get_col(col_nmb),
             "bed": _parse_bool(get_col(col_bed)),
-            "hse": get_col(col_hse),
+            "liv": get_col(col_liv),
             "way": get_col(col_way),
             "chk": _parse_bool(get_col(col_chk)),
             "cst": _parse_int(get_col(col_cst)),
@@ -278,7 +278,7 @@ def get_y26_domik_mates(house: str, exclude_isu: int) -> str:
         from sqlalchemy import select
         with session_scope() as s:
             rows = s.execute(
-                select(UserY26Model).where(UserY26Model.hse != "")
+                select(UserY26Model).where(UserY26Model.liv != "")
             ).scalars().all()
             
             mates = []
@@ -286,7 +286,7 @@ def get_y26_domik_mates(house: str, exclude_isu: int) -> str:
                 if row.isu == exclude_isu:
                     continue
                 
-                row_house = (row.hse or "").strip().lower()
+                row_house = (row.liv or "").strip().lower()
                 if row_house == house.strip().lower():
                     nck = (row.nck or "").strip()
                     if nck and nck != "-":

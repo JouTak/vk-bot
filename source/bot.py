@@ -89,7 +89,7 @@ def format_y26_message(user: User) -> str:
     number = (y26.get('nmb') or '').strip()
     transport = (y26.get('way') or '').strip()  # was 'transport', now 'way'
     bed = y26.get('bed', False)
-    house = (y26.get('hse') or '').strip()  # was 'house', now 'hse'
+    house = (y26.get('liv') or '').strip()
     money = y26.get('chk', False)  # was 'money', now 'chk'
     
     # Build domik_mates

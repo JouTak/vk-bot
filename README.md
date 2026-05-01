@@ -53,7 +53,7 @@ Rules:
 - Rows are merged into normalized tables (`users` + event tables).
 - Existing event data is not deleted just because the incoming `users.txt` row does not contain that event key.
 - Known current event keys use typed tables: `a24`, `s25`, `y25`, `a25`, `y26`.
-- Y26 uses short keys: `uid` (VK ID), `hse` (house), `way` (transport), `chk` (payment), `cst` (cost), `ugo` (approved).
+- Y26 uses short keys: `uid` (VK ID), `liv` (living with), `way` (transport), `chk` (payment), `cst` (cost), `ugo` (approved).
 - Legacy/future event keys that do not have a typed table, for example `s24` or `y24`, are stored as-is in `user_events` and returned back in `met` under the same key.
 - If a DB user already has `a25`, legacy import keeps the DB base fields (`uid`, `fio`, `grp`, `nck`) as newer data unless the incoming row itself contains `a25`.
 - Rows that need attention are additionally stored in `users_raw_lines` and appear in Fix panel (examples: uid=0/1, unusual grp, invalid nck, invalid met_json).
@@ -138,7 +138,7 @@ Y26 keys:
 - `uid` — VK ID (0 = missing, 1 = unresolved)
 - `fio`, `nck`, `nmb` — ФИО, никнейм, телефон
 - `bed` — постельное бельё (bool)
-- `hse` — домик (string)
+- `liv` — с кем в домике (string)
 - `way` — способ добраться (string)
 - `chk` — оплата получена (bool)
 - `cst` — стоимость (int)

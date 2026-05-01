@@ -162,7 +162,7 @@ class UserRepository:
                 "nck": y26.nck,
                 "nmb": y26.nmb,
                 "bed": _bool(y26.bed),
-                "hse": y26.hse,
+                "liv": y26.liv,
                 "way": y26.way,
                 "chk": _bool(y26.chk),
                 "cst": int(y26.cst),
@@ -299,7 +299,7 @@ class UserRepository:
             row.nck = str(m.get("nck", "") or "")
             row.nmb = str(m.get("nmb", "") or "")
             row.bed = _to_bool(m.get("bed", False))
-            row.hse = str(m.get("hse", "") or "")
+            row.liv = str(m.get("liv", "") or "")
             row.way = str(m.get("way", "") or "")
             row.chk = _to_bool(m.get("chk", False))
             row.cst = _to_int(m.get("cst", 0))
