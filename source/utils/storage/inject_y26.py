@@ -142,6 +142,7 @@ def inject_y26(vk_helper=None) -> dict[str, Any]:
             vk_link_to_uid[link] = 1
     
     # Process data rows
+    processed_isus: set[int] = set()
     for line_no, line in enumerate(lines[1:], start=2):
         parts = line.strip().split("\t")
         if not parts or all(not p.strip() for p in parts):
@@ -227,6 +228,7 @@ def inject_y26(vk_helper=None) -> dict[str, Any]:
                         )
                         isu = dto.isu
                     stats["upserted"] += 1
+                    processed_isus.add(isu)
                 else:
                     # Regular user with known ISU
                     existing = repo.get(isu)
@@ -254,9 +256,33 @@ def inject_y26(vk_helper=None) -> dict[str, Any]:
                         repo.upsert(dto)
                     
                     stats["upserted"] += 1
+                    processed_isus.add(isu)
         except Exception as e:
             stats["errors"].append(f"Line {line_no}: DB error - {e}")
             stats["skipped"] += 1
+    
+    # Remove y26 data from users not in current table
+    try:
+        with session_scope() as s:
+            repo = UserRepository(s)
+            # Get all users with y26 data
+            from sqlalchemy import select
+            all_y26_rows = s.execute(select(UserY26Model)).scalars().all()
+            
+            for row in all_y26_rows:
+                if row.isu not in processed_isus:
+                    # Delete from user_y26 table
+                    s.delete(row)
+                    # Also remove y26 from user's met
+                    user = repo.get(row.isu)
+                    if user and "y26" in user.met:
+                        new_met = dict(user.met)
+                        del new_met["y26"]
+                        dto = UserDTO(isu=user.isu, uid=user.uid, fio=user.fio, grp=user.grp, nck=user.nck, met=new_met)
+                        repo.upsert(dto)
+                    stats["removed"] = stats.get("removed", 0) + 1
+    except Exception as e:
+        stats["errors"].append(f"Cleanup error: {e}")
     
     return stats
 
