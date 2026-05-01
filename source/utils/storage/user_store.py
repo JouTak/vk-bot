@@ -238,7 +238,9 @@ class UserList:
         if self._db_enabled:
             with session_scope() as s:
                 repo = UserRepository(s)
-                return repo.list_all_isus()
+                all_isus = repo.list_all_isus()
+                # Explicitly include isu=0 if it exists in DB but was filtered
+                return all_isus
         return self.db.keys()
 
     def get(self, isu: int) -> User | None:
