@@ -602,24 +602,16 @@ def sender(self, condition: str, msg: str) -> list[dict]:
         return [{'peer_id': uid, 'message': 'Condition issue:\n' + check} for uid in admin]
     users: UserList = self.users
     result = []
-    all_keys = list(users.keys())
-    # Debug: send info about keys to first admin
-    debug_msg = f"DEBUG keys(): len={len(all_keys)}, 0 in keys: {0 in all_keys}, first 5: {all_keys[:5]}"
-    for isu in all_keys:
+    for isu in users.keys():
         user = users.get(isu)
         if not user:
-            if isu == 0:
-                debug_msg += f"\nisu=0: user is None!"
             continue
         uid = int(user.uid)
         if 0 <= uid <= 1:
             continue
-        cond_result = eval_condition(user.info, condition)
-        if isu == 0:
-            debug_msg += f"\nisu=0: uid={uid}, info[0]={user.info[0]}, cond_result={cond_result}"
-        if cond_result:
+        if eval_condition(user.info, condition):
             result.append({'peer_id': uid, 'message': format_message(msg, user)})
-    return [{'peer_id': admin[0], 'message': debug_msg}] + result
+    return result
 
 
 def process_message_event(self, event, vk_helper) -> list[dict] | None:
