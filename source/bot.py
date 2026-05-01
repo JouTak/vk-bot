@@ -672,7 +672,50 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
                     y26_msg = f"Y26 error: {e}"
                 
                 users_ok = self.users.load()
-                return [{'peer_id': uid, 'message': f"Users: {'Success' if users_ok else 'Failed'}\n{y26_msg}"}]
+                return [{'peer_id': uid, 'message': f"Users: {'Success' if users_ok else 'Failed'}\\n{y26_msg}"}]
+            elif msgs[0] == 'db':
+                # Execute raw SQL query
+                sql = msg.removeprefix('db').strip()
+                if not sql:
+                    return [{'peer_id': uid, 'message': 'Использование: db <SQL запрос>'}]
+                
+                try:
+                    from utils.db.db import is_database_enabled, session_scope
+                    from sqlalchemy import text
+                    
+                    if not is_database_enabled():
+                        return [{'peer_id': uid, 'message': 'БД отключена'}]
+                    
+                    with session_scope() as s:
+                        result = s.execute(text(sql))
+                        
+                        # Check if it's a SELECT query
+                        if sql.strip().upper().startswith('SELECT'):
+                            rows = result.fetchall()
+                            if not rows:
+                                return [{'peer_id': uid, 'message': 'Пустой результат'}]
+                            
+                            # Format output
+                            cols = result.keys()
+                            header = ' | '.join(str(c) for c in cols)
+                            lines = [header, '-' * len(header)]
+                            for row in rows[:50]:  # Limit to 50 rows
+                                lines.append(' | '.join(str(v) for v in row))
+                            
+                            if len(rows) > 50:
+                                lines.append(f'... и ещё {len(rows) - 50} строк')
+                            
+                            output = '\n'.join(lines)
+                            if len(output) > 4000:
+                                output = output[:4000] + '\n... (обрезано)'
+                            return [{'peer_id': uid, 'message': output}]
+                        else:
+                            # Non-SELECT: commit and report affected rows
+                            s.commit()
+                            affected = result.rowcount
+                            return [{'peer_id': uid, 'message': f'OK. Затронуто строк: {affected}'}]
+                except Exception as e:
+                    return [{'peer_id': uid, 'message': f'Ошибка: {e}'}]
             elif msgs[0] == 'migrate':
                 if not is_migration_enabled():
                     return [{
