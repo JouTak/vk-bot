@@ -283,22 +283,24 @@ def edit_one(raw_id: int) -> None:
 
         # ISU rules:
         # - university isu: 100000..999999
-        # - special_isu: 1..99999 (when student has no ITMO isu)
+        # - special_isu: 0..99999 (when student has no ITMO isu)
         isu = row.isu
         if isu is None:
-            issues["isu"] = "ISU is missing (set ITMO isu 100000..999999 or special_isu 1..99999)"
+            issues["isu"] = "ISU is missing (set ITMO isu 100000..999999 or special_isu 0..99999)"
         else:
             isu = int(isu)
-            if isu == 0 or isu < 0:
-                issues["isu"] = "ISU must be positive (ITMO 100000..999999 or special_isu 1..99999)"
-            elif 1 <= isu <= 99999:
+            if isu < 0:
+                issues["isu"] = "ISU must be non-negative (ITMO 100000..999999 or special_isu 0..99999)"
+            elif 0 <= isu <= 99999:
                 # ok: special_isu
                 pass
             elif 100000 <= isu <= 999999:
                 # ok: regular isu
                 pass
+            elif isu >= 1000000:
+                issues["isu"] = "ISU too large (max 999999)"
             else:
-                issues["isu"] = "ISU must be 100000..999999 or special_isu 1..99999"
+                issues["isu"] = "ISU must be 100000..999999 or special_isu 0..99999"
 
         # uid: allowed to be 0/1 (valid but not usable for sender); show as issue to fix optionally
         if row.uid is None:
