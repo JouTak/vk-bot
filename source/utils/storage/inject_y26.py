@@ -2,15 +2,15 @@
 """
 Y26 (Ягодное 2026) event data injection.
 
-Reads TSV file subscribers/yagodnoe26.txt and upserts Y26 participant data
-into the database using the typed UserY26Model table.
+Reads data from Google Sheets (or local TSV fallback) and upserts Y26 participant
+data into the database using the typed UserY26Model table.
 """
 from __future__ import annotations
 
-import json
-import os
 from pathlib import Path
 from typing import Any
+import urllib.request
+import urllib.error
 
 from ..db.db import is_database_enabled, session_scope
 from ..db.repositories import UserRepository, UserDTO
@@ -18,6 +18,7 @@ from ..db.models import UserY26Model
 
 
 Y26_TSV_PATH = "./subscribers/yagodnoe26.txt"
+Y26_GSHEET_URL = "https://docs.google.com/spreadsheets/d/15g_s2MciovUVVrDtj6y-u-I3SHZ5X7u3gLGPfHzTIPg/export?format=tsv&gid=1986446860"
 
 
 def _parse_bool(value: str) -> bool:
@@ -38,73 +39,110 @@ def _parse_int(value: str, default: int = 0) -> int:
         return default
 
 
+def _fetch_tsv_data() -> tuple[list[str], str]:
+    """
+    Fetch TSV data from Google Sheets, fallback to local file.
+    Returns (lines, source) where source is 'gsheet' or 'file'.
+    """
+    # Try Google Sheets first
+    try:
+        req = urllib.request.Request(Y26_GSHEET_URL, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            content = resp.read().decode("utf-8")
+            lines = content.splitlines()
+            if lines:
+                return lines, "gsheet"
+    except (urllib.error.URLError, TimeoutError):
+        pass
+    
+    # Fallback to local file
+    tsv_path = Path(Y26_TSV_PATH)
+    if tsv_path.exists():
+        content = tsv_path.read_text(encoding="utf-8")
+        return content.splitlines(), "file"
+    
+    return [], "none"
+
+
 def inject_y26(vk_helper=None) -> dict[str, Any]:
     """
-    Read Y26 TSV file and inject participant data into DB.
+    Read Y26 data from Google Sheets (or local TSV fallback) and inject into DB.
     
-    TSV columns (expected header): isu, vkid, fio, nck, approve, number, bed, house, transport, money, cost
+    TSV columns: isu, uid, fio, nck, ugo, nmb, bed, liv, way, chk, cst
     
     Returns stats dict with counts.
     """
-    stats = {"skipped": 0, "upserted": 0, "errors": [], "file_found": False}
+    stats: dict[str, Any] = {"skipped": 0, "upserted": 0, "errors": [], "source": "none"}
     
     if not is_database_enabled():
         return stats
     
-    tsv_path = Path(Y26_TSV_PATH)
-    if not tsv_path.exists():
-        stats["errors"].append(f"Y26 inject skipped: file not found at {tsv_path}")
-        return stats
+    lines, source = _fetch_tsv_data()
+    stats["source"] = source
     
-    stats["file_found"] = True
-    
-    lines = tsv_path.read_text(encoding="utf-8").splitlines()
     if not lines:
+        if source == "none":
+            stats["errors"].append("Y26 inject skipped: no data source available")
         return stats
     
     # Parse header
-    header = lines[0].strip().split("\t")
-    header_map = {col.lower().strip(): idx for idx, col in enumerate(header)}
+    header = [col.lower().strip() for col in lines[0].strip().split("\t")]
+    header_map = {col: idx for idx, col in enumerate(header)}
     
     # Required columns
-    required = {"isu", "vkid"}
+    required = {"isu", "uid"}
     if not required.issubset(header_map.keys()):
         stats["errors"].append(f"Missing required columns: {required - set(header_map.keys())}")
         return stats
     
     # Column indices
     col_isu = header_map.get("isu")
-    col_vkid = header_map.get("vkid")
+    col_uid = header_map.get("uid")
     col_fio = header_map.get("fio")
     col_nck = header_map.get("nck")
-    col_approve = header_map.get("approve")
-    col_number = header_map.get("number")
+    col_ugo = header_map.get("ugo")
+    col_nmb = header_map.get("nmb")
     col_bed = header_map.get("bed")
-    col_house = header_map.get("house")
-    col_transport = header_map.get("transport")
-    col_money = header_map.get("money")
-    col_cost = header_map.get("cost")
+    col_liv = header_map.get("liv")
+    col_way = header_map.get("way")
+    col_chk = header_map.get("chk")
+    col_cst = header_map.get("cst")
     
     # Collect VK links to resolve
     vk_links_to_resolve: list[str] = []
-    for line in lines[1:]:
+    link_line_indices: list[int] = []
+    for line_idx, line in enumerate(lines[1:], start=1):
         parts = line.strip().split("\t")
-        if len(parts) <= col_vkid:
+        if col_uid is None or len(parts) <= col_uid:
             continue
-        vkid_raw = parts[col_vkid].strip()
-        if vkid_raw and not vkid_raw.lstrip("-").isdigit():
-            vk_links_to_resolve.append(vkid_raw)
+        uid_raw = parts[col_uid].strip()
+        if uid_raw and not uid_raw.lstrip("-").isdigit():
+            vk_links_to_resolve.append(uid_raw)
+            link_line_indices.append(line_idx)
     
     # Resolve VK links to UIDs
     vk_link_to_uid: dict[str, int] = {}
     if vk_links_to_resolve and vk_helper:
         try:
-            from ..vk_helper import links_to_uids
-            vk_link_to_uid = links_to_uids(vk_helper, vk_links_to_resolve)
+            resolved_uids = vk_helper.links_to_uids(vk_links_to_resolve)
+            for link, uid in zip(vk_links_to_resolve, resolved_uids):
+                if uid and uid > 1:
+                    vk_link_to_uid[link] = uid
+                else:
+                    # 1 = failed to resolve
+                    vk_link_to_uid[link] = 1
         except Exception as e:
             stats["errors"].append(f"VK link resolution failed: {e}")
+            # Mark all as unresolved
+            for link in vk_links_to_resolve:
+                vk_link_to_uid[link] = 1
+    elif vk_links_to_resolve:
+        # No vk_helper, mark as unresolved
+        for link in vk_links_to_resolve:
+            vk_link_to_uid[link] = 1
     
     # Process data rows
+    processed_isus: set[int] = set()
     for line_no, line in enumerate(lines[1:], start=2):
         parts = line.strip().split("\t")
         if not parts or all(not p.strip() for p in parts):
@@ -117,59 +155,134 @@ def inject_y26(vk_helper=None) -> dict[str, Any]:
         
         # Parse ISU
         isu_raw = get_col(col_isu)
-        if not isu_raw or not isu_raw.isdigit():
-            stats["errors"].append(f"Line {line_no}: invalid ISU '{isu_raw}'")
-            stats["skipped"] += 1
-            continue
-        isu = int(isu_raw)
+        is_external = isu_raw.lower() in ("внешний", "external", "ext")
+        
+        if not is_external:
+            if not isu_raw or not isu_raw.isdigit():
+                stats["errors"].append(f"Line {line_no}: invalid ISU '{isu_raw}'")
+                stats["skipped"] += 1
+                continue
+            isu = int(isu_raw)
+        else:
+            isu = None  # Will be assigned later
         
         # Parse VK ID
-        vkid_raw = get_col(col_vkid)
+        uid_raw = get_col(col_uid)
         uid = 0
-        if vkid_raw:
-            if vkid_raw.lstrip("-").isdigit():
-                uid = int(vkid_raw)
-            elif vkid_raw in vk_link_to_uid:
-                uid = vk_link_to_uid[vkid_raw]
+        if uid_raw:
+            if uid_raw.lstrip("-").isdigit():
+                uid = int(uid_raw)
+            elif uid_raw in vk_link_to_uid:
+                uid = vk_link_to_uid[uid_raw]
+            else:
+                uid = 1
         
-        # Build Y26 event data with new 3-letter keys
+        # Build Y26 event data
         y26_data = {
+            "uid": uid,
             "fio": get_col(col_fio),
             "nck": get_col(col_nck),
-            "nmb": get_col(col_number),
+            "nmb": get_col(col_nmb),
             "bed": _parse_bool(get_col(col_bed)),
-            "hse": get_col(col_house),  # house -> hse
-            "way": get_col(col_transport),  # transport -> way
-            "chk": _parse_bool(get_col(col_money)),  # money -> chk (check)
-            "cst": _parse_int(get_col(col_cost)),  # cost -> cst
-            "ugo": _parse_bool(get_col(col_approve)),  # approve -> ugo (you go)
+            "liv": get_col(col_liv),
+            "way": get_col(col_way),
+            "chk": _parse_bool(get_col(col_chk)),
+            "cst": _parse_int(get_col(col_cst)),
+            "ugo": _parse_bool(get_col(col_ugo)),
         }
         
         # Upsert into DB
         try:
             with session_scope() as s:
                 repo = UserRepository(s)
-                existing = repo.get(isu)
                 
-                if existing:
-                    # Update existing user, add y26 to met
-                    new_met = dict(existing.met)
-                    new_met["y26"] = y26_data
-                    if uid and uid != existing.uid:
-                        # Update UID if different
-                        dto = UserDTO(isu=isu, uid=uid, fio=existing.fio, grp=existing.grp, nck=existing.nck, met=new_met)
+                # Handle external users (special ISU)
+                if is_external:
+                    # Try to find existing user by VK uid
+                    existing_by_uid = None
+                    if uid > 1:
+                        existing_by_uid = repo.get_by_uid(uid)
+                    
+                    if existing_by_uid:
+                        # Update existing external user
+                        isu = existing_by_uid.isu
+                        new_met = dict(existing_by_uid.met)
+                        new_met["y26"] = y26_data
+                        dto = UserDTO(
+                            isu=isu,
+                            uid=uid,
+                            fio=existing_by_uid.fio or y26_data.get("fio", ""),
+                            grp=existing_by_uid.grp,
+                            nck=existing_by_uid.nck or y26_data.get("nck", ""),
+                            met=new_met
+                        )
+                        repo.upsert(dto)
                     else:
-                        dto = UserDTO(isu=isu, uid=existing.uid, fio=existing.fio, grp=existing.grp, nck=existing.nck, met=new_met)
-                    repo.upsert(dto)
+                        # Create new external user with auto ISU
+                        dto = repo.add_with_auto_isu(
+                            uid=uid if uid > 1 else 0,
+                            fio=y26_data.get("fio", ""),
+                            grp="",
+                            nck=y26_data.get("nck", ""),
+                            met={"y26": y26_data}
+                        )
+                        isu = dto.isu
+                    stats["upserted"] += 1
+                    processed_isus.add(isu)
                 else:
-                    # Create new user with y26 data
-                    dto = UserDTO(isu=isu, uid=uid, fio=y26_data.get("fio", ""), grp="", nck=y26_data.get("nck", ""), met={"y26": y26_data})
-                    repo.upsert(dto)
-                
-                stats["upserted"] += 1
+                    # Regular user with known ISU
+                    existing = repo.get(isu)
+                    
+                    if existing:
+                        # Update existing user, add y26 to met
+                        new_met = dict(existing.met)
+                        new_met["y26"] = y26_data
+                        # Update main user uid if we have a valid one and existing doesn't
+                        new_uid = existing.uid
+                        if uid > 1 and existing.uid in (0, 1):
+                            new_uid = uid
+                        dto = UserDTO(isu=isu, uid=new_uid, fio=existing.fio, grp=existing.grp, nck=existing.nck, met=new_met)
+                        repo.upsert(dto)
+                    else:
+                        # Create new user with y26 data
+                        dto = UserDTO(
+                            isu=isu,
+                            uid=uid if uid > 1 else 0,
+                            fio=y26_data.get("fio", ""),
+                            grp="",
+                            nck=y26_data.get("nck", ""),
+                            met={"y26": y26_data}
+                        )
+                        repo.upsert(dto)
+                    
+                    stats["upserted"] += 1
+                    processed_isus.add(isu)
         except Exception as e:
             stats["errors"].append(f"Line {line_no}: DB error - {e}")
             stats["skipped"] += 1
+    
+    # Remove y26 data from users not in current table
+    try:
+        with session_scope() as s:
+            repo = UserRepository(s)
+            # Get all users with y26 data
+            from sqlalchemy import select
+            all_y26_rows = s.execute(select(UserY26Model)).scalars().all()
+            
+            for row in all_y26_rows:
+                if row.isu not in processed_isus:
+                    # Delete from user_y26 table
+                    s.delete(row)
+                    # Also remove y26 from user's met
+                    user = repo.get(row.isu)
+                    if user and "y26" in user.met:
+                        new_met = dict(user.met)
+                        del new_met["y26"]
+                        dto = UserDTO(isu=user.isu, uid=user.uid, fio=user.fio, grp=user.grp, nck=user.nck, met=new_met)
+                        repo.upsert(dto)
+                    stats["removed"] = stats.get("removed", 0) + 1
+    except Exception as e:
+        stats["errors"].append(f"Cleanup error: {e}")
     
     return stats
 
@@ -190,9 +303,8 @@ def get_y26_domik_mates(house: str, exclude_isu: int) -> str:
     try:
         from sqlalchemy import select
         with session_scope() as s:
-            # Query from typed UserY26Model table
             rows = s.execute(
-                select(UserY26Model).where(UserY26Model.hse != "")
+                select(UserY26Model).where(UserY26Model.liv != "")
             ).scalars().all()
             
             mates = []
@@ -200,7 +312,7 @@ def get_y26_domik_mates(house: str, exclude_isu: int) -> str:
                 if row.isu == exclude_isu:
                     continue
                 
-                row_house = (row.hse or "").strip().lower()
+                row_house = (row.liv or "").strip().lower()
                 if row_house == house.strip().lower():
                     nck = (row.nck or "").strip()
                     if nck and nck != "-":
@@ -209,3 +321,44 @@ def get_y26_domik_mates(house: str, exclude_isu: int) -> str:
             return ", ".join(sorted(mates)) if mates else ""
     except Exception:
         return ""
+
+
+if __name__ == "__main__":
+    import sys
+    import os
+    
+    # Change to source directory for relative paths
+    script_dir = Path(__file__).parent
+    source_dir = script_dir.parent.parent
+    os.chdir(source_dir)
+    
+    # Initialize DB
+    from utils.db.db import init_engine
+    init_engine()
+    
+    # Try to get VK helper if possible
+    vk_helper = None
+    try:
+        from utils import initialize
+        import vk_api
+        from vk_helper import VKHelper
+        
+        token, group_id = initialize()
+        vk_session = vk_api.VkApi(token=token)
+        vk_helper = VKHelper(vk_session, group_id)
+        print("[Y26] VK helper initialized")
+    except Exception as e:
+        print(f"[Y26] Running without VK helper: {e}")
+    
+    # Run injection
+    stats = inject_y26(vk_helper)
+    
+    source = stats.get("source", "none")
+    if source != "none":
+        print(f"[Y26] Source: {source}, upserted: {stats.get('upserted', 0)}, skipped: {stats.get('skipped', 0)}")
+    else:
+        print("[Y26] No data source available")
+    
+    if stats.get("errors"):
+        for err in stats["errors"]:
+            print(f"[Y26] Error: {err}")

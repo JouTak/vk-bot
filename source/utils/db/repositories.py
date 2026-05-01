@@ -157,11 +157,12 @@ class UserRepository:
         y26 = self.session.get(UserY26Model, isu)
         if y26:
             met["y26"] = {
+                "uid": int(y26.uid),
                 "fio": y26.fio,
                 "nck": y26.nck,
                 "nmb": y26.nmb,
                 "bed": _bool(y26.bed),
-                "hse": y26.hse,
+                "liv": y26.liv,
                 "way": y26.way,
                 "chk": _bool(y26.chk),
                 "cst": int(y26.cst),
@@ -293,11 +294,12 @@ class UserRepository:
             if row is None:
                 row = UserY26Model(isu=dto.isu)
                 self.session.add(row)
+            row.uid = _to_int(m.get("uid", 0))
             row.fio = str(m.get("fio", "") or "")
             row.nck = str(m.get("nck", "") or "")
             row.nmb = str(m.get("nmb", "") or "")
             row.bed = _to_bool(m.get("bed", False))
-            row.hse = str(m.get("hse", "") or "")
+            row.liv = str(m.get("liv", "") or "")
             row.way = str(m.get("way", "") or "")
             row.chk = _to_bool(m.get("chk", False))
             row.cst = _to_int(m.get("cst", 0))
@@ -362,6 +364,15 @@ class UserRepository:
 
     def list_all_isus(self) -> list[int]:
         return [int(x) for x in self.session.execute(select(UserModel.isu)).scalars().all()]
+
+    def get_by_uid(self, uid: int) -> UserDTO | None:
+        """Find user by VK uid. Returns None if not found."""
+        row = self.session.execute(
+            select(UserModel).where(UserModel.uid == uid)
+        ).scalars().first()
+        if row is None:
+            return None
+        return self.get(row.isu)
 
 
 class IgnoredRepository:
