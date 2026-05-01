@@ -59,21 +59,38 @@ class Main:
         result = process_message_event(self, event, self.VK)
         self.handle_actions(result)
 
-    def handle_actions(self, actions: list[dict]) -> int:
+    def handle_actions(self, actions: list[dict]) -> dict:
+        """
+        Send messages and return stats with errors.
+        
+        Returns dict with:
+            - sent: number of successfully sent messages
+            - failed: list of (peer_id, error_msg) tuples
+        """
         if not actions:
-            return 0
-        counter = 0
+            return {"sent": 0, "failed": []}
+        
+        result = {"sent": 0, "failed": []}
+        
         for i in range(0, len(actions), 25):
             chunk = actions[i:i + 25]
-            responses = self.VK.send_messages(chunk)
-            for action, response in zip(chunk, responses):
-                if not response:
-                    # print('Something wrong with', action)
-                    continue
-                else:
-                    # print('Success with', action)
-                    counter += 1
-        return counter
+            try:
+                responses = self.VK.send_messages(chunk)
+                for action, response in zip(chunk, responses):
+                    if isinstance(response, dict) and response.get("error"):
+                        err = response["error"]
+                        error_msg = err.get("error_msg", str(err))
+                        result["failed"].append((action.get("peer_id"), error_msg))
+                    elif response:
+                        result["sent"] += 1
+                    else:
+                        result["failed"].append((action.get("peer_id"), "Пустой ответ"))
+            except Exception as e:
+                # If whole batch failed
+                for action in chunk:
+                    result["failed"].append((action.get("peer_id"), str(e)))
+        
+        return result
 
 
 if __name__ == '__main__':
