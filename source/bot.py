@@ -596,6 +596,35 @@ def format_message(msg: str, user: User.info2text, **additional) -> str:
     return msg.format_map(_SafeDict(mapping | additional))
 
 
+def query(self, condition: str) -> str:
+    """Returns stats about users matching condition without sending messages."""
+    check = check_condition(condition)
+    if check != 'ok':
+        return f'Condition issue:\n{check}'
+    users: UserList = self.users
+    matched = []
+    for isu in users.keys():
+        user = users.get(isu)
+        if not user:
+            continue
+        uid = int(user.uid)
+        if 0 <= uid <= 1:
+            continue
+        if eval_condition(user.info, condition):
+            matched.append(user)
+    
+    if not matched:
+        return 'Совпадений: 0'
+    
+    result = f'Совпадений: {len(matched)}\n\nПервые {min(10, len(matched))}:'
+    for user in matched[:10]:
+        nck = user.nck or '-'
+        fio = user.fio or '-'
+        result += f'\n• {user.isu} | {user.uid} | {nck} | {fio}'
+    
+    return result
+
+
 def sender(self, condition: str, msg: str) -> list[dict]:
     check = check_condition(condition)
     if check_condition(condition) != 'ok':
@@ -741,6 +770,17 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
                     }]
                 except Exception as e:
                     return [{'peer_id': uid, 'message': f'Ошибка миграции:\n{e}'}]
+            elif msgs[0] == 'query':
+                try:
+                    self.users.load()
+                except Exception:
+                    pass
+                if len(msgs) >= 2:
+                    condition = msgs[1]
+                    tts = query(self, condition)
+                else:
+                    tts = 'Использование: query <условие>'
+                return [{'peer_id': uid, 'message': tts}]
             elif msgs[0] == 'sender':
                 try:
                     self.users.load()
