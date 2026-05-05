@@ -672,7 +672,7 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
                     y26_msg = f"Y26 error: {e}"
                 
                 users_ok = self.users.load()
-                return [{'peer_id': uid, 'message': f"Users: {'Success' if users_ok else 'Failed'}\\n{y26_msg}"}]
+                return [{'peer_id': uid, 'message': f"Users: {'Success' if users_ok else 'Failed'}\n{y26_msg}"}]
             elif msgs[0] == 'db':
                 # Execute raw SQL query
                 sql = msg.removeprefix('db').strip()
@@ -748,8 +748,26 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
                     pass
                 if len(msgs) > 2:
                     result = sender(self, msgs[1], msg.removeprefix(msgs[0]).strip().removeprefix(msgs[1]).strip())
-                    count = self.handle_actions(result)
-                    tts = f'Готово. Всего разослано {count} сообщений'
+                    stats = self.handle_actions(result)
+                    
+                    # Format response
+                    tts = f'Отправлено: {stats["sent"]}'
+                    
+                    if stats["failed"]:
+                        failed = stats["failed"]
+                        tts += f'\nОшибок: {len(failed)}'
+                        
+                        if len(failed) <= 10:
+                            # Show each error
+                            for peer_id, error in failed:
+                                tts += f'\n• {peer_id}: {error}'
+                        else:
+                            # Group by error message
+                            from collections import Counter
+                            error_counts = Counter(err for _, err in failed)
+                            tts += '\n'
+                            for error, count in error_counts.most_common():
+                                tts += f'\n• {error} (x{count})'
                 elif len(msgs) == 2:
                     tts = 'Нет сообщения'
                 else:
