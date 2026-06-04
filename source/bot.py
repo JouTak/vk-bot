@@ -5,6 +5,7 @@ import time
 from utils.query_helper import MinecraftServerQuery
 from utils.vk_helper import *
 from utils.storage.user_store import User, UserList
+from utils.templates import get_welcome_message, get_current_template_name, set_current_template, list_templates
 # NOTE: legacy file-based user_list module is kept in repo but should not be imported after DB migration.
 # Using db-backed UserList from utils.storage.user_store instead.
 users_path = ""
@@ -596,6 +597,35 @@ def format_message(msg: str, user: User.info2text, **additional) -> str:
     return msg.format_map(_SafeDict(mapping | additional))
 
 
+def query(self, condition: str) -> str:
+    """Returns stats about users matching condition without sending messages."""
+    check = check_condition(condition)
+    if check != 'ok':
+        return f'Condition issue:\n{check}'
+    users: UserList = self.users
+    matched = []
+    for isu in users.keys():
+        user = users.get(isu)
+        if not user:
+            continue
+        uid = int(user.uid)
+        if 0 <= uid <= 1:
+            continue
+        if eval_condition(user.info, condition):
+            matched.append(user)
+    
+    if not matched:
+        return 'Совпадений: 0'
+    
+    result = f'Совпадений: {len(matched)}\n\nПервые {min(10, len(matched))}:'
+    for user in matched[:10]:
+        nck = user.nck or '-'
+        fio = user.fio or '-'
+        result += f'\n• {user.isu} | {user.uid} | {nck} | {fio}'
+    
+    return result
+
+
 def sender(self, condition: str, msg: str) -> list[dict]:
     check = check_condition(condition)
     if check_condition(condition) != 'ok':
@@ -741,6 +771,17 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
                     }]
                 except Exception as e:
                     return [{'peer_id': uid, 'message': f'Ошибка миграции:\n{e}'}]
+            elif msgs[0] == 'query':
+                try:
+                    self.users.load()
+                except Exception:
+                    pass
+                if len(msgs) >= 2:
+                    condition = msgs[1]
+                    tts = query(self, condition)
+                else:
+                    tts = 'Использование: query <условие>'
+                return [{'peer_id': uid, 'message': tts}]
             elif msgs[0] == 'sender':
                 try:
                     self.users.load()
@@ -796,6 +837,22 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
                     'peer_id': uid,
                     'message': f'{tts}\n{len(set(msgs)) - len(errors.keys()) - 1} пользователей были успешно добавлены!'
                 }]
+            elif msgs[0] == 'message':
+                # Template management: /message [template_name]
+                if len(msgs) == 1:
+                    # Show current template
+                    current = get_current_template_name()
+                    available = list_templates()
+                    tts = f'Текущий шаблон: {current}\nДоступные: {", ".join(available)}'
+                else:
+                    # Set template
+                    template_name = msgs[1]
+                    if set_current_template(template_name):
+                        tts = f'Шаблон изменён на: {template_name}'
+                    else:
+                        available = list_templates()
+                        tts = f'Шаблон "{template_name}" не найден.\nДоступные: {", ".join(available)}'
+                return [{'peer_id': uid, 'message': tts}]
 
         if ignored.is_ignored(uid) and 'админ' not in msg.lower() and not callplay_trigger:
             return
@@ -909,7 +966,15 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
         elif not is_member:
             tts = info_message
         else:
-            tts = y26_welcome_message
+            # Use template system for welcome message
+            tts = get_welcome_message(
+                itmocraft_ip=itmocraft_ip,
+                joutak_link=joutak_link,
+                form_link=form_link,
+                telegram_link=telegram_link,
+                discord_link=discord_link,
+                a25_reg_link=a25_reg_link,
+            )
             buttons = [{'label': 'ПОЗВАТЬ АДМИНА', 'payload': {'type': 'callmanager'}, 'color': 'positive'}]
             keyboard_out = create_standard_keyboard(buttons)
 
