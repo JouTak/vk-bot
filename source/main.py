@@ -1,10 +1,14 @@
 from vk_api.bot_longpoll import VkBotLongPoll, VkBotEventType
 import traceback
+import time
 from utils import IgnoredList, initialize
 from utils.db.db import init_engine
 from utils.log import *
 from bot import *
 import requests
+from requests.exceptions import ConnectionError
+from urllib3.exceptions import MaxRetryError
+from http.client import RemoteDisconnected
 import re
 
 
@@ -101,6 +105,17 @@ if __name__ == '__main__':
             bot.run()
         except requests.exceptions.ReadTimeout:
             pass
+        except (ConnectionError, MaxRetryError, RemoteDisconnected) as e:
+            # Transient network errors (DNS failures, connection drops) — retry with backoff
+            print(f"[Network] {type(e).__name__}: {e}")
+            time.sleep(1)
+        except OSError as e:
+            # Only catch network-related OSError subclasses
+            if isinstance(e, (ConnectionResetError, BrokenPipeError, TimeoutError)):
+                print(f"[Network] {type(e).__name__}: {e}")
+                time.sleep(1)
+            else:
+                raise  # Re-raise unexpected OSError
         except Exception as e:
             bot.error(e)
             bot.VK.send_messages([{'peer_id': uid, 'message': str(e)} for uid in admin])
