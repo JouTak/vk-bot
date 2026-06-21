@@ -16,6 +16,7 @@ from .models import (
     UserS25Model,
     UserY25Model,
     UserY26Model,
+    UserE26Model
 )
 
 
@@ -62,7 +63,7 @@ def _to_bool(v: Any, default: bool = False) -> bool:
     return default
 
 
-KNOWN_EVENT_KEYS = {"a24", "s25", "y25", "a25", "y26"}
+KNOWN_EVENT_KEYS = {"a24", "s25", "y25", "a25", "y26", "e26"}
 LEGACY_EVENT_KEY_ALIASES = {"s24": "a24"}
 
 
@@ -172,6 +173,17 @@ class UserRepository:
                 "ugo": _bool(y26.ugo),
             }
 
+        e26 = self.session.get(UserE26Model, isu)
+        if e26:
+            met["e26"] = {
+                "uid": int(e26.uid),
+                "fio": e26.fio,
+                "nck": e26.nck,
+                "qs1": int(e26.qs1),
+                "scr": int(e26.scr),
+                "plc": int(e26.plc),
+            }
+
         return UserDTO(isu=u.isu, uid=u.uid, fio=u.fio, grp=u.grp, nck=u.nck, met=met)
 
     def get_isu_by_uid(self, uid: int) -> int | None:
@@ -211,11 +223,11 @@ class UserRepository:
         return migrated
 
     def upsert(
-        self,
-        dto: UserDTO,
-        *,
-        merge_events: bool = True,
-        preserve_existing_base_if_has_a25: bool = True,
+            self,
+            dto: UserDTO,
+            *,
+            merge_events: bool = True,
+            preserve_existing_base_if_has_a25: bool = True,
     ) -> None:
         raw_met = dto.met or {}
         met = _canonicalize_met(raw_met)
@@ -310,6 +322,21 @@ class UserRepository:
         elif not merge_events:
             self.session.execute(delete(UserY26Model).where(UserY26Model.isu == dto.isu))
 
+        if "e26" in met:
+            m = met["e26"] or {}
+            row = self.session.get(UserE26Model, dto.isu)
+            if row is None:
+                row = UserE26Model(isu=dto.isu)
+                self.session.add(row)
+            row.uid = _to_int(m.get("uid", 0))
+            row.fio = str(m.get("fio", "") or "")
+            row.nck = str(m.get("nck", "") or "")
+            row.qs1 = _to_int(m.get("qs1", 0))
+            row.scr = _to_int(m.get("scr", 0))
+            row.plc = _to_int(m.get("plc", 0))
+        elif not merge_events:
+            self.session.execute(delete(UserE26Model).where(UserE26Model.isu == dto.isu))
+
         for legacy_key in legacy_alias_keys:
             self.session.execute(
                 delete(UserEventModel).where(
@@ -351,12 +378,12 @@ class UserRepository:
         return n
 
     def add_with_auto_isu(
-        self,
-        uid: int,
-        fio: str = "",
-        grp: str = "",
-        nck: str = "",
-        met: dict[str, Any] | None = None,
+            self,
+            uid: int,
+            fio: str = "",
+            grp: str = "",
+            nck: str = "",
+            met: dict[str, Any] | None = None,
     ) -> UserDTO:
         if met is None:
             met = {}

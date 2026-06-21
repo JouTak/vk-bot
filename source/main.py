@@ -27,18 +27,20 @@ class Main:
         self.info(self.ignored.load_from_file())
         self.users = UserList(users_path, self.VK)
 
-        # Inject Y26 event data
+        # Inject E26 event data
         try:
-            from utils.storage.inject_y26 import inject_y26
-            stats = inject_y26(self.VK)
-            source = stats.get("source", "none")
-            if source != "none":
-                print(f"[Y26] Source: {source}, upserted: {stats.get('upserted', 0)}, skipped: {stats.get('skipped', 0)}")
-            if stats.get("errors"):
-                for err in stats["errors"]:
-                    print(f"[Y26] {err}")
+            from utils.storage.inject_e26 import inject_e26
+            stats_e26 = inject_e26(self.VK)
+            source_e26 = stats_e26.get("source", "none")
+            if source_e26 != "none":
+                print(f"[E26] Source: {source_e26}, "
+                      f"upserted: {stats_e26.get('upserted', 0)}, "
+                      f"skipped: {stats_e26.get('skipped', 0)}")
+            if stats_e26.get("errors"):
+                for err in stats_e26["errors"]:
+                    print(f"[E26] {err}")
         except Exception as e:
-            print(f"[Y26] Injection error: {e}")
+            print(f"[E26] Injection error: {e}")
 
         if warnings:
             self.warn('\n'.join(warnings))
@@ -73,9 +75,9 @@ class Main:
         """
         if not actions:
             return {"sent": 0, "failed": []}
-        
+
         result = {"sent": 0, "failed": []}
-        
+
         for i in range(0, len(actions), 25):
             chunk = actions[i:i + 25]
             try:
@@ -93,7 +95,7 @@ class Main:
                 # If whole batch failed
                 for action in chunk:
                     result["failed"].append((action.get("peer_id"), str(e)))
-        
+
         return result
 
 

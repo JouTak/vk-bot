@@ -116,6 +116,22 @@ class UserY26Model(Base):
     ugo: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)  # approved
 
 
+class UserE26Model(Base):
+    __tablename__ = "user_e26"
+    isu: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("users.isu", ondelete="CASCADE"),
+        primary_key=True,
+        autoincrement=False,
+    )
+    uid: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
+    fio: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    nck: Mapped[str] = mapped_column(String(64), nullable=False, default="")
+    qs1: Mapped[int] = mapped_column(Integer, nullable=False, default=0)  # вопрос 1
+    scr: Mapped[int] = mapped_column(Integer, nullable=False, default=0)  # итого (баллы)
+    plc: Mapped[int] = mapped_column(Integer, nullable=False, default=0)  # призовое место
+
+
 class UserEventModel(Base):
     __tablename__ = "user_events"
 

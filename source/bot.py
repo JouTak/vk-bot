@@ -5,6 +5,7 @@ import time
 from utils.query_helper import MinecraftServerQuery
 from utils.vk_helper import *
 from utils.storage.user_store import User, UserList
+
 # NOTE: legacy file-based user_list module is kept in repo but should not be imported after DB migration.
 # Using db-backed UserList from utils.storage.user_store instead.
 users_path = ""
@@ -65,6 +66,13 @@ y26_welcome_message = (
     f'Если ты уже зарегистрирован(а) на events, подожди одобрения заявки, мы свяжемся с тобой здесь!'
 )
 
+e26_welcome_message = (
+    'Если ты зарегистрировался на ЕГЭ по майнкрафту, значит всё правильно и мы ждём тебя на проверке своих знаний!\n'
+    'Обязательно зови друзей, можно и не из ИТМО.\n'
+    'Позже здесь появится твой ник, а также количество набранных за экзамен баллов\n'
+    'Подробности здесь: https://itmo.events/events/120728'
+)
+
 
 def format_y26_message(user: User) -> str:
     """
@@ -75,7 +83,7 @@ def format_y26_message(user: User) -> str:
     y26 = user.met.get('y26', {})
     if not y26:
         return ''
-    
+
     # Helper to format bool fields
     def b2t(v) -> str:
         if isinstance(v, bool):
@@ -83,7 +91,7 @@ def format_y26_message(user: User) -> str:
         if isinstance(v, str):
             return 'Да' if v.lower() in ('1', 'true', 'yes', 'да') else 'Нет'
         return 'Да' if v else 'Нет'
-    
+
     # Get values with defaults (using new 3-letter keys)
     nck = (y26.get('nck') or '').strip()
     number = (y26.get('nmb') or '').strip()
@@ -91,7 +99,7 @@ def format_y26_message(user: User) -> str:
     bed = y26.get('bed', False)
     house = (y26.get('liv') or '').strip()
     money = y26.get('chk', False)  # was 'money', now 'chk'
-    
+
     # Build domik_mates
     domik_mates = ''
     if house and house.lower() not in ('', '-', 'пока пусто'):
@@ -100,40 +108,63 @@ def format_y26_message(user: User) -> str:
             domik_mates = get_y26_domik_mates(house, user.isu)
         except Exception:
             pass
-    
+
     # Build message with conditional paragraphs
     parts = ['Привет! Вот твои данные по выезду в Ягодное:']
-    
+
     # Ник
     if nck and nck != '-':
         parts.append(f'\nТвой ник: {nck}')
-    
+
     # Номер телефона
     if number and number != '-':
         parts.append(f'\nТвой номер телефона (чтобы мы могли оперативно с тобой связаться):\n{number}')
-    
+
     # Как добираешься
     if transport and transport != '-':
         parts.append(f'\nКак добираешься до Ягодного:\n{transport}')
         parts.append('Важно: если ты решил поехать самостоятельно, вызови админа!')
-    
+
     # Берёшь ли бельё
     parts.append(f'\nБерёшь ли ты в Ягодном постельное бельё: {b2t(bed)}')
-    
+
     # Где живёшь
     if house and house != '-' and house.lower() != 'пока пусто':
         parts.append(f'\nГде ты живёшь:\n{house}')
-        
+
         # С кем живёшь
         if domik_mates:
             parts.append(f'\nС кем ты живешь в этом домике:\n{domik_mates}')
-    
+
     # Оплата
     parts.append(f'\nПолучена ли оплата от тебя:\n{b2t(money)}')
-    
+
     # Footer
     parts.append('\nЧто-то не так? Вызывай админа!')
-    
+
+    return '\n'.join(parts)
+
+
+def format_e26_message(user: User) -> str:
+    e26 = user.met.get('e26', {})
+    if not e26: return ''
+    fio = (e26.get('fio') or '').strip()
+    nck = (e26.get('nck') or '').strip()
+    qs1 = e26.get('qs1', 0)
+    scr = e26.get('scr', 0)
+    plc = e26.get('plc', 0)
+    name = fio.split()[0] if fio else 'участник'
+
+    parts = [f'Привет, {name}!']
+    parts.append('ЕГЭ по маинкрафт инфа ниже:')
+    parts.append(f'Твоё ФИО: {fio}')
+    parts.append(f'Твой ник: {nck}')
+    if qs1:
+        parts.append(f'Вопрос 1: {qs1}')
+    if scr:
+        parts.append(f'Итого баллов: {scr}')
+    if plc:
+        parts.append(f'Призовое место: {plc}')
     return '\n'.join(parts)
 
 
@@ -150,6 +181,13 @@ def is_y26_participant(user: User) -> bool:
     if isinstance(ugo, str):
         return ugo.lower() in ('1', 'true', 'yes', 'да')
     return bool(ugo)
+
+
+def is_e26_participant(user: User) -> bool:
+    """Check if user is an E26 (ЕГЭ по майнкрафту) participant."""
+    if user is None or not isinstance(user.met, dict):
+        return False
+    return 'e26' in user.met
 
 
 a25_welcome_message = (
@@ -309,9 +347,6 @@ CAPTAIN_CALL_COOLDOWN_SECONDS = 120
 CAPTAIN_CALL_COOLDOWN_UNTIL: dict[int, float] = {}
 
 
-
-
-
 def _run_migration_bridge(db_url: str | None = None, users_txt: str | None = None):
     try:
         from source.utils.tools.cli.migrate_from_txt import run_migration
@@ -337,7 +372,6 @@ def is_a25_captain(user: User, uid: int) -> bool:
         return False
 
 
-
 def build_a25_stage_info(user: User) -> str:
     """Returns a formatted stage line for A25 participants who passed round 1.
 
@@ -361,7 +395,6 @@ def build_a25_stage_info(user: User) -> str:
         return ''
 
 
-
 def get_a25_captain_uids(users: UserList) -> set[int]:
     # Collects all unique captain VK uids from A25 metadata.
     result: set[int] = set()
@@ -382,7 +415,6 @@ def get_a25_captain_uids(users: UserList) -> set[int]:
     return result
 
 
-
 def get_a25_current_stage(a25: dict) -> int | None:
     # Returns 1..3 for first not-completed stage, or None if all stages are completed.
     try:
@@ -395,7 +427,6 @@ def get_a25_current_stage(a25: dict) -> int | None:
         return None
     except Exception:
         return 1
-
 
 
 def flat_info2text() -> dict[str]:
@@ -612,16 +643,16 @@ def query(self, condition: str) -> str:
             continue
         if eval_condition(user.info, condition):
             matched.append(user)
-    
+
     if not matched:
         return 'Совпадений: 0'
-    
+
     result = f'Совпадений: {len(matched)}\n\nПервые {min(10, len(matched))}:'
     for user in matched[:10]:
         nck = user.nck or '-'
         fio = user.fio or '-'
         result += f'\n• {user.isu} | {user.uid} | {nck} | {fio}'
-    
+
     return result
 
 
@@ -689,51 +720,51 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
             if msgs[0] == 'stop':
                 exit()
             elif msgs[0] == 'reload':
-                # Reload users and re-inject Y26 data
+                # Reload users and re-inject E26 data
                 try:
-                    from utils.storage.inject_y26 import inject_y26
-                    y26_stats = inject_y26(self.VK)
-                    src = y26_stats.get('source', 'none')
-                    y26_msg = f"Y26 ({src}): {y26_stats.get('upserted', 0)} upserted"
-                    if y26_stats.get('errors'):
-                        y26_msg += f", {len(y26_stats['errors'])} errors"
+                    from utils.storage.inject_e26 import inject_e26
+                    e26_stats = inject_e26(self.VK)
+                    src_e26 = e26_stats.get('source', 'none')
+                    e26_msg = f"E26 ({src_e26}): {e26_stats.get('upserted', 0)} upserted"
+                    if e26_stats.get('errors'):
+                        e26_msg += f", {len(e26_stats['errors'])} errors"
                 except Exception as e:
-                    y26_msg = f"Y26 error: {e}"
-                
+                    e26_msg = f"E26 error: {e}"
+
                 users_ok = self.users.load()
-                return [{'peer_id': uid, 'message': f"Users: {'Success' if users_ok else 'Failed'}\n{y26_msg}"}]
+                return [{'peer_id': uid, 'message': f"Users: {'Success' if users_ok else 'Failed'}\n{e26_msg}"}]
             elif msgs[0] == 'db':
                 # Execute raw SQL query
                 sql = msg.removeprefix('db').strip()
                 if not sql:
                     return [{'peer_id': uid, 'message': 'Использование: db <SQL запрос>'}]
-                
+
                 try:
                     from utils.db.db import is_database_enabled, session_scope
                     from sqlalchemy import text
-                    
+
                     if not is_database_enabled():
                         return [{'peer_id': uid, 'message': 'БД отключена'}]
-                    
+
                     with session_scope() as s:
                         result = s.execute(text(sql))
-                        
+
                         # Check if it's a SELECT query
                         if sql.strip().upper().startswith('SELECT'):
                             rows = result.fetchall()
                             if not rows:
                                 return [{'peer_id': uid, 'message': 'Пустой результат'}]
-                            
+
                             # Format output
                             cols = result.keys()
                             header = ' | '.join(str(c) for c in cols)
                             lines = [header, '-' * len(header)]
                             for row in rows[:50]:  # Limit to 50 rows
                                 lines.append(' | '.join(str(v) for v in row))
-                            
+
                             if len(rows) > 50:
                                 lines.append(f'... и ещё {len(rows) - 50} строк')
-                            
+
                             output = '\n'.join(lines)
                             if len(output) > 4000:
                                 output = output[:4000] + '\n... (обрезано)'
@@ -789,14 +820,14 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
                 if len(msgs) > 2:
                     result = sender(self, msgs[1], msg.removeprefix(msgs[0]).strip().removeprefix(msgs[1]).strip())
                     stats = self.handle_actions(result)
-                    
+
                     # Format response
                     tts = f'Отправлено: {stats["sent"]}'
-                    
+
                     if stats["failed"]:
                         failed = stats["failed"]
                         tts += f'\nОшибок: {len(failed)}'
-                        
+
                         if len(failed) <= 10:
                             # Show each error
                             for peer_id, error in failed:
@@ -941,15 +972,13 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
                 user = users.get(isu)
 
         keyboard_out = None
-        # Priority: Y26 participant with approve=True > non-member > welcome message
-        if user is not None and is_y26_participant(user):
-            tts = format_y26_message(user)
+        # E26: есть в БД → инфа, нет в БД → welcome
+        if user is not None and is_e26_participant(user):
+            tts = format_e26_message(user)
             buttons = [{'label': 'ПОЗВАТЬ АДМИНА', 'payload': {'type': 'callmanager'}, 'color': 'positive'}]
             keyboard_out = create_standard_keyboard(buttons)
-        elif not is_member:
-            tts = info_message
         else:
-            tts = y26_welcome_message
+            tts = e26_welcome_message
             buttons = [{'label': 'ПОЗВАТЬ АДМИНА', 'payload': {'type': 'callmanager'}, 'color': 'positive'}]
             keyboard_out = create_standard_keyboard(buttons)
 
