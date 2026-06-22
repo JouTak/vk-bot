@@ -56,6 +56,14 @@ class User:
                 "cst": int,
                 "ugo": s2b,
             },
+            "e26": {
+                "uid": int,
+                "fio": str,
+                "nck": str,
+                "qs1": int,
+                "scr": int,
+                "plc": int,
+            },
         },
     )
     t2ic = staticmethod(str.isdigit)
@@ -69,7 +77,8 @@ class User:
         {
             "a24": {"tsp": t2ic, "nck": bool, "lr1": t2bc, "wr1": t2bc, "wr2": t2bc, "nyt": t2bc, "fnl": t2bc},
             "s25": {"tsp": t2ic, "nck": bool, "wr1": t2bc, "rr1": t2ic, "wr2": t2bc, "rr2": t2ic, "fnl": t2ic},
-            "y25": {"tsp": t2ic, "nck": bool, "nmb": bool, "bed": t2bc, "way": t2ic, "car": bool, "liv": bool, "ugo": t2ic},
+            "y25": {"tsp": t2ic, "nck": bool, "nmb": bool, "bed": t2bc, "way": t2ic, "car": bool, "liv": bool,
+                    "ugo": t2ic},
             "a25": {
                 "fio": bool,
                 "sts": t2bc,
@@ -93,6 +102,14 @@ class User:
                 "chk": t2bc,
                 "cst": t2ic,
                 "ugo": t2bc,
+            },
+            "e26": {
+                "uid": t2ic,
+                "fio": bool,
+                "nck": bool,
+                "qs1": t2ic,
+                "scr": t2ic,
+                "plc": t2ic,
             },
         },
     )
@@ -135,6 +152,14 @@ class User:
                 "chk": b2t,
                 "cst": str,
                 "ugo": b2t,
+            },
+            "e26": {
+                "uid": str,
+                "fio": opt,
+                "nck": opt,
+                "qs1": str,
+                "scr": str,
+                "plc": str,
             },
         },
     )
@@ -261,7 +286,8 @@ class UserList:
                 if isu == -1:
                     dto = repo.add_with_auto_isu(uid=int(uid), fio=fio, grp=grp, nck=nck, met=met or {})
                 else:
-                    dto = UserDTO(isu=int(isu), uid=int(uid), fio=fio or "", grp=grp or "", nck=nck or "", met=met or {})
+                    dto = UserDTO(isu=int(isu), uid=int(uid), fio=fio or "", grp=grp or "", nck=nck or "",
+                                  met=met or {})
                     repo.upsert(dto)
                 if not (0 <= int(dto.uid) <= 1):
                     self.uid_to_isu[int(dto.uid)] = int(dto.isu)
@@ -371,12 +397,12 @@ def import_users_txt_to_db(users_txt_path: str) -> int:
                         return False
                 return default
 
-            for key in ("a24", "s25", "y25", "a25", "y26"):
+            for key in ("a24", "s25", "y25", "a25", "y26", "e26"):
                 if key not in met or not isinstance(met.get(key), dict):
                     continue
                 m = met[key]
 
-                if key in ("a24", "s25", "y25"):
+                if key in ("a24", "s25", "y25", "a25", "y26", "e26"):
                     if "tsp" in m:
                         m["tsp"] = to_int(m.get("tsp", 0))
                     if key == "a24":
@@ -413,6 +439,11 @@ def import_users_txt_to_db(users_txt_path: str) -> int:
                     for b in ("bed", "chk", "ugo"):
                         if b in m:
                             m[b] = to_bool(m.get(b, False))
+
+                if key == "e26":
+                    for i in ("qs1", "scr", "plc"):
+                        if i in m:
+                            m[i] = to_int(m.get(i, 0))
 
             dto = UserDTO(
                 isu=isu,
