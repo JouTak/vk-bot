@@ -150,7 +150,7 @@ def format_e26_message(user: User) -> str:
     if not e26: return ''
     fio = (e26.get('fio') or '').strip()
     nck = (e26.get('nck') or '').strip()
-    qs1 = e26.get('qs1', 0)
+    bls = e26.get('bls', 0)
     scr = e26.get('scr', 0)
     plc = e26.get('plc', 0)
     name = fio.split()[0] if fio else 'участник'
@@ -159,8 +159,8 @@ def format_e26_message(user: User) -> str:
     parts.append('ЕГЭ по маинкрафт инфа ниже:')
     parts.append(f'Твоё ФИО: {fio}')
     parts.append(f'Твой ник: {nck}')
-    if qs1:
-        parts.append(f'Вопрос 1: {qs1}')
+    if bls:
+        parts.append(f'Вопрос 1: {bls}')
     if scr:
         parts.append(f'Итого баллов: {scr}')
     if plc:

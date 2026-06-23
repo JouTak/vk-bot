@@ -57,10 +57,11 @@ class User:
                 "ugo": s2b,
             },
             "e26": {
+                "rid": int,
                 "uid": int,
                 "fio": str,
                 "nck": str,
-                "qs1": int,
+                "bls": int,
                 "scr": int,
                 "plc": int,
             },
@@ -104,10 +105,11 @@ class User:
                 "ugo": t2bc,
             },
             "e26": {
+                "rid": t2ic,
                 "uid": t2ic,
                 "fio": bool,
                 "nck": bool,
-                "qs1": t2ic,
+                "bls": t2ic,
                 "scr": t2ic,
                 "plc": t2ic,
             },
@@ -154,10 +156,11 @@ class User:
                 "ugo": b2t,
             },
             "e26": {
+                "rid": str,
                 "uid": str,
                 "fio": opt,
                 "nck": opt,
-                "qs1": str,
+                "bls": str,
                 "scr": str,
                 "plc": str,
             },
@@ -441,7 +444,7 @@ def import_users_txt_to_db(users_txt_path: str) -> int:
                             m[b] = to_bool(m.get(b, False))
 
                 if key == "e26":
-                    for i in ("qs1", "scr", "plc"):
+                    for i in ("bls", "scr", "plc"):
                         if i in m:
                             m[i] = to_int(m.get(i, 0))
 
