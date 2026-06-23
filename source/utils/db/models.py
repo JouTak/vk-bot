@@ -124,12 +124,13 @@ class UserE26Model(Base):
         primary_key=True,
         autoincrement=False,
     )
+    rid: Mapped[int] = mapped_column(Integer, nullable=False, default=0)  # айди регистрации
     uid: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
     fio: Mapped[str] = mapped_column(String(255), nullable=False, default="")
     nck: Mapped[str] = mapped_column(String(64), nullable=False, default="")
-    qs1: Mapped[int] = mapped_column(Integer, nullable=False, default=0)  # вопрос 1
-    scr: Mapped[int] = mapped_column(Integer, nullable=False, default=0)  # итого (баллы)
-    plc: Mapped[int] = mapped_column(Integer, nullable=False, default=0)  # призовое место
+    bls: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    scr: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    plc: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
 
 class UserEventModel(Base):

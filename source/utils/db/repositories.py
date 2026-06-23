@@ -176,10 +176,11 @@ class UserRepository:
         e26 = self.session.get(UserE26Model, isu)
         if e26:
             met["e26"] = {
+                "rid": int(e26.rid),
                 "uid": int(e26.uid),
                 "fio": e26.fio,
                 "nck": e26.nck,
-                "qs1": int(e26.qs1),
+                "bls": int(e26.bls),
                 "scr": int(e26.scr),
                 "plc": int(e26.plc),
             }
@@ -328,10 +329,11 @@ class UserRepository:
             if row is None:
                 row = UserE26Model(isu=dto.isu)
                 self.session.add(row)
+            row.rid = _to_int(m.get("rid", 0))
             row.uid = _to_int(m.get("uid", 0))
             row.fio = str(m.get("fio", "") or "")
             row.nck = str(m.get("nck", "") or "")
-            row.qs1 = _to_int(m.get("qs1", 0))
+            row.bls = _to_int(m.get("bls", 0))
             row.scr = _to_int(m.get("scr", 0))
             row.plc = _to_int(m.get("plc", 0))
         elif not merge_events:
