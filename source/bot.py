@@ -689,20 +689,15 @@ def process_message_event(self, event, vk_helper) -> list[dict] | None:
 def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
     users: UserList = self.users
     uid = event.message.from_id
-
     user_get = vk_helper.vk.users.get(user_ids=uid)
     user_get = user_get[0]
     uname = user_get['first_name']
     username = user_get['last_name']
-
     msg: str = event.message.text
     msg = (event.object['message'].get('text') or '')
     msgs = msg.split()
-
-    # Check for attachments
     attachments = event.object['message'].get('attachments') or []
     has_attachments = len(attachments) > 0
-
     payload_raw = event.object['message'].get('payload')
     payload_type = None
     if payload_raw:
@@ -712,15 +707,12 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
             payload_obj = None
         if isinstance(payload_obj, dict):
             payload_type = payload_obj.get('type')
-
     callplay_trigger = (payload_type == 'callplay') or ('призвать поиграть' in msg.lower())
-
     if not event.from_chat:
         if uid in admin and msgs:
             if msgs[0] == 'stop':
                 exit()
             elif msgs[0] == 'reload':
-                # Reload users and re-inject E26 data
                 try:
                     from utils.storage.inject_e26 import inject_e26
                     e26_stats = inject_e26(self.VK)
@@ -730,47 +722,35 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
                         e26_msg += f", {len(e26_stats['errors'])} errors"
                 except Exception as e:
                     e26_msg = f"E26 error: {e}"
-
                 users_ok = self.users.load()
                 return [{'peer_id': uid, 'message': f"Users: {'Success' if users_ok else 'Failed'}\n{e26_msg}"}]
             elif msgs[0] == 'db':
-                # Execute raw SQL query
                 sql = msg.removeprefix('db').strip()
                 if not sql:
                     return [{'peer_id': uid, 'message': 'Использование: db <SQL запрос>'}]
-
                 try:
                     from utils.db.db import is_database_enabled, session_scope
                     from sqlalchemy import text
-
                     if not is_database_enabled():
                         return [{'peer_id': uid, 'message': 'БД отключена'}]
-
                     with session_scope() as s:
                         result = s.execute(text(sql))
-
-                        # Check if it's a SELECT query
                         if sql.strip().upper().startswith('SELECT'):
                             rows = result.fetchall()
                             if not rows:
                                 return [{'peer_id': uid, 'message': 'Пустой результат'}]
-
-                            # Format output
                             cols = result.keys()
                             header = ' | '.join(str(c) for c in cols)
                             lines = [header, '-' * len(header)]
-                            for row in rows[:50]:  # Limit to 50 rows
+                            for row in rows[:50]:
                                 lines.append(' | '.join(str(v) for v in row))
-
                             if len(rows) > 50:
                                 lines.append(f'... и ещё {len(rows) - 50} строк')
-
                             output = '\n'.join(lines)
                             if len(output) > 4000:
                                 output = output[:4000] + '\n... (обрезано)'
                             return [{'peer_id': uid, 'message': output}]
                         else:
-                            # Non-SELECT: commit and report affected rows
                             s.commit()
                             affected = result.rowcount
                             return [{'peer_id': uid, 'message': f'OK. Затронуто строк: {affected}'}]
@@ -820,20 +800,14 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
                 if len(msgs) > 2:
                     result = sender(self, msgs[1], msg.removeprefix(msgs[0]).strip().removeprefix(msgs[1]).strip())
                     stats = self.handle_actions(result)
-
-                    # Format response
                     tts = f'Отправлено: {stats["sent"]}'
-
                     if stats["failed"]:
                         failed = stats["failed"]
                         tts += f'\nОшибок: {len(failed)}'
-
                         if len(failed) <= 10:
-                            # Show each error
                             for peer_id, error in failed:
                                 tts += f'\n• {peer_id}: {error}'
                         else:
-                            # Group by error message
                             from collections import Counter
                             error_counts = Counter(err for _, err in failed)
                             tts += '\n'
@@ -860,7 +834,6 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
                     tts = '\n'.join(f'Ошибка при добавлении "{key}":\n{errors[key]}\n' for key in errors.keys())
                 else:
                     tts = 'Успешный успех!'
-
                 if len(set(msgs)) - len(errors.keys()) - 1 != 0:
                     users.save()
                 return [{
@@ -868,11 +841,20 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
                     'message': f'{tts}\n{len(set(msgs)) - len(errors.keys()) - 1} пользователей были успешно добавлены!'
                 }]
 
+        if uid not in admin:
+            try:
+                is_member = bool(vk_helper.vk_session.method(
+                    'groups.isMember',
+                    {'group_id': self.group_id, 'user_id': uid}
+                ))
+            except Exception:
+                is_member = True
+            if not is_member:
+                return [{'peer_id': uid, 'message': info_message}]
+
         if ignored.is_ignored(uid) and 'админ' not in msg.lower() and not callplay_trigger:
             return
 
-        # --- ATTACHMENT HANDLING ---
-        # If user sends an attachment without being in "ignored" (support) mode, warn them
         if has_attachments and not ignored.is_ignored(uid) and 'админ' not in msg.lower():
             return [{
                 'peer_id': uid,
@@ -922,57 +904,13 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
             isu = users.uid_to_isu[uid]
             user = users.get(isu)
 
-        # if callplay_trigger:
-        #     if user is None or not isinstance(user.met, dict) or 'a25' not in user.met:
-        #         return [{'peer_id': uid, 'message': 'Эта команда доступна только капитанам команд Майнокиады.'}]
-        #
-        #     if not is_a25_captain(user, uid):
-        #         return [{'peer_id': uid, 'message': 'Эта команда доступна только капитанам команд Майнокиады.'}]
-        #
-        #     now = time.time()
-        #     until = CAPTAIN_CALL_COOLDOWN_UNTIL.get(int(uid), 0)
-        #     if until > now:
-        #         remaining = int(until - now + 0.999)
-        #         return [{'peer_id': uid, 'message': f'Слишком часто. Подожди {remaining} сек. и попробуй ещё раз.'}]
-        #
-        #     a25 = user.met.get('a25') or {}
-        #     team = (a25.get('cmd') or '').strip()
-        #     if not team or team == '-':
-        #         return [{'peer_id': uid, 'message': 'Не вижу название твоей команды в базе. Напиши: АДМИН'}]
-        #
-        #     stage = get_a25_current_stage(a25)
-        #     if stage is None:
-        #         return [{'peer_id': uid, 'message': 'Похоже, у вашей команды уже отмечены все режимы. Если это ошибка — напиши: АДМИН'}]
-        #
-        #     stage_text = {1: 'первый режим', 2: 'второй режим', 3: 'третий режим'}.get(stage, f'режим {stage}')
-        #
-        #     notify_text = (
-        #         f'Капитан команды "{team}" призывает поиграть!\n'
-        #         f'Текущий режим: {stage_text}.\n'
-        #         f'Нужны игроки от вашей команды.'
-        #     )
-        #
-        #     captains = sorted(get_a25_captain_uids(users))
-        #     actions = [{'peer_id': int(c), 'message': notify_text} for c in captains if int(c) != int(uid)]
-        #
-        #     CAPTAIN_CALL_COOLDOWN_UNTIL[int(uid)] = time.time() + CAPTAIN_CALL_COOLDOWN_SECONDS
-        #
-        #     ack = {'peer_id': uid, 'message': f'Принято! Разослал другим капитанам ({len(actions)}).'}
-        #     return [ack, *actions]
-
-        is_member = vk_helper.vk_session.method(
-            'groups.isMember',
-            {'group_id': self.group_id, 'user_id': uid}
-        ) != 0
-
         if 'user' not in locals() or user is None:
             user = None
-            if uid in users.uid_to_isu:
-                isu = users.uid_to_isu[uid]
-                user = users.get(isu)
+        if uid in users.uid_to_isu:
+            isu = users.uid_to_isu[uid]
+            user = users.get(isu)
 
         keyboard_out = None
-        # E26: есть в БД → инфа, нет в БД → welcome
         if user is not None and is_e26_participant(user):
             tts = format_e26_message(user)
             buttons = [{'label': 'ПОЗВАТЬ АДМИНА', 'payload': {'type': 'callmanager'}, 'color': 'positive'}]
@@ -981,17 +919,14 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
             tts = e26_welcome_message
             buttons = [{'label': 'ПОЗВАТЬ АДМИНА', 'payload': {'type': 'callmanager'}, 'color': 'positive'}]
             keyboard_out = create_standard_keyboard(buttons)
-
     else:
         is_ping = False
         msg = event.object['message']['text']
         if not msg:
             return
         msgs = msg.split()
-
         uid = event.object['message']['peer_id']
         cuid = event.object['message'].get('conversation_message_id')
-
         if msgs and msgs[0].lstrip('/') == 'ping':
             mc = MinecraftServerQuery()
             try:
