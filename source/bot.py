@@ -852,6 +852,15 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
             if not is_member:
                 return [{'peer_id': uid, 'message': info_message}]
 
+        if uid not in users.uid_to_isu:
+            fio = f"{uname} {username}".strip()
+            try:
+                users.add((-1, uid, fio, '', '', {}))
+                users.save()
+                self.info(f"Auto-added new user: uid={uid}, fio='{fio}'")
+            except Exception as e:
+                self.warn(f"Failed to auto-add user {uid}: {e}")
+
         if ignored.is_ignored(uid) and 'админ' not in msg.lower() and not callplay_trigger:
             return
 
