@@ -134,6 +134,10 @@ def inject_e26(vk_helper=None) -> dict[str, Any]:
             isu = None
 
         uid_raw = get_col(col_uid)
+        # Пропускаем участников без ВК (где стоит "-")
+        if uid_raw == "-" or not uid_raw:
+            stats["skipped"] += 1
+            continue
         uid = 0
         if uid_raw:
             if uid_raw.lstrip("-").isdigit():
@@ -142,6 +146,13 @@ def inject_e26(vk_helper=None) -> dict[str, Any]:
                 uid = vk_link_to_uid[uid_raw]
             else:
                 uid = 1
+
+
+        nck_raw = get_col(col_nck)
+        # Пропускаем участников без ника (где стоит "-")
+        if nck_raw == "-" or not nck_raw:
+            stats["skipped"] += 1
+            continue
 
         # Парсинг scr
         scr_raw = get_col(col_scr)
@@ -155,7 +166,7 @@ def inject_e26(vk_helper=None) -> dict[str, Any]:
             "rid": rid,
             "uid": uid,
             "fio": get_col(col_fio),
-            "nck": get_col(col_nck),
+            "nck": nck_raw,
             "bls": _parse_int(get_col(col_bls)),
             "scr": scr,
             "plc": _parse_int(get_col(col_plc)),
