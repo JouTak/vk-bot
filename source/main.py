@@ -39,6 +39,16 @@ class Main:
             if stats_e26.get("errors"):
                 for err in stats_e26["errors"]:
                     print(f"[E26] {err}")
+
+            skipped_details = stats_e26.get("skipped_details", [])
+            if skipped_details:
+                details_text = "\n".join(skipped_details)
+                message = f"[E26] Пропущено участников: {len(skipped_details)}\n{details_text}"
+
+                try:
+                    self.VK.send_messages([{'peer_id': uid, 'message': message} for uid in admin])
+                except Exception as notify_err:
+                    print(f"[E26] Failed to notify admins: {notify_err}")
         except Exception as e:
             print(f"[E26] Injection error: {e}")
 

@@ -720,6 +720,14 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
                     e26_msg = f"E26 ({src_e26}): {e26_stats.get('upserted', 0)} upserted"
                     if e26_stats.get('errors'):
                         e26_msg += f", {len(e26_stats['errors'])} errors"
+                    skipped_details = e26_stats.get('skipped_details', [])
+                    if skipped_details:
+                        details_text = "\n".join(skipped_details)
+                        skip_msg = f"[E26 reload] Пропущено участников: {len(skipped_details)}\n{details_text}"
+                        try:
+                            self.VK.send_messages([{'peer_id': uid, 'message': skip_msg} for uid in admin])
+                        except Exception as notify_err:
+                            e26_msg += f", notify error: {notify_err}"
                 except Exception as e:
                     e26_msg = f"E26 error: {e}"
                 users_ok = self.users.load()
