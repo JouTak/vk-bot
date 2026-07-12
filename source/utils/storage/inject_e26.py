@@ -127,17 +127,17 @@ def inject_e26(vk_helper=None) -> dict[str, Any]:
         def get_col(idx: int | None, default: str = "") -> str:
             return parts[idx].strip() if idx is not None and idx < len(parts) else default
 
-        isu_raw = get_col(col_isu)
         rid = _parse_int(get_col(col_rid))
-        is_external = isu_raw.lower() in ("внешний", "external", "ext")
-        if not is_external:
-            if not isu_raw or not isu_raw.isdigit():
-                stats["errors"].append(f"Line {line_no}: invalid ISU '{isu_raw}'")
-                stats["skipped"] += 1
-                continue
-            isu = int(isu_raw)
-        else:
-            isu = None
+
+        isu_raw = get_col(col_isu)
+        # Пропускаем участников без ISU (где стоит "-")
+        if isu_raw == "-" or not isu_raw:
+            fio_for_log = get_col(col_fio) or "(нет ФИО)"
+            detail = f"Line {line_no}: no ISU (fio='{fio_for_log}')"
+            print(f"[E26] {detail}")
+            skipped_details.append(detail)
+            stats["skipped"] += 1
+            continue
 
         uid_raw = get_col(col_uid)
         # Пропускаем участников без ВК (где стоит "-")
