@@ -11,6 +11,7 @@ from ..db.models import UserE26Model
 E26_TSV_PATH = "./subscribers/ege26.txt"
 E26_GSHEET_URL = "https://docs.google.com/spreadsheets/d/11aRURg_RU-WwaMs19xh5yE-_epG8Ea5fW-N8HGKBFZc/export?format=tsv&gid=1008955115"
 
+
 def _parse_int(value: str, default: int = 0) -> int:
     if not value:
         return default
@@ -18,6 +19,7 @@ def _parse_int(value: str, default: int = 0) -> int:
         return int(value.strip())
     except ValueError:
         return default
+
 
 def _parse_scr(value: str) -> int | None:
     """Парсит строку баллов. Возвращает сумму или None если есть неизвестные символы."""
@@ -35,6 +37,7 @@ def _parse_scr(value: str) -> int | None:
             return None  # Неизвестный символ — скип
     return total
 
+
 def _fetch_tsv_data() -> tuple[list[str], str]:
     try:
         req = urllib.request.Request(E26_GSHEET_URL, headers={"User-Agent": "Mozilla/5.0"})
@@ -50,6 +53,7 @@ def _fetch_tsv_data() -> tuple[list[str], str]:
         return tsv_path.read_text(encoding="utf-8").splitlines(), "file"
     return [], "none"
 
+
 def _find_col(header_map: dict[str, int], *aliases: str) -> int | None:
     for alias in aliases:
         if alias in header_map:
@@ -60,8 +64,10 @@ def _find_col(header_map: dict[str, int], *aliases: str) -> int | None:
                 return idx
     return None
 
+
 def inject_e26(vk_helper=None) -> dict[str, Any]:
     stats: dict[str, Any] = {"skipped": 0, "upserted": 0, "errors": [], "source": "none"}
+    skipped_details: list[str] = []
     if not is_database_enabled():
         return stats
 
@@ -134,6 +140,15 @@ def inject_e26(vk_helper=None) -> dict[str, Any]:
             isu = None
 
         uid_raw = get_col(col_uid)
+        # Пропускаем участников без ВК (где стоит "-")
+        if uid_raw == "-" or not uid_raw:
+            fio_for_log = get_col(col_fio) or "(нет ФИО)"
+            isu_for_log = get_col(col_isu) or "(нет ISU)"
+            detail = f"Line {line_no}: no VK uid (isu={isu_for_log}, fio='{fio_for_log}')"
+            print(f"[E26] {detail}")
+            skipped_details.append(detail)
+            stats["skipped"] += 1
+            continue
         uid = 0
         if uid_raw:
             if uid_raw.lstrip("-").isdigit():
@@ -142,6 +157,17 @@ def inject_e26(vk_helper=None) -> dict[str, Any]:
                 uid = vk_link_to_uid[uid_raw]
             else:
                 uid = 1
+
+        nck_raw = get_col(col_nck)
+        # Пропускаем участников без ника (где стоит "-")
+        if nck_raw == "-" or not nck_raw:
+            fio_for_log = get_col(col_fio) or "(нет ФИО)"
+            isu_for_log = get_col(col_isu) or "(нет ISU)"
+            detail = f"Line {line_no}: no nickname (isu={isu_for_log}, fio='{fio_for_log}')"
+            print(f"[E26] {detail}")
+            skipped_details.append(detail)
+            stats["skipped"] += 1
+            continue
 
         # Парсинг scr
         scr_raw = get_col(col_scr)
@@ -155,7 +181,7 @@ def inject_e26(vk_helper=None) -> dict[str, Any]:
             "rid": rid,
             "uid": uid,
             "fio": get_col(col_fio),
-            "nck": get_col(col_nck),
+            "nck": nck_raw,
             "bls": _parse_int(get_col(col_bls)),
             "scr": scr,
             "plc": _parse_int(get_col(col_plc)),
@@ -244,4 +270,6 @@ def inject_e26(vk_helper=None) -> dict[str, Any]:
                         )
     except Exception:
         pass
+    if skipped_details:
+        stats["skipped_details"] = skipped_details
     return stats

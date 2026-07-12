@@ -720,6 +720,14 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
                     e26_msg = f"E26 ({src_e26}): {e26_stats.get('upserted', 0)} upserted"
                     if e26_stats.get('errors'):
                         e26_msg += f", {len(e26_stats['errors'])} errors"
+                    skipped_details = e26_stats.get('skipped_details', [])
+                    if skipped_details:
+                        details_text = "\n".join(skipped_details)
+                        skip_msg = f"[E26 reload] Пропущено участников: {len(skipped_details)}\n{details_text}"
+                        try:
+                            self.VK.send_messages([{'peer_id': uid, 'message': skip_msg} for uid in admin])
+                        except Exception as notify_err:
+                            e26_msg += f", notify error: {notify_err}"
                 except Exception as e:
                     e26_msg = f"E26 error: {e}"
                 users_ok = self.users.load()
@@ -851,6 +859,15 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
                 is_member = True
             if not is_member:
                 return [{'peer_id': uid, 'message': info_message}]
+
+        if uid not in users.uid_to_isu:
+            fio = f"{uname} {username}".strip()
+            try:
+                users.add((-1, uid, fio, '', '', {}))
+                users.save()
+                self.info(f"Auto-added new user: uid={uid}, fio='{fio}'")
+            except Exception as e:
+                self.warn(f"Failed to auto-add user {uid}: {e}")
 
         if ignored.is_ignored(uid) and 'админ' not in msg.lower() and not callplay_trigger:
             return
