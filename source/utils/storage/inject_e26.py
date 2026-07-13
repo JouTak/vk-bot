@@ -129,7 +129,7 @@ def inject_e26(vk_helper=None) -> dict[str, Any]:
 
         isu_raw = get_col(col_isu)
         rid = _parse_int(get_col(col_rid))
-        is_external = isu_raw.lower() in ("внешний", "external", "ext")
+        is_external = isu_raw.lower() in ("внешний", "-")
         if not is_external:
             if not isu_raw or not isu_raw.isdigit():
                 stats["errors"].append(f"Line {line_no}: invalid ISU '{isu_raw}'")
