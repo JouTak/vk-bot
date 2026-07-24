@@ -118,19 +118,39 @@ class UserY26Model(Base):
 
 class UserE26Model(Base):
     __tablename__ = "user_e26"
+
     isu: Mapped[int] = mapped_column(
         Integer,
         ForeignKey("users.isu", ondelete="CASCADE"),
         primary_key=True,
         autoincrement=False,
     )
-    rid: Mapped[int] = mapped_column(Integer, nullable=False, default=0)  # айди регистрации
     uid: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
     fio: Mapped[str] = mapped_column(String(255), nullable=False, default="")
     nck: Mapped[str] = mapped_column(String(64), nullable=False, default="")
-    bls: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    scr: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    clk: Mapped[str] = mapped_column(String(64), nullable=False, default="")
+    sum_: Mapped[int] = mapped_column("sum", Integer, nullable=False, default=0)
     plc: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    z01: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    z02: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    z03: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    z04: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    z05: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    z06: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    z07: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    z08: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    z09: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    z10: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    z11: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    z12: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    z13: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    z14: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    z15: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    z16: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    z17: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    z18: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    z19: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    z20: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
 
 class UserEventModel(Base):

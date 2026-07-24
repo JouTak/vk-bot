@@ -57,13 +57,16 @@ class User:
                 "ugo": s2b,
             },
             "e26": {
-                "rid": int,
                 "uid": int,
                 "fio": str,
                 "nck": str,
-                "bls": int,
-                "scr": int,
+                "clk": str,
+                "sum": int,
                 "plc": int,
+                "z01": int, "z02": int, "z03": int, "z04": int, "z05": int,
+                "z06": int, "z07": int, "z08": int, "z09": int, "z10": int,
+                "z11": int, "z12": int, "z13": int, "z14": int, "z15": int,
+                "z16": int, "z17": int, "z18": int, "z19": int, "z20": int,
             },
         },
     )
@@ -105,13 +108,16 @@ class User:
                 "ugo": t2bc,
             },
             "e26": {
-                "rid": t2ic,
                 "uid": t2ic,
                 "fio": bool,
                 "nck": bool,
-                "bls": t2ic,
-                "scr": t2ic,
+                "clk": bool,
+                "sum": t2ic,
                 "plc": t2ic,
+                "z01": t2ic, "z02": t2ic, "z03": t2ic, "z04": t2ic, "z05": t2ic,
+                "z06": t2ic, "z07": t2ic, "z08": t2ic, "z09": t2ic, "z10": t2ic,
+                "z11": t2ic, "z12": t2ic, "z13": t2ic, "z14": t2ic, "z15": t2ic,
+                "z16": t2ic, "z17": t2ic, "z18": t2ic, "z19": t2ic, "z20": t2ic,
             },
         },
     )
@@ -156,13 +162,16 @@ class User:
                 "ugo": b2t,
             },
             "e26": {
-                "rid": str,
                 "uid": str,
                 "fio": opt,
                 "nck": opt,
-                "bls": str,
-                "scr": str,
+                "clk": opt,
+                "sum": str,
                 "plc": str,
+                "z01": str, "z02": str, "z03": str, "z04": str, "z05": str,
+                "z06": str, "z07": str, "z08": str, "z09": str, "z10": str,
+                "z11": str, "z12": str, "z13": str, "z14": str, "z15": str,
+                "z16": str, "z17": str, "z18": str, "z19": str, "z20": str,
             },
         },
     )
@@ -444,9 +453,13 @@ def import_users_txt_to_db(users_txt_path: str) -> int:
                             m[b] = to_bool(m.get(b, False))
 
                 if key == "e26":
-                    for i in ("bls", "scr", "plc"):
+                    for i in ("sum", "plc"):
                         if i in m:
                             m[i] = to_int(m.get(i, 0))
+                    for i in range(1, 21):
+                        zk = f"z{i:02d}"
+                        if zk in m:
+                            m[zk] = to_int(m.get(zk, 0))
 
             dto = UserDTO(
                 isu=isu,
