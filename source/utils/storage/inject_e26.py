@@ -1,15 +1,20 @@
 # -*- coding: utf-8 -*-
 from __future__ import annotations
+
 from pathlib import Path
 from typing import Any
+
 import urllib.request
 import urllib.error
+
+from sqlalchemy import delete, select
+
 from ..db.db import is_database_enabled, session_scope
 from ..db.repositories import UserRepository, UserDTO
 from ..db.models import UserE26Model
 
 E26_TSV_PATH = "./subscribers/ege26.txt"
-E26_GSHEET_URL = "https://docs.google.com/spreadsheets/d/11aRURg_RU-WwaMs19xh5yE-_epG8Ea5fW-N8HGKBFZc/export?format=tsv&gid=1008955115"
+E26_GSHEET_URL = "https://docs.google.com/spreadsheets/d/11aRURg_RU-WwaMs19xh5yE-_epG8Ea5fW-N8HGKBFZc/export?format=tsv&gid=938113370"
 
 
 def _parse_int(value: str, default: int = 0) -> int:
@@ -19,23 +24,6 @@ def _parse_int(value: str, default: int = 0) -> int:
         return int(value.strip())
     except ValueError:
         return default
-
-
-def _parse_scr(value: str) -> int | None:
-    """Парсит строку баллов. Возвращает сумму или None если есть неизвестные символы."""
-    if not value:
-        return 0
-    total = 0
-    for ch in value.strip():
-        if ch == '-':
-            total += 0
-        elif ch == '+':
-            total += 1
-        elif ch.isdigit():
-            total += int(ch)
-        else:
-            return None  # Неизвестный символ — скип
-    return total
 
 
 def _fetch_tsv_data() -> tuple[list[str], str]:
@@ -68,8 +56,17 @@ def _find_col(header_map: dict[str, int], *aliases: str) -> int | None:
 def inject_e26(vk_helper=None) -> dict[str, Any]:
     stats: dict[str, Any] = {"skipped": 0, "upserted": 0, "errors": [], "source": "none"}
     skipped_details: list[str] = []
+
     if not is_database_enabled():
         return stats
+
+    # --- Drop & recreate e26 table (structure may change between seasons) ---
+    from sqlalchemy import text as sa_text
+    from ..db.db import get_engine
+    engine = get_engine()
+    with engine.begin() as conn:
+        conn.execute(sa_text("DROP TABLE IF EXISTS user_e26"))
+    UserE26Model.__table__.create(engine)
 
     lines, source = _fetch_tsv_data()
     stats["source"] = source
@@ -78,23 +75,32 @@ def inject_e26(vk_helper=None) -> dict[str, Any]:
             stats["errors"].append("E26 inject skipped: no data source available")
         return stats
 
+    # --- Parse header ---
     header = [col.lower().strip() for col in lines[0].strip().split("\t")]
     header_map = {col: idx for idx, col in enumerate(header)}
 
-    col_isu = _find_col(header_map, "ису", "isu")
-    col_rid = _find_col(header_map, "rid", "айди", "регистрации")
-    col_uid = _find_col(header_map, "uid", "вк", "vk")
-    col_fio = _find_col(header_map, "fio", "фио")
-    col_nck = _find_col(header_map, "nck", "ник", "nick")
-    col_bls = _find_col(header_map, "bls", "баллы")
-    col_scr = _find_col(header_map, "scr", "итого", "score")
-    col_plc = _find_col(header_map, "plc", "призовое место", "место", "place")
+    col_isu = _find_col(header_map, "isu")
+    col_uid = _find_col(header_map, "uid")
+    col_fio = _find_col(header_map, "fio")
+    col_nck = _find_col(header_map, "nck")
+    col_sum = _find_col(header_map, "sum")
+    col_plc = _find_col(header_map, "plc")
+    col_clk = _find_col(header_map, "clk")
+
+    # z01..z20 columns
+    col_z: dict[str, int | None] = {}
+    for i in range(1, 21):
+        key = f"z{i:02d}"
+        idx = header_map.get(key)
+        if idx is None:
+            idx = header_map.get(f"z{i}")
+        col_z[key] = idx
 
     if col_uid is None:
         stats["errors"].append(f"Missing required column: uid/вк. Found: {list(header_map.keys())}")
         return stats
 
-    # Сбор VK-ссылок для ресолва
+    # --- Collect VK links to resolve ---
     vk_links_to_resolve: list[str] = []
     for line_idx, line in enumerate(lines[1:], start=1):
         parts = line.strip().split("\t")
@@ -118,7 +124,9 @@ def inject_e26(vk_helper=None) -> dict[str, Any]:
         for link in vk_links_to_resolve:
             vk_link_to_uid[link] = 1
 
+    # --- Process data rows ---
     processed_isus: set[int] = set()
+
     for line_no, line in enumerate(lines[1:], start=2):
         parts = line.strip().split("\t")
         if not parts or all(not p.strip() for p in parts):
@@ -127,9 +135,10 @@ def inject_e26(vk_helper=None) -> dict[str, Any]:
         def get_col(idx: int | None, default: str = "") -> str:
             return parts[idx].strip() if idx is not None and idx < len(parts) else default
 
+        # Parse ISU
         isu_raw = get_col(col_isu)
-        rid = _parse_int(get_col(col_rid))
         is_external = isu_raw.lower() in ("внешний", "-")
+
         if not is_external:
             if not isu_raw or not isu_raw.isdigit():
                 stats["errors"].append(f"Line {line_no}: invalid ISU '{isu_raw}'")
@@ -139,8 +148,8 @@ def inject_e26(vk_helper=None) -> dict[str, Any]:
         else:
             isu = None
 
+        # Parse VK ID
         uid_raw = get_col(col_uid)
-        # Пропускаем участников без ВК (где стоит "-")
         if uid_raw == "-" or not uid_raw:
             fio_for_log = get_col(col_fio) or "(нет ФИО)"
             isu_for_log = get_col(col_isu) or "(нет ISU)"
@@ -149,6 +158,7 @@ def inject_e26(vk_helper=None) -> dict[str, Any]:
             skipped_details.append(detail)
             stats["skipped"] += 1
             continue
+
         uid = 0
         if uid_raw:
             if uid_raw.lstrip("-").isdigit():
@@ -158,38 +168,29 @@ def inject_e26(vk_helper=None) -> dict[str, Any]:
             else:
                 uid = 1
 
+        # Parse NCK (don't skip if empty, just leave empty)
         nck_raw = get_col(col_nck)
-        # Пропускаем участников без ника (где стоит "-")
-        if nck_raw == "-" or not nck_raw:
-            fio_for_log = get_col(col_fio) or "(нет ФИО)"
-            isu_for_log = get_col(col_isu) or "(нет ISU)"
-            detail = f"Line {line_no}: no nickname (isu={isu_for_log}, fio='{fio_for_log}')"
-            print(f"[E26] {detail}")
-            skipped_details.append(detail)
-            stats["skipped"] += 1
-            continue
+        if nck_raw == "-":
+            nck_raw = ""
 
-        # Парсинг scr
-        scr_raw = get_col(col_scr)
-        scr = _parse_scr(scr_raw)
-        if scr is None:
-            stats["errors"].append(f"Line {line_no}: invalid scr '{scr_raw}'")
-            stats["skipped"] += 1
-            continue
-
-        e26_data = {
-            "rid": rid,
+        # Build e26 data
+        e26_data: dict[str, Any] = {
             "uid": uid,
             "fio": get_col(col_fio),
             "nck": nck_raw,
-            "bls": _parse_int(get_col(col_bls)),
-            "scr": scr,
+            "clk": get_col(col_clk),
+            "sum": _parse_int(get_col(col_sum)),
             "plc": _parse_int(get_col(col_plc)),
         }
+        for i in range(1, 21):
+            key = f"z{i:02d}"
+            e26_data[key] = _parse_int(get_col(col_z.get(key)))
 
+        # Upsert into DB
         try:
             with session_scope() as s:
                 repo = UserRepository(s)
+
                 if is_external:
                     existing_by_uid = repo.get_by_uid(uid) if uid > 1 else None
                     if existing_by_uid:
@@ -202,7 +203,7 @@ def inject_e26(vk_helper=None) -> dict[str, Any]:
                             fio=existing_by_uid.fio or e26_data["fio"],
                             grp=existing_by_uid.grp,
                             nck=existing_by_uid.nck or e26_data["nck"],
-                            met=new_met
+                            met=new_met,
                         )
                         repo.upsert(dto)
                     else:
@@ -211,7 +212,7 @@ def inject_e26(vk_helper=None) -> dict[str, Any]:
                             fio=e26_data["fio"],
                             grp="",
                             nck=e26_data["nck"],
-                            met={"e26": e26_data}
+                            met={"e26": e26_data},
                         )
                         isu = dto.isu
                 else:
@@ -228,7 +229,7 @@ def inject_e26(vk_helper=None) -> dict[str, Any]:
                             fio=existing.fio,
                             grp=existing.grp,
                             nck=existing.nck,
-                            met=new_met
+                            met=new_met,
                         )
                         repo.upsert(dto)
                     else:
@@ -238,38 +239,40 @@ def inject_e26(vk_helper=None) -> dict[str, Any]:
                             fio=e26_data["fio"],
                             grp="",
                             nck=e26_data["nck"],
-                            met={"e26": e26_data}
+                            met={"e26": e26_data},
                         )
                         repo.upsert(dto)
+
                 stats["upserted"] += 1
                 processed_isus.add(isu)
+
         except Exception as e:
             stats["errors"].append(f"Line {line_no}: DB error - {e}")
             stats["skipped"] += 1
 
-    # Очистка тех, кого больше нет в таблице
+    # --- Cleanup: remove e26 from met for users no longer in table ---
     try:
         with session_scope() as s:
-            from sqlalchemy import select
-            for row in s.execute(select(UserE26Model)).scalars().all():
-                if row.isu not in processed_isus:
-                    s.delete(row)
-                    user = UserRepository(s).get(row.isu)
-                    if user and "e26" in user.met:
-                        new_met = dict(user.met)
-                        del new_met["e26"]
-                        UserRepository(s).upsert(
-                            UserDTO(
-                                isu=user.isu,
-                                uid=user.uid,
-                                fio=user.fio,
-                                grp=user.grp,
-                                nck=user.nck,
-                                met=new_met
-                            )
+            repo = UserRepository(s)
+            for isu in old_isus - processed_isus:
+                user = repo.get(isu)
+                if user and "e26" in user.met:
+                    new_met = dict(user.met)
+                    del new_met["e26"]
+                    repo.upsert(
+                        UserDTO(
+                            isu=user.isu,
+                            uid=user.uid,
+                            fio=user.fio,
+                            grp=user.grp,
+                            nck=user.nck,
+                            met=new_met,
                         )
+                    )
     except Exception:
         pass
+
     if skipped_details:
         stats["skipped_details"] = skipped_details
+
     return stats
