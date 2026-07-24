@@ -192,7 +192,7 @@ def format_e26_message(user: User) -> str:
         parts.append(f'Задание {i}: {val}')
 
     # Secondary points
-    parts.append(f'Итого баллов: {sum_score}')
+    parts.append(f'Итого баллов (вторичных): {sum_score}')
 
     # Place in ranking
     if plc > 0:
