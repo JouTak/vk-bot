@@ -52,6 +52,9 @@ class Main:
         except Exception as e:
             print(f"[E26] Injection error: {e}")
 
+        # for uid_to_isu reloading
+        self.users.load()
+
         if warnings:
             self.warn('\n'.join(warnings))
         self.info('Готов!\n')
