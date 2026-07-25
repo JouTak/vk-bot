@@ -146,25 +146,60 @@ def format_y26_message(user: User) -> str:
 
 
 def format_e26_message(user: User) -> str:
+    """
+    Formats E26 (ЕГЭ по майнкрафту 2026) message.
+
+    Logic:
+    - If CLK is empty -> person didn't show up -> "По нашей информации, тебя не было :("
+    - If CLK is present -> person showed up:
+      - Show time (CLK)
+      - Show all z01..z20 (even if 0, because person was present)
+      - Show SUM (secondary points)
+      - PLC > 0 -> show place; PLC == 0 -> "не занял призовое место"
+    """
     e26 = user.met.get('e26', {})
-    if not e26: return ''
+    if not e26:
+        return ''
+
     fio = (e26.get('fio') or '').strip()
     nck = (e26.get('nck') or '').strip()
-    bls = e26.get('bls', 0)
-    scr = e26.get('scr', 0)
+    clk = (e26.get('clk') or '').strip()
+    sum_score = e26.get('sum', 0)
     plc = e26.get('plc', 0)
-    name = fio.split()[0] if fio else 'участник'
 
+    name = fio.split()[0] if fio else 'участник'
     parts = [f'Привет, {name}!']
-    parts.append('ЕГЭ по маинкрафт инфа ниже:')
-    parts.append(f'Твоё ФИО: {fio}')
-    parts.append(f'Твой ник: {nck}')
-    if bls:
-        parts.append(f'Вопрос 1: {bls}')
-    if scr:
-        parts.append(f'Итого баллов: {scr}')
-    if plc:
-        parts.append(f'Призовое место: {plc}')
+    parts.append('ЕГЭ по майнкрафту — инфа ниже:')
+
+    if fio:
+        parts.append(f'Твоё ФИО: {fio}')
+    if nck:
+        parts.append(f'Твой ник: {nck}')
+
+    # --- Person didn't show up ---
+    if not clk:
+        parts.append('')
+        parts.append('По нашей информации, тебя не было :(')
+        return '\n'.join(parts)
+
+    # --- Person showed up ---
+    parts.append(f'Время сдачи: {clk}')
+
+    # All 20 tasks (shown even if 0, because person was present)
+    for i in range(1, 21):
+        key = f'z{i:02d}'
+        val = e26.get(key, 0)
+        parts.append(f'Задание {i}: {val}')
+
+    # Secondary points
+    parts.append(f'Итого баллов (вторичных): {sum_score}')
+
+    # Place in ranking
+    if plc > 0:
+        parts.append(f'Твоё место: {plc}')
+    else:
+        parts.append('К сожалению, ты не занял призовое место')
+
     return '\n'.join(parts)
 
 
