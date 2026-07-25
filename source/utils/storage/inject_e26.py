@@ -250,28 +250,6 @@ def inject_e26(vk_helper=None) -> dict[str, Any]:
             stats["errors"].append(f"Line {line_no}: DB error - {e}")
             stats["skipped"] += 1
 
-    # --- Cleanup: remove e26 from met for users no longer in table ---
-    try:
-        with session_scope() as s:
-            repo = UserRepository(s)
-            for isu in old_isus - processed_isus:
-                user = repo.get(isu)
-                if user and "e26" in user.met:
-                    new_met = dict(user.met)
-                    del new_met["e26"]
-                    repo.upsert(
-                        UserDTO(
-                            isu=user.isu,
-                            uid=user.uid,
-                            fio=user.fio,
-                            grp=user.grp,
-                            nck=user.nck,
-                            met=new_met,
-                        )
-                    )
-    except Exception:
-        pass
-
     if skipped_details:
         stats["skipped_details"] = skipped_details
 
