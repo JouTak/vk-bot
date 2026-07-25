@@ -175,39 +175,39 @@ class UserRepository:
 
             # e26: wrapped in try-except because table structure may be stale
             # before inject_e26() drops and recreates it
-            try:
-                e26 = self.session.get(UserE26Model, isu)
-                if e26:
-                    met["e26"] = {
-                        "uid": int(e26.uid),
-                        "fio": e26.fio,
-                        "nck": e26.nck,
-                        "clk": e26.clk,
-                        "sum": int(e26.sum_),
-                        "plc": int(e26.plc),
-                        "z01": int(e26.z01),
-                        "z02": int(e26.z02),
-                        "z03": int(e26.z03),
-                        "z04": int(e26.z04),
-                        "z05": int(e26.z05),
-                        "z06": int(e26.z06),
-                        "z07": int(e26.z07),
-                        "z08": int(e26.z08),
-                        "z09": int(e26.z09),
-                        "z10": int(e26.z10),
-                        "z11": int(e26.z11),
-                        "z12": int(e26.z12),
-                        "z13": int(e26.z13),
-                        "z14": int(e26.z14),
-                        "z15": int(e26.z15),
-                        "z16": int(e26.z16),
-                        "z17": int(e26.z17),
-                        "z18": int(e26.z18),
-                        "z19": int(e26.z19),
-                        "z20": int(e26.z20),
-                    }
-            except Exception:
-                pass  # stale table structure — will be fixed by inject_e26()
+        try:
+            e26 = self.session.get(UserE26Model, isu)
+            if e26:
+                met["e26"] = {
+                    "uid": int(e26.uid),
+                    "fio": e26.fio,
+                    "nck": e26.nck,
+                    "clk": e26.clk,
+                    "sum": int(e26.sum_),
+                    "plc": int(e26.plc),
+                    "z01": int(e26.z01),
+                    "z02": int(e26.z02),
+                    "z03": int(e26.z03),
+                    "z04": int(e26.z04),
+                    "z05": int(e26.z05),
+                    "z06": int(e26.z06),
+                    "z07": int(e26.z07),
+                    "z08": int(e26.z08),
+                    "z09": int(e26.z09),
+                    "z10": int(e26.z10),
+                    "z11": int(e26.z11),
+                    "z12": int(e26.z12),
+                    "z13": int(e26.z13),
+                    "z14": int(e26.z14),
+                    "z15": int(e26.z15),
+                    "z16": int(e26.z16),
+                    "z17": int(e26.z17),
+                    "z18": int(e26.z18),
+                    "z19": int(e26.z19),
+                    "z20": int(e26.z20),
+                }
+        except Exception:
+            pass  # stale table structure — will be fixed by inject_e26()
 
         return UserDTO(isu=u.isu, uid=u.uid, fio=u.fio, grp=u.grp, nck=u.nck, met=met)
 
