@@ -127,7 +127,7 @@ class UserRepository:
         ).all()
         return {int(uid): int(isu) for uid, isu in rows}
 
-    def _next_special_isu(self) -> int:
+    def next_special_isu(self) -> int:
         rows = self.session.execute(
             select(UserModel.isu).where(
                 and_(UserModel.isu >= 0, UserModel.isu < 100000)
