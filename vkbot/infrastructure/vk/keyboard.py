@@ -2,21 +2,24 @@ from __future__ import annotations
 
 from vk_api.keyboard import VkKeyboard, VkKeyboardColor
 
+from vkbot.infrastructure.db.event_registry import get_active_events
 
-def build_welcome_keyboard(events: list[dict]) -> str:
+
+def build_welcome_keyboard() -> str:
     """
-    Инлайн-клавиатура с кнопками ивентов.
-    Каждый элемент: {"key": "y26", "title": "Ягодное 2026"}
+    Инлайн-клавиатура с кнопками активных ивентов.
+    Генерируется из реестра событий.
     """
+    events = get_active_events()
     keyboard = VkKeyboard(inline=True)
 
-    for i, event in enumerate(events):
+    for i, event_def in enumerate(events):
         if i > 0 and i % 3 == 0:
             keyboard.add_line()
 
         keyboard.add_callback_button(
-            label=event["title"][:20],  # VK limit: 20 chars
-            payload={"type": "event_info", "event_key": event["key"]},
+            label=event_def.title[:20],
+            payload={"type": "event_info", "event_key": event_def.key},
             color=VkKeyboardColor.PRIMARY,
         )
 
@@ -24,13 +27,14 @@ def build_welcome_keyboard(events: list[dict]) -> str:
 
 
 def build_standard_keyboard(buttons: list[dict]) -> str:
-    """
-    Обычная (не инлайн) клавиатура.
-    Каждый элемент: {"label": "...", "payload": {...}, "color": "positive"}
-    """
+    """Обычная (не инлайн) клавиатура."""
     keyboard = VkKeyboard(inline=False)
     for btn in buttons:
-        color = getattr(VkKeyboardColor, btn.get("color", "primary").upper(), VkKeyboardColor.PRIMARY)
+        color = getattr(
+            VkKeyboardColor,
+            btn.get("color", "primary").upper(),
+            VkKeyboardColor.PRIMARY,
+        )
         keyboard.add_button(
             label=btn["label"],
             payload=btn.get("payload", {}),
