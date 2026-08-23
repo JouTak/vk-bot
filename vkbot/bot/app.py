@@ -292,7 +292,7 @@ class BotApp:
             if not settings.enable_migration:
                 return "Миграция отключена. Установи ENABLE_MIGRATION=1 и перезапусти бота."
             from vkbot.cli.migrate import run_migration
-            path = msg.removeprefix("migrate").strip() or "source/subscribers/users.txt"
+            path = msg.removeprefix("migrate").strip() or "subscribers/users.txt"
             try:
                 st = run_migration(path)
                 return (
