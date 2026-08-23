@@ -66,6 +66,38 @@ class UserRepository:
     # WRITE
     # ----------------------------------------------------------
 
+    def change_isu(self, old_isu: int, new_isu: int) -> bool:
+        """Перенос юзера на новый ISU вместе со всеми ивент-строками."""
+        if old_isu == new_isu:
+            return False
+
+        old_row = self.session.get(UserModel, old_isu)
+        if old_row is None:
+            return False
+        if self.session.get(UserModel, new_isu) is not None:
+            return False  # целевой ISU уже занят — не трогаем
+
+        new_row = UserModel(
+            isu=new_isu,
+            uid=old_row.uid,
+            fio=old_row.fio,
+            grp=old_row.grp,
+            nck=old_row.nck,
+        )
+        self.session.add(new_row)
+        self.session.flush()  # FK на users.isu должен существовать
+
+        # Переносим строки ивентов
+        for model_cls in EVENT_MODELS.values():
+            ev_row = self.session.get(model_cls, old_isu)
+            if ev_row is not None:
+                ev_row.isu = new_isu
+        self.session.flush()
+
+        self.session.delete(old_row)
+        self.session.flush()
+        return True
+
     def upsert(self, user: User, merge_events: bool = True) -> User:
         """Создать или обновить юзера + все его ивенты."""
         # 1. Базовая запись
@@ -112,13 +144,41 @@ class UserRepository:
             met: dict[str, Any] | None = None,
     ) -> User:
         """Создать юзера с автогенерируемым ISU (для внешних)."""
-        new_isu = self._next_special_isu()
+        new_isu = self.next_special_isu()
         user = User(isu=new_isu, uid=uid, fio=fio, grp=grp, nck=nck, met=met or {})
         return self.upsert(user)
 
     # ----------------------------------------------------------
     # HELPERS
     # ----------------------------------------------------------
+
+    def list_all_users(self) -> list[User]:
+        """Все юзеры + их ивенты за 1 + len(events) запросов."""
+        rows = self.session.execute(select(UserModel)).scalars().all()
+
+        event_rows: dict[str, dict[int, object]] = {}
+        for event_key, model_cls in EVENT_MODELS.items():
+            ev_rows = self.session.execute(select(model_cls)).scalars().all()
+            event_rows[event_key] = {r.isu: r for r in ev_rows}
+
+        users = []
+        for row in rows:
+            met: dict[str, dict[str, Any]] = {}
+            for event_key, by_isu in event_rows.items():
+                ev_row = by_isu.get(row.isu)
+                if ev_row is None:
+                    continue
+                event_def = get_event(event_key)
+                if event_def is None:
+                    continue
+                met[event_key] = {
+                    f.name: getattr(ev_row, f.name, f.default)
+                    for f in event_def.fields
+                }
+            users.append(User(
+                isu=row.isu, uid=row.uid, fio=row.fio, grp=row.grp, nck=row.nck, met=met,
+            ))
+        return users
 
     def list_all_uids(self) -> dict[int, int]:
         """uid -> isu mapping для всех валидных юзеров."""

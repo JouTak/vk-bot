@@ -1,6 +1,7 @@
-from __future__ import annotations
 from pathlib import Path
-from pydantic_settings import BaseSettings
+
+from pydantic import Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
@@ -12,8 +13,8 @@ class Settings(BaseSettings):
     database_url: str
     use_database: bool = True
 
-    # Admins — из env, НЕ из кода
-    admin_ids: list[int] = []
+    # Admins
+    admin_ids: list[int] = Field(default_factory=list)
 
     # Feature flags
     enable_migration: bool = False
@@ -23,13 +24,13 @@ class Settings(BaseSettings):
     log_path: str = "/app/data/py.log"
 
     # Paths
-    base_dir: Path = Path(__file__).resolve().parent.parent
+    base_dir: Path = Path(__file__).resolve().parents[1]
 
-    model_config = {
-        "env_file": ".env",
-        "env_file_encoding": "utf-8",
-        "extra": "ignore",
-    }
+    model_config = SettingsConfigDict(
+        env_file=base_dir / ".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
 
 
 settings = Settings()

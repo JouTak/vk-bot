@@ -56,6 +56,7 @@ source/subscribers/
 entrypoint.sh
 project_bundle.py
 project_bundle.txt
+temp.py
 
 # local/secret configs sometimes used in prod
 *.pem

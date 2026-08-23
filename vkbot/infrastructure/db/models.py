@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from sqlalchemy import BigInteger, Boolean, Integer, String, Text, DateTime, ForeignKey, Column
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy import BigInteger, Boolean, Integer, String, Text, DateTime, ForeignKey
+from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func
 
 from .engine import Base
-from .event_registry import EVENT_REGISTRY, EventDef, FieldDef
+from .event_registry import EVENT_REGISTRY, EventDef
 
 
 # ============================================================

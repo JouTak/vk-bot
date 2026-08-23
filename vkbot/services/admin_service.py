@@ -2,12 +2,12 @@ from __future__ import annotations
 
 from loguru import logger
 from sqlalchemy import text
+from sqlalchemy.engine import CursorResult
 
 from vkbot.domain.user import User
 from vkbot.domain.permissions import PermissionChecker
 from vkbot.infrastructure.db.engine import session_scope
 from vkbot.infrastructure.db.repositories.user_repo import UserRepository
-from vkbot.services.message_service import MessageService
 from vkbot.services.condition_parser import (
     check_and_evaluate,
     validate_condition,
@@ -17,10 +17,9 @@ from vkbot.services.condition_parser import (
 class AdminService:
     """Все админские команды."""
 
-    def __init__(self, perms: PermissionChecker, vk_client, msg_svc: MessageService):
+    def __init__(self, perms: PermissionChecker, vk_client):
         self.perms = perms
         self.vk = vk_client
-        self.msg_svc = msg_svc
 
     # ----------------------------------------------------------
     # sender
@@ -136,7 +135,7 @@ class AdminService:
                         output = output[:4000] + "\n... (обрезано)"
                     return output
                 else:
-                    affected = result.rowcount
+                    affected = result.rowcount if isinstance(result, CursorResult) else 0
                     return f"OK. Затронуто строк: {affected}"
 
         except Exception as e:
@@ -173,19 +172,13 @@ class AdminService:
     # Хелперы
     # ----------------------------------------------------------
 
-    def _load_all_users(self) -> list[User]:
-        """Загружает всех юзеров из БД."""
+    @staticmethod
+    def _load_all_users() -> list[User]:
         with session_scope() as s:
-            repo = UserRepository(s)
-            isus = repo.list_all_uids()  # uid -> isu
-            users = []
-            for uid, isu in isus.items():
-                user = repo.get_by_isu(isu)
-                if user:
-                    users.append(user)
-            return users
+            return UserRepository(s).list_all_users()
 
-    def _format_sender_message(self, template: str, user: User) -> str:
+    @staticmethod
+    def _format_sender_message(template: str, user: User) -> str:
         """Форматирует сообщение для рассылки с подстановкой полей юзера."""
         # Простая подстановка: {isu}, {uid}, {fio}, {grp}, {nck}
         # + met.<event>.<field>

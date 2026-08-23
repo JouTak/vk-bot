@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
 
@@ -69,8 +69,27 @@ def get_active_events() -> list[EventDef]:
 # ============================================================
 
 register_event(EventDef(
+    key="e26",
+    title="ЕГЭ по майнкрафту",
+    active=False,
+    inject_url="https://docs.google.com/spreadsheets/d/11aRURg_RU-WwaMs19xh5yE-_epG8Ea5fW-N8HGKBFZc/export?format=tsv&gid=938113370",
+    inject_file="./subscribers/ege26.txt",
+    fields=(
+        FieldDef("uid", "int", 0),
+        FieldDef("fio", "str", ""),
+        FieldDef("nck", "str", ""),
+        FieldDef("clk", "str", "", label="Время сдачи"),
+        FieldDef("sum", "int", 0, label="Баллы (вторичные)"),
+        FieldDef("plc", "int", 0, label="Место"),
+        # Задания z01..z20
+        *(FieldDef(f"z{i:02d}", "int", 0) for i in range(1, 21)),
+    ),
+))
+
+register_event(EventDef(
     key="y26",
     title="Ягодное 2026",
+    active=False,
     inject_url="https://docs.google.com/spreadsheets/d/15g_s2MciovUVVrDtj6y-u-I3SHZ5X7u3gLGPfHzTIPg/export?format=tsv&gid=1986446860",
     inject_file="./subscribers/yagodnoe26.txt",
     fields=(
@@ -88,25 +107,25 @@ register_event(EventDef(
 ))
 
 register_event(EventDef(
-    key="e26",
-    title="ЕГЭ по майнкрафту",
-    inject_url="https://docs.google.com/spreadsheets/d/11aRURg_RU-WwaMs19xh5yE-_epG8Ea5fW-N8HGKBFZc/export?format=tsv&gid=938113370",
-    inject_file="./subscribers/ege26.txt",
+    key="y25",
+    title="Ягодное 2025",
+    active=False,
     fields=(
-        FieldDef("uid", "int", 0),
-        FieldDef("fio", "str", ""),
+        FieldDef("tsp", "int", 0),
         FieldDef("nck", "str", ""),
-        FieldDef("clk", "str", "", label="Время сдачи"),
-        FieldDef("sum", "int", 0, label="Баллы (вторичные)"),
-        FieldDef("plc", "int", 0, label="Место"),
-        # Задания z01..z20
-        *(FieldDef(f"z{i:02d}", "int", 0) for i in range(1, 21)),
+        FieldDef("nmb", "str", "", label="Номер телефона"),
+        FieldDef("bed", "bool", False, label="Берёшь бельё"),
+        FieldDef("way", "int", 0, label="Как добираешься"),
+        FieldDef("car", "str", "", label="Номер машины"),
+        FieldDef("liv", "str", "", label="Домик"),
+        FieldDef("ugo", "int", 0, label="Одобрен"),
     ),
 ))
 
 register_event(EventDef(
     key="a25",
     title="Майнокиада",
+    active=False,
     inject_file="./subscribers/a25.txt",
     fields=(
         FieldDef("fio", "str", ""),
@@ -128,6 +147,7 @@ register_event(EventDef(
 register_event(EventDef(
     key="s25",
     title="Спартакиада весна 2025",
+    active=False,
     fields=(
         FieldDef("tsp", "int", 0),
         FieldDef("nck", "str", ""),
@@ -142,6 +162,7 @@ register_event(EventDef(
 register_event(EventDef(
     key="a24",
     title="Спартакиада осень 2024",
+    active=False,
     fields=(
         FieldDef("tsp", "int", 0),
         FieldDef("nck", "str", ""),

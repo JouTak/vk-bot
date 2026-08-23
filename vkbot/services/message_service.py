@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+from sqlalchemy import select
 from vkbot.domain.user import User
 from vkbot.domain.rules import is_real_isu, is_valid_uid
 from vkbot.infrastructure.db.event_registry import EventDef, get_event
+from vkbot.infrastructure.db.engine import session_scope
+from vkbot.infrastructure.db.models import get_event_model
 
 
 class MessageService:
@@ -10,6 +13,8 @@ class MessageService:
     Форматирование сообщений с conditional rendering.
     Заменяет все format_y26_message, format_e26_message и т.д.
     """
+    WAY2TEXT = ("На бесплатном трансфере от ГК", "Своим ходом (электричка)", "Своим ходом (на машине)")
+    UGO2TEXT = ("Нет.", "Да, ты прошёл отбор, ждём оплату!", "Оплата дошла до нас, ты едешь!")
 
     def render_event_info(self, user: User, event_key: str) -> str:
         """
@@ -51,36 +56,6 @@ class MessageService:
     # Кастомные шаблоны для конкретных ивентов
     # ----------------------------------------------------------
 
-    def _format_y26(self, user: User, data: dict) -> str:
-        parts = ["Привет! Вот твои данные по выезду в Ягодное:"]
-
-        nck = data.get("nck", "")
-        nmb = data.get("nmb", "")
-        way = data.get("way", "")
-        bed = data.get("bed", False)
-        liv = data.get("liv", "")
-        chk = data.get("chk", False)
-
-        if nck and nck != "-":
-            parts.append(f"\nТвой ник: {nck}")
-
-        if nmb and nmb != "-":
-            parts.append(f"\nТвой номер телефона:\n{nmb}")
-
-        if way and way != "-":
-            parts.append(f"\nКак добираешься до Ягодного:\n{way}")
-            parts.append("Важно: если ты решил поехать самостоятельно, вызови админа!")
-
-        parts.append(f"\nБерёшь ли ты постельное бельё: {self._b2t(bed)}")
-
-        if liv and liv != "-" and liv.lower() != "пока пусто":
-            parts.append(f"\nГде ты живёшь:\n{liv}")
-
-        parts.append(f"\nПолучена ли оплата: {self._b2t(chk)}")
-        parts.append("\nЧто-то не так? Вызывай админа!")
-
-        return "\n".join(parts)
-
     def _format_e26(self, user: User, data: dict) -> str:
         fio = data.get("fio", "")
         nck = data.get("nck", "")
@@ -117,31 +92,88 @@ class MessageService:
 
         return "\n".join(parts)
 
-    def _format_a25(self, user: User, data: dict) -> str:
-        parts = ["Вот твои данные за Майнокиаду!"]
+    def _format_y26(self, user: User, data: dict) -> str:
+        parts = ["Привет! Вот твои данные по выезду в Ягодное:"]
 
         nck = data.get("nck", "")
-        cmd = data.get("cmd", "")
-        cap = data.get("cap", "")
-        kbr = data.get("kbr", "")
-        stg = data.get("stg", "")
-        wr1 = data.get("wr1", False)
+        nmb = data.get("nmb", "")
+        way = data.get("way", "")
+        bed = data.get("bed", False)
+        liv = data.get("liv", "")
+        chk = data.get("chk", False)
 
-        if nck:
-            parts.append(f"\nНик: {nck}")
-        if cmd:
-            parts.append(f"\nКоманда: {cmd}")
-        if cap:
-            parts.append(f"\nКапитан: {cap}")
+        if nck and nck != "-":
+            parts.append(f"\nТвой ник: {nck}")
 
-        if wr1:
-            stage_display = stg if stg and stg != "-" else "[НЕ НАЗНАЧЕН]"
-            parts.append(f"\nТвой турнирный матч (stage): {stage_display}")
+        if nmb and nmb != "-":
+            parts.append(f"\nТвой номер телефона:\n{nmb}")
 
-        if kbr and kbr != "-":
-            parts.append(f"\nЧасы на киберарене: {kbr}")
+        if way and way != "-":
+            parts.append(f"\nКак добираешься до Ягодного:\n{way}")
+            parts.append("Важно: если ты решил поехать самостоятельно, вызови админа!")
 
-        parts.append("\nОбязательно проверь данные. Если что-то не так — напиши АДМИН")
+        parts.append(f"\nБерёшь ли ты постельное бельё: {self._b2t(bed)}")
+
+        if liv and liv != "-" and liv.lower() != "пока пусто":
+            parts.append(f"\nГде ты живёшь:\n{liv}")
+            mates = self._get_y26_domik_mates(liv, user.isu)
+            if mates:
+                parts.append(f"\nС кем ты живешь в этом домике:\n{mates}")
+
+        parts.append(f"\nПолучена ли оплата: {self._b2t(chk)}")
+        parts.append("\nЧто-то не так? Вызывай админа!")
+
+        return "\n".join(parts)
+
+    def _format_y25(self, user: User, data: dict) -> str:
+        parts = ["Вот твои данные по выезду в Ягодное 2025!"]
+        parts.append(f"Едешь ли ты: {self._safe_pick(self.UGO2TEXT, data.get('ugo', 0), str(data.get('ugo', '')))}")
+        parts.append(f"Ник: {user.nck or data.get('nck') or '[НЕТ ДАННЫХ]'}")
+        if user.fio:
+            parts.append(f"ФИО: {user.fio}")
+        nmb = data.get("nmb", "")
+        if nmb and nmb != "-":
+            parts.append(f"Номер телефона: {nmb}")
+        parts.append(f"Планируешь ли взять бельё в ягодном: {self._b2t(data.get('bed', False))}")
+        way = data.get("way", 0)
+        parts.append(f"Как планируешь добираться до Ягодного: {self._safe_pick(self.WAY2TEXT, way, str(way))}")
+        if int(way or 0) == 2:
+            car = data.get("car", "")
+            if car and car != "-":
+                parts.append(f"Номер машины: {car}")
+        liv = data.get("liv", "")
+        parts.append(f"В каком домике ты живёшь: {liv or '[НЕТ ДАННЫХ]'}")
+        return "\n".join(parts)
+
+    def _format_s25(self, user: User, data: dict) -> str:
+        parts = ["Вот твои данные за весеннюю Спартакиаду по Майнкрафту 2025!"]
+        parts.append(f"ИСУ: {user.isu}")
+        parts.append(f"Ник: {user.nck or data.get('nck') or '[НЕТ ДАННЫХ]'}")
+        parts.append("Участвуешь ли ты в первом этапе (BlockParty): Да")
+        parts.append(f"Проходишь ли в следующий этап (AceRace): {self._b2t(data.get('wr1', False))}")
+        parts.append(f"Поставят ли 10 баллов: {self._b2t(data.get('rr1', 0) != 0)}")
+        parts.append(f"Рекорд раундов в BlockParty: {data.get('rr1', 0)}")
+        if data.get("wr1"):
+            parts.append(f"Рекорд в AceRace: {data.get('rr2', 0)}")
+            parts.append(f"Проходишь ли ты в финал (SurvivalGames): {self._b2t(data.get('wr2', False))}")
+        if data.get("wr2"):
+            parts.append(f"Место в финале: {data.get('fnl', 0)}")
+        parts.append('Обязательно проверь данные, только в случае несоответствий напиши "АДМИН"')
+        return "\n".join(parts)
+
+    def _format_a24(self, user: User, data: dict) -> str:
+        parts = ["Вот твои данные за осеннюю Спартакиаду по Майнкрафту 2024!"]
+        parts.append(f"Ник: {user.nck or data.get('nck') or '[НЕТ ДАННЫХ]'}")
+        parts.append("Участвуешь ли ты в первом этапе: Да")
+        parts.append(f"Использовал ли ты все попытки: {self._b2t(data.get('lr1', False))}")
+        parts.append(f"Проходишь ли в следующий этап: {self._b2t(data.get('wr1', False))}")
+        parts.append(f"Поставят ли 10 баллов: {self._b2t(data.get('lr1', False))}")
+        if data.get("wr1"):
+            parts.append(f"Проходишь ли ты в финал: {self._b2t(data.get('wr2', False))}")
+            parts.append(f"Ещё не отыграл в финале: {self._b2t(data.get('nyt', False))}")
+        if data.get("wr2"):
+            parts.append(f"Победил ли в финале: {self._b2t(data.get('fnl', False))}")
+        parts.append('Обязательно проверь данные, только в случае несоответствий напиши "АДМИН"')
         return "\n".join(parts)
 
     # ----------------------------------------------------------
@@ -165,6 +197,40 @@ class MessageService:
     # ----------------------------------------------------------
     # Хелперы
     # ----------------------------------------------------------
+
+    @staticmethod
+    @staticmethod
+    def _get_y26_domik_mates(house: str, exclude_isu: int) -> str:
+        if not house or house.strip().lower() in ("", "-", "пока пусто"):
+            return ""
+        model = get_event_model("y26")
+        if model is None:
+            return ""
+
+        with session_scope() as s:
+            rows = s.execute(select(model).where(model.liv != "")).scalars().all()
+            # Сразу материализуем все нужные поля ВНУТРИ сессии
+            data = [
+                (r.isu, (r.liv or "").strip().lower(), (r.nck or "").strip())
+                for r in rows
+            ]
+
+        # Теперь сессия закрыта, но у нас обычные tuples — безопасно
+        house_lower = house.strip().lower()
+        mates = sorted(
+            nck for isu, liv, nck in data
+            if isu != exclude_isu
+            and liv == house_lower
+            and nck not in ("", "-")
+        )
+        return ", ".join(mates)
+
+    @staticmethod
+    def _safe_pick(mapping: tuple[str, ...], idx, fallback: str = "") -> str:
+        try:
+            return mapping[int(idx)]
+        except (IndexError, ValueError, TypeError):
+            return fallback
 
     @staticmethod
     def _b2t(value) -> str:

@@ -37,46 +37,52 @@ class UserService:
             event_data: dict,
     ) -> User:
         """
-        Инъекция данных из внешнего источника (Google Sheets, events.itmo.ru).
+        Инъекция из внешнего источника. ISU — источник истины.
 
-        Правила:
-        - Если ISU настоящий (100000–999999) и есть в базе → обновить по ISU
-        - Если ISU специальный/отсутствует → искать по VK UID
-        - Если VK UID совпадает → обновить базовые поля
-        - Данные ивента всегда добавляются/обновляются
+        - Нашли по настоящему ISU        -> актуализируем uid/fio/grp/nck
+        - Нашли по vkid, принесли настоящий ISU (был спец) -> меняем ISU + актуализируем поля
+        - Нашли по vkid, ISU спец/нет    -> актуализируем поля, ISU не трогаем
+        - Не нашли                       -> создаём
         """
         user = None
 
-        # 1. Ищем по настоящему ISU
+        # 1) Поиск по настоящему ISU
         if isu is not None and is_real_isu(isu):
             user = self.repo.get_by_isu(isu)
 
-        # 2. Если не нашли — ищем по VK UID
+        # 2) Поиск по VK UID
         if user is None and is_valid_uid(uid):
-            user = self.repo.get_by_uid(uid)
+            found = self.repo.get_by_uid(uid)
+            if found is not None:
+                # Спец-ISU заменяется на настоящий из инъекции
+                if (
+                        isu is not None
+                        and is_real_isu(isu)
+                        and not found.has_real_isu
+                ):
+                    if self.repo.change_isu(found.isu, isu):
+                        found = self.repo.get_by_isu(isu)
+                user = found
 
-        # 3. Если не нашли — создаём нового
+        # 3) Новый юзер
         if user is None:
-            new_isu = isu if isu is not None else self.repo.next_special_isu()
-            user = User(isu=new_isu, uid=uid, fio=fio, grp=grp, nck=nck)
+            new_isu = (
+                isu if (isu is not None and is_real_isu(isu))
+                else self.repo.next_special_isu()
+            )
+            user = User(isu=new_isu, uid=uid if uid else 0)
 
-        # Обновляем базовые поля если новые данные лучше
-        if fio and not user.fio:
+        # Актуализация базовых полей (инъекция свежее; пустые значения не затирают)
+        if is_valid_uid(uid):
+            user.uid = uid
+        if fio:
             user.fio = fio
-        elif fio and user.has_real_isu:
-            # Для настоящих ISU всегда обновляем fio из инъекции
-            user.fio = fio
-
-        if grp and not user.grp:
+        if grp:
             user.grp = grp
-
-        if nck and not user.nck:
+        if nck:
             user.nck = nck
 
-        if is_valid_uid(uid) and not is_valid_uid(user.uid):
-            user.uid = uid
-
-        # Добавляем/обновляем данные ивента
+        # Данные ивента — всегда обновляются
         user.met[event_key] = event_data
 
         return self.repo.upsert(user)
