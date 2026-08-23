@@ -16,7 +16,7 @@ inject_a25 = lambda *args, **kwargs: None
 
 spartakiada_subs_path = './subscribers/spartakiada{}.txt'
 
-admin = [297002785, 325899178, 229488682, 304032635]
+admin = [297002785, 325899178, 229488682, 514131768]
 
 itmocraft_ip = 'craft.itmo.ru'
 joutak_ip = 'mc.joutak.ru'
