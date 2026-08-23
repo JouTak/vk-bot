@@ -20,7 +20,7 @@ admin = [297002785, 325899178, 229488682, 304032635]
 
 itmocraft_ip = 'craft.itmo.ru'
 joutak_ip = 'mc.joutak.ru'
-joutak_link = 'https://joutak.ru'
+joutak_link = 'https://wiki.joutak.ru'
 form_link = 'https://forms.yandex.ru/u/6501f64f43f74f18a8da28de/'
 a25_reg_link = 'https://itmo.events/events/116180'
 telegram_link = 't.me/itmocraft'
@@ -45,15 +45,12 @@ hi_message = (
     f'Более того, мы регулярно проводим там ивенты, самое время залететь на сервер 😇 '
     f'(+30дней, если у тебя лицензия)\n'
     f'Как это сделать?\n'
-    f'1) Почитай информацию о том, что мы делаем, на нашем сайте: {joutak_link}\n'
-    f'2) Заполняй анкету, чтобы мы с тобой связались: {form_link}\n'
+    f'1) Почитай информацию о том, что мы делаем, на нашей wiki: {joutak_link}\n'
+    f'2) Заполняй анкету, чтобы мы с тобой связались в этом боте: {form_link}\n'
     f'3) Следи за новостями в нашем телеграм канале: {telegram_link}.\n'
     f'Помогая нашему продвижению, ты делаешь ивенты масштабнее, а сервера круче!\n'
     f'P.S.: Плашку в ису "Член клуба ITMOcraft" тоже можно получить после заполнения этой анкеты, по желанию.\n'
-    f'Если есть вопросы, в том числе по спартакиаде, пиши "АДМИН"!\n'
-    f'\n'
-    f'P.P.S.: У нас скоро начнётся осенняя Спартакиада, если хочешь, можешь зарегистрироваться: '
-    f'{a25_reg_link}'
+    f'Если есть вопросы, пиши "АДМИН"!\n'
 )
 
 y26_welcome_message = (
@@ -968,7 +965,7 @@ def process_message_new(self, event, vk_helper, ignored) -> list[dict] | None:
             buttons = [{'label': 'ПОЗВАТЬ АДМИНА', 'payload': {'type': 'callmanager'}, 'color': 'positive'}]
             keyboard_out = create_standard_keyboard(buttons)
         else:
-            tts = e26_welcome_message
+            tts = hi_message
             buttons = [{'label': 'ПОЗВАТЬ АДМИНА', 'payload': {'type': 'callmanager'}, 'color': 'positive'}]
             keyboard_out = create_standard_keyboard(buttons)
     else:
