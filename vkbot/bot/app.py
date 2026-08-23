@@ -19,6 +19,7 @@ from vkbot.services.event_service import EventService
 from vkbot.services.message_service import MessageService
 from vkbot.services.welcome_service import WelcomeService
 from vkbot.domain.permissions import PermissionChecker
+from vkbot.services.admin_service import AdminService
 
 
 class BotApp:
@@ -30,6 +31,11 @@ class BotApp:
         self.perms = PermissionChecker(set(settings.admin_ids))
         self.msg_svc = MessageService()
         self.welcome_svc = WelcomeService()
+        self.admin_svc = AdminService(
+            perms=self.perms,
+            vk_client=self.vk,
+            msg_svc=self.msg_svc,
+        )
 
         logger.info("Bot initialized")
 
@@ -147,7 +153,7 @@ class BotApp:
         ])
         logger.info(f"Admin called by uid={uid}")
 
-    def _handle_admin_command(self, uid: int, msg: str, user_svc: UserService) -> str | None:
+    def _handle_admin_command(self, uid: int, msg: str, user_svc) -> str | None:
         parts = msg.split()
         if not parts:
             return None
@@ -159,16 +165,27 @@ class BotApp:
             raise SystemExit(0)
 
         if cmd == "reload":
-            return self._reload_events()
+            return self.admin_svc.reload(uid)
 
         if cmd == "sender":
-            return "[sender] TODO: Step 6"
+            if len(parts) < 3:
+                return "Использование: sender <условие> <сообщение>"
+            condition = parts[1]
+            message = msg.split(None, 2)[2]  # всё после условия
+            return self.admin_svc.sender(uid, condition, message)
 
         if cmd == "query":
-            return "[query] TODO: Step 6"
+            if len(parts) < 2:
+                return "Использование: query <условие>"
+            condition = parts[1]
+            return self.admin_svc.query(uid, condition)
 
         if cmd == "db":
-            return "[db] TODO: Step 6"
+            sql = msg.removeprefix("db").strip()
+            return self.admin_svc.db_query(uid, sql)
+
+        if cmd == "migrate":
+            return "[migrate] TODO: Step 7 (CLI)"
 
         return None
 
