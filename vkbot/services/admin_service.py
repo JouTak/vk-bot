@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from loguru import logger
 from sqlalchemy import text
 from sqlalchemy.engine import CursorResult
@@ -190,7 +191,6 @@ class AdminService:
         result = result.replace("{nck}", user.nck or "")
 
         # Подстановка met-полей: {met.y26.nck}
-        import re
         met_pattern = re.compile(r"\{met\.(\w+)\.(\w+)\}")
         for match in met_pattern.finditer(template):
             event_key, field_name = match.group(1), match.group(2)

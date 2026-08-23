@@ -1,157 +1,119 @@
 # ITMOcraftBOT (VK Bot)
-VK bot for vk.com/itmocraft. Users are stored in **MySQL/MariaDB** (SQLAlchemy), not in a plain text file.
 
-## Requirements
-- Python 3.10+
-- MySQL/MariaDB
-- Real terminal (TTY) for interactive console tools
+Бот для vk.com/itmocraft. Хранение — MySQL/MariaDB (SQLAlchemy 2.x),
+конфиг — `.env` (pydantic-settings).
 
-## Install
-```bash
-pip install -r source/requirements.txt
-```
+## Архитектура
 
-## Configuration
-Create `.env` (gitignored) or export env vars:
-```env
-BOT_TOKEN=...
-GROUP_ID=...
-STORAGE_BACKEND=db
-DATABASE_URL=mysql+pymysql://user:pass@127.0.0.1:3306/vk_bot?charset=utf8mb4
-```
-
-## Run bot
-```bash
-python -m source.main
-```
-
-## Maintenance console
-```bash
-python -m source.utils.tools.console
-```
-
-What’s inside:
-- **Users DB** — find/add/update/delete users
-- **Import users.txt -> DB** — parse legacy file and merge it into DB (+ creates/updates Fix panel)
-- **Reset DB** — drop bot tables (double confirm)
-- **Fix panel** — review/fix flagged rows (`users_raw_lines`) + apply to mark row as fixed
-- **DB stats** — compact summary + top fix reasons
-
-### Import (users.txt -> DB)
-```bash
-python -m source.utils.tools.cli.migrate_from_txt
-```
-
-With explicit paths:
-```bash
-python -m source.utils.tools.cli.migrate_from_txt \
-  --db-url 'mysql+pymysql://user:pass@127.0.0.1:3306/vk_bot?charset=utf8mb4' \
-  --users-txt source/subscribers/users.txt
-```
-
-Rules:
-- Rows are merged into normalized tables (`users` + event tables).
-- Existing event data is not deleted just because the incoming `users.txt` row does not contain that event key.
-- Known current event keys use typed tables: `a24`, `s25`, `y25`, `a25`, `y26`.
-- Y26 uses short keys: `uid` (VK ID), `liv` (living with), `way` (transport), `chk` (payment), `cst` (cost), `ugo` (approved).
-- Legacy/future event keys that do not have a typed table, for example `s24` or `y24`, are stored as-is in `user_events` and returned back in `met` under the same key.
-- If a DB user already has `a25`, legacy import keeps the DB base fields (`uid`, `fio`, `grp`, `nck`) as newer data unless the incoming row itself contains `a25`.
-- Rows that need attention are additionally stored in `users_raw_lines` and appear in Fix panel (examples: uid=0/1, unusual grp, invalid nck, invalid met_json).
-- `verify_import` checks that DB state matches the classification rules.
-
-### Import in Docker
-Find the bot service name:
-```bash
-docker compose ps
-```
-
-If the bot container is already running:
-```bash
-docker compose cp ./users.txt <bot-service>:/app/source/subscribers/users.txt
-
-docker compose exec <bot-service> python -m source.utils.tools.cli.migrate_from_txt \
-  --users-txt /app/source/subscribers/users.txt
-```
-
-If the container does not already have DB env variables:
-```bash
-docker compose exec \
-  -e STORAGE_BACKEND=db \
-  -e DATABASE_URL='mysql+pymysql://user:pass@mariadb:3306/vk_bot?charset=utf8mb4' \
-  <bot-service> \
-  python -m source.utils.tools.cli.migrate_from_txt \
-  --users-txt /app/source/subscribers/users.txt
-```
-
-If the bot container is not running:
-```bash
-docker compose run --rm \
-  -v "$PWD/users.txt:/app/source/subscribers/users.txt:ro" \
-  <bot-service> \
-  python -m source.utils.tools.cli.migrate_from_txt \
-  --users-txt /app/source/subscribers/users.txt
-```
-
-Before importing production data, make a DB dump:
-```bash
-docker compose exec <db-service> mysqldump -u <db-user> -p <db-name> > vk_bot_before_legacy_merge.sql
-```
-
-### Fix panel
-Picker:
-```bash
-python -m source.utils.tools.cli.raw_pick
-```
-
-Editor:
-```bash
-python -m source.utils.tools.cli.raw_edit <raw_id>
-```
-
-A row disappears from Fix panel only after it becomes valid for current rules and is marked as `status=ok`.
-
-### Verify import
-```bash
-python -m source.utils.tools.cli.verify_import
-```
-
-## Sender (admin broadcast)
-Sender is an admin command handled by the bot (see `source/bot.py`).
-
-Syntax:
 ```text
-sender <condition> <message>
+vkbot/
+├── config.py            # конфиг из .env
+├── bot/app.py           # точка входа: longpoll, роутинг, хендлеры
+├── domain/              # чистый домен: User, правила ISU/UID, permissions
+├── services/            # бизнес-логика: user/event/message/admin/welcome + парсер условий
+├── infrastructure/
+│   ├── db/              # engine, ORM-модели, реестр ивентов, schema_sync, репозитории
+│   ├── vk/              # VK API клиент, клавиатуры
+│   └── sheets/          # TSV fetcher/parser для инъекций из Google Sheets
+└── cli/                 # консольные утилиты: migrate, stats, fix_panel
 ```
 
-Operators:
-- `&` — AND
-- `|` — OR
-- `->` — key exists
-- `!>` — key does NOT exist
-- `==`, `!=`, `>>`, `>=`, `<<`, `<=` — comparisons
+Главная идея: **ивент — это данные, а не код**. Ивент описывается одной декларацией
+в `infrastructure/db/event_registry.py`; ORM-таблица генерируется из декларации,
+а репозиторий, инъекции и форматирование работают генерично.
 
-Fields:
-- Base: `isu`, `uid`, `fio`, `grp`, `nck`
-- Met fields: `met.<event>.<key>` (events: `a24`, `s25`, `y25`, `a25`, `y26`)
+## Установка и запуск (локально)
 
-Y26 keys:
-- `uid` — VK ID (0 = missing, 1 = unresolved)
-- `fio`, `nck`, `nmb` — ФИО, никнейм, телефон
-- `bed` — постельное бельё (bool)
-- `liv` — с кем в домике (string)
-- `way` — способ добраться (string)
-- `chk` — оплата получена (bool)
-- `cst` — стоимость (int)
-- `ugo` — одобрен (bool)
+```bash
+pip install -r vkbot/requirements.txt
+cp .env.example .env   # заполнить
+python -m vkbot.bot.app   # из корня репозитория
+```
 
-Example:
+## Конфиг (.env)
+
+| Переменная | Назначение |
+|---|---|
+| `BOT_TOKEN`, `GROUP_ID` | VK |
+| `DATABASE_URL` | MySQL/MariaDB |
+| `USE_DATABASE` | 1 = БД включена |
+| `ADMIN_IDS` | JSON-список VK ID админов |
+| `ENABLE_MIGRATION` | 1 = разрешить команду `migrate` |
+| `LOG_LEVEL`, `LOG_PATH` | логирование (loguru) |
+
+## Поведение бота
+
+- Чаты игнорируются; **вложения игнорируются молча** (без автоответа) (может быть исправлено в будущем).
+- Любое сообщение/нажатие кнопки из ЛС гарантирует запись юзера в `users`
+  (внешним выдаётся спец-ISU 0–99999 автоматически).
+- Неподписанным флудит сообщением о подписке, пока не подпишутся.
+- Welcome с кнопками ивентов — не чаще раза в 24 часа; в остальное время бот молчит.
+- «АДМИН» / кнопка «ПОЗВАТЬ АДМИНА» — toggle вызова админов; пока вызов активен,
+  бот молчит для этого юзера; «СПАСИБО АДМИН» снимает вызов.
+
+## Ивенты
+
+Новый ивент = один `register_event(EventDef(...))` в `event_registry.py`:
+
+- `active=True` — инъекция при старте бота и по команде `reload`
+  (Google Sheets TSV, fallback — локальный файл);
+- welcome-клавиатура показывает **все** ивенты независимо от `active`;
+- шаблон сообщения юзеру — опциональный `MessageService._format_<key>()`,
+  без него используется генеричный вывод полей декларации.
+
+Схема БД синхронизируется с декларациями автоматически при старте
+(`schema_sync`: добавляет недостающие колонки/таблицы, идемпотентно).
+
+## Админ-команды (в ЛС бота)
+
 ```text
-sender met.y25.ugo==2 Привет! Ты едешь в Ягодное.
+sender <условие> <сообщение>   рассылка; плейсхолдеры: {isu} {uid} {fio} {grp} {nck} {met.<ивент>.<поле>}
+query <условие>                кто подходит под условие (без отправки)
+db <SQL>                       SQL-консоль
+reload                         повторная инъекция активных ивентов
+migrate [путь]                 импорт legacy users.txt (нужен ENABLE_MIGRATION=1)
+stop                           остановить бота
 ```
 
-Note:
-- Users with `uid` 0/1 are skipped by sender (legacy semantics).
+### Синтаксис условий
 
-## Repo hygiene / secrets
-- `.env` is gitignored.
-- `source/subscribers/` is gitignored (local legacy data).
+- Поля: `isu`, `uid`, `fio`, `grp`, `nck`, `met.<ивент>.<поле>`
+- Сравнение: `==` `!=` `>>` `>=` `<<` `<=`
+- Существование: `->` (есть), `!>` (нет)
+- Логика: `&` `|`, скобки `(` `)`
+- Строки с пробелами — в кавычках `"..."` / `'...'`, экранирование `\"`
+
+Примеры:
+
+```text
+sender met.y26.bed==1 & met.y26.chk==1 Привет! Ты едешь в Ягодное, бельё учтено.
+sender (met.e26.plc>>0 & met.e26.plc<<=3) | uid==297002785 Поздравляем с призовым местом!
+query met.y25.ugo==2
+```
+
+## CLI
+
+```bash
+python -m vkbot.cli.migrate --users-txt <путь к users.txt>
+python -m vkbot.cli.stats
+python -m vkbot.cli.fix_panel
+```
+
+## Деплой
+
+- Автодеплой с GitHub; `entrypoint.sh` лежит в репозитории и запускает
+  `python -u -m vkbot.bot.app`; зависимости ставятся на сборке (Dockerfile).
+- При первом старте `schema_sync` аддитивно доводит схему БД до актуальной.
+- Откат: revert коммита и редеплой (схема обратно совместима).
+
+## Отличия от legacy-бота
+
+- Убрано: `/ping` в чатах, `add_users`, «ПРИЗВАТЬ ПОИГРАТЬ», автоответ про вложения,
+  старый синтаксис плейсхолдеров `{met_x_y}` (новый — `{met.x.y}`).
+- Чаты и вложения игнорируются молча.
+
+## Гигиена репозитория
+
+- В gitignore: `.env`, `temp.py` (локальная песочница), `subscribers/`.
+- Токен бота — секрет: при утечке перевыпускать в настройках группы VK.
+```ального прогона — пуш, и прод сам переедет. На этом роадмап закрыт полностью: все 8 фаз + фиксы. 🎉

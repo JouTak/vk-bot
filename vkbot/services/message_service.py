@@ -199,7 +199,6 @@ class MessageService:
     # ----------------------------------------------------------
 
     @staticmethod
-    @staticmethod
     def _get_y26_domik_mates(house: str, exclude_isu: int) -> str:
         if not house or house.strip().lower() in ("", "-", "пока пусто"):
             return ""

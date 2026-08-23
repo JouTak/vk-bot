@@ -42,15 +42,3 @@ def build_standard_keyboard(buttons: list[dict]) -> str:
             color=color,
         )
     return keyboard.get_keyboard()
-
-
-def build_link_keyboard(buttons: list[dict]) -> str:
-    """Инлайн-клавиатура с кнопками-ссылками."""
-    keyboard = VkKeyboard(inline=True)
-    for btn in buttons:
-        keyboard.add_openlink_button(
-            label=btn["label"],
-            payload=btn.get("payload", {}),
-            link=btn["link"],
-        )
-    return keyboard.get_keyboard()

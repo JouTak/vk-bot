@@ -18,7 +18,6 @@ dist/
 # logs
 *.log
 py.log
-source/py.log
 
 # cache / test artifacts
 .pytest_cache/
@@ -49,11 +48,9 @@ Thumbs.db
 
 # --- Project-specific ---
 # local subscribers data / exports
-source/subscribers/
 /data/subscribers
 
 # misc local helper artifacts
-entrypoint.sh
 project_bundle.py
 project_bundle.txt
 temp.py

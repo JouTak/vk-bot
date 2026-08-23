@@ -111,7 +111,7 @@ def run_migration(users_txt: str) -> dict:
 
 def main():
     p = argparse.ArgumentParser(description="Import legacy users.txt into DB")
-    p.add_argument("--users-txt", default="source/subscribers/users.txt")
+    p.add_argument("--users-txt", default="subscribers/users.txt")
     args = p.parse_args()
 
     init_engine()

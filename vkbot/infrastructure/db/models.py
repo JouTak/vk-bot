@@ -56,12 +56,6 @@ class UsersRawLineModel(Base):
 # Генерация таблиц ивентов из деклараций
 # ============================================================
 
-_TYPE_MAP = {
-    "int": Integer,
-    "str": String(255),
-    "bool": Boolean,
-}
-
 
 def _build_event_table(event: EventDef) -> type:
     """

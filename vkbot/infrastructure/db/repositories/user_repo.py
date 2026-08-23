@@ -180,13 +180,6 @@ class UserRepository:
             ))
         return users
 
-    def list_all_uids(self) -> dict[int, int]:
-        """uid -> isu mapping для всех валидных юзеров."""
-        rows = self.session.execute(
-            select(UserModel.uid, UserModel.isu).where(UserModel.uid > 1)
-        ).all()
-        return {int(uid): int(isu) for uid, isu in rows}
-
     def next_special_isu(self) -> int:
         rows = self.session.execute(
             select(UserModel.isu).where(
