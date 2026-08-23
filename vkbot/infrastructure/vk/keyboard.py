@@ -2,15 +2,16 @@ from __future__ import annotations
 
 from vk_api.keyboard import VkKeyboard, VkKeyboardColor
 
-from vkbot.infrastructure.db.event_registry import get_active_events
+from vkbot.infrastructure.db.event_registry import get_all_events
 
 
 def build_welcome_keyboard() -> str:
     """
-    Инлайн-клавиатура с кнопками активных ивентов.
-    Генерируется из реестра событий.
+    Инлайн-клавиатура с кнопками ВСЕХ ивентов.
+    active=False влияет только на инъекции (старт/reload),
+    но не на видимость кнопок.
     """
-    events = get_active_events()
+    events = get_all_events()
     keyboard = VkKeyboard(inline=True)
 
     for i, event_def in enumerate(events):
@@ -18,7 +19,7 @@ def build_welcome_keyboard() -> str:
             keyboard.add_line()
 
         keyboard.add_callback_button(
-            label=event_def.title[:20],
+            label=event_def.title[:40],  # VK limit: 40 chars
             payload={"type": "event_info", "event_key": event_def.key},
             color=VkKeyboardColor.PRIMARY,
         )

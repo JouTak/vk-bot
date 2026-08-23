@@ -17,11 +17,13 @@ class FieldDef:
 @dataclass(frozen=True)
 class EventDef:
     """Полная декларация ивента."""
-    key: str  # "e26", "y26", "a25"
-    title: str  # "ЕГЭ по майнкрафту", "Ягодное 2026"
+    key: str
+    title: str
     fields: tuple[FieldDef, ...]
     inject_url: str | None = None
-    inject_file: str | None = None  # fallback TSV path
+    inject_file: str | None = None
+    # active управляет ТОЛЬКО инъекциями (старт бота и команда reload).
+    # Кнопки в welcome показывают все ивенты независимо от active.
     active: bool = True
 
     @property
