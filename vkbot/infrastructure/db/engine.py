@@ -6,6 +6,8 @@ from typing import Generator
 from sqlalchemy import create_engine
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
+from loguru import logger
+
 from vkbot.config import settings
 
 
@@ -32,6 +34,12 @@ def init_engine() -> None:
 
     # Создаём все таблицы, зарегистрированные в Base.metadata
     Base.metadata.create_all(_engine)
+
+    try:
+        from .schema_sync import sync_schema
+        sync_schema(_engine)
+    except Exception as e:
+        logger.warning(f"schema_sync failed (non-fatal): {e}")
 
 
 def get_engine():
