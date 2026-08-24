@@ -34,7 +34,6 @@ dump*.sql
 
 # dotenv / secrets
 .env
-.env.*
 
 # IDEs
 .idea/
@@ -47,10 +46,9 @@ dump*.sql
 Thumbs.db
 
 # --- Project-specific ---
-# local subscribers data / exports
-/data/subscribers
-
 # misc local helper artifacts
+vkbot/bot/subscribers/*
+!vkbot/bot/subscribers/.gitkeep
 project_bundle.py
 project_bundle.txt
 temp.py

@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import json
 import time
+import requests
+from loguru import logger
 
 import vk_api
 from vk_api.utils import get_random_id
-from loguru import logger
 
 
 class VKClient:
@@ -36,13 +37,20 @@ class VKClient:
         return "", ""
 
     def send_messages(self, messages: list[dict]) -> list:
-        """Батч-отправка через execute (до 25 за раз)."""
+        """Батч-отправка через execute (до 25 за раз).
+
+        Возвращает список в том же порядке, что и messages:
+        - успех: то, что вернул VK (message_id)
+        - ошибка: {"error": "<текст ошибки>"}
+        """
         if not messages:
             return []
 
         results = []
+
         for i in range(0, len(messages), 25):
             chunk = messages[i:i + 25]
+
             for d in chunk:
                 d["group_id"] = self.group_id
                 d["random_id"] = get_random_id()
@@ -54,16 +62,61 @@ class VKClient:
             code = f"return [{','.join(parts)}];"
 
             try:
-                resp = self.session.method("execute", {"code": code})
-                results.extend(resp)
+                resp, exec_errors = self._execute_raw(code)
+
+                # Сопоставляем execute_errors с позициями False в resp
+                err_iter = iter(exec_errors)
+                for r in resp:
+                    if r is False:
+                        e = next(err_iter, None) or {}
+                        results.append({
+                            "error": e.get("error_msg") or "VK вернул false",
+                        })
+                    else:
+                        results.append(r)
+
+                # Если VK вернул массив короче чанка — помечаем остаток ошибкой
+                if len(resp) < len(chunk):
+                    results.extend(
+                        [{"error": "Нет результата от execute"}]
+                        * (len(chunk) - len(resp))
+                    )
+
             except Exception as e:
                 logger.error(f"send_messages batch error: {e}")
-                results.extend([None] * len(chunk))
+                results.extend([{"error": str(e)}] * len(chunk))
 
             if i + 25 < len(messages):
                 time.sleep(0.35)
 
         return results
+
+    def _execute_raw(self, code: str) -> tuple[list, list]:
+        """execute с возвратом execute_errors (vk_api.method их не отдаёт)."""
+        resp = requests.post(
+            "https://api.vk.com/method/execute",
+            data={
+                "code": code,
+                "access_token": self._get_access_token(),
+                "v": getattr(self.session, "API_VERSION", "5.131"),
+            },
+            timeout=30,
+        )
+        values = resp.json()
+
+        if "error" in values:
+            err = values["error"]
+            raise RuntimeError(
+                f"VK error {err.get('error_code')}: {err.get('error_msg')}"
+            )
+
+        return values.get("response") or [], values.get("execute_errors") or []
+
+    def _get_access_token(self) -> str:
+        raw = self.session.token
+        if isinstance(raw, dict):
+            return raw.get("access_token", "")
+        return raw or ""
 
     def resolve_links(self, links: list[str]) -> list[int]:
         """Резолвит VK-ссылки/screen_names в uid. Батчи по 25."""

@@ -23,6 +23,7 @@ from vkbot.services.message_service import MessageService
 from vkbot.services.welcome_service import WelcomeService
 from vkbot.services.admin_service import AdminService
 from vkbot.domain.permissions import PermissionChecker
+from vkbot.cli.migrate import run_migration
 
 
 class BotApp:
@@ -32,12 +33,14 @@ class BotApp:
         self.vk = VKClient(settings.bot_token, settings.group_id)
         self.longpoll = VkBotLongPoll(self.vk.session, settings.group_id)
         self.perms = PermissionChecker(set(settings.admin_ids))
+
         self.msg_svc = MessageService()
         self.welcome_svc = WelcomeService()
         self.admin_svc = AdminService(
             perms=self.perms,
-            vk_client=self.vk
+            vk_client=self.vk,
         )
+
         logger.info("Bot initialized")
 
     # ----------------------------------------------------------
@@ -45,10 +48,10 @@ class BotApp:
     # ----------------------------------------------------------
 
     def run(self):
-        # Инъекция при старте
         self._inject_all_events()
 
         logger.info("Starting longpoll loop")
+
         while True:
             try:
                 for event in self.longpoll.listen():
@@ -65,7 +68,8 @@ class BotApp:
                 raise
             except Exception as e:
                 logger.error(f"Loop error: {e}\n{traceback.format_exc()}")
-                time.sleep(1)
+
+            time.sleep(1)
 
     # ----------------------------------------------------------
     # Роутинг событий
@@ -78,22 +82,28 @@ class BotApp:
             self._handle_message_event(event)
 
     # ----------------------------------------------------------
-    # MESSAGE_NEW: обычные сообщения и НЕ-инлайн кнопки
+    # MESSAGE_NEW
     # ----------------------------------------------------------
 
     def _handle_message_new(self, event):
         if getattr(event, "from_chat", False):
-            return  # чаты игнорируем
+            return
 
         uid = event.message.from_id
         msg = (event.message.text or "").strip()
         ptype = (self._extract_payload(event) or {}).get("type")
+        attachments = getattr(event.message, "attachments", None) or []
 
-        # 1. Всегда: юзер в базе
+        # Любое ЛС-сообщение гарантирует запись юзера
         with session_scope() as s:
             UserService(UserRepository(s)).ensure_user_exists(uid)
 
-        # 2. Подписка (флудим, пока не подпишется)
+        # Вложения игнорируем полностью
+        if attachments:
+            logger.debug(f"Attachment ignored: uid={uid}")
+            return
+
+        # Подписка
         if not self.vk.is_member(uid):
             self.vk.send_messages([{
                 "peer_id": uid,
@@ -101,64 +111,78 @@ class BotApp:
             }])
             return
 
-        # 3. Кнопки/слово АДМИН (toggle)
+        # Кнопки/слово АДМИН
         if ptype == "uncallmanager":
             self._toggle_admin_call(uid, force_off=True)
             return
+
         if ptype == "callmanager" or "админ" in msg.lower():
             self._toggle_admin_call(uid)
             return
 
-        # 4. Админские команды
+        # Админские команды
         if self.perms.is_admin(uid) and msg:
             response = self._handle_admin_command(uid, msg)
             if response:
                 self.vk.send_messages([{"peer_id": uid, "message": response}])
                 return
 
-        # 5. Юзер в режиме «ждёт админа» → молчание
+        # Юзер ждёт админа — молчим
         if self._is_ignored(uid):
             logger.debug(f"Ignored silence: uid={uid}")
             return
 
-        # 6. Welcome раз в 24 часа
+        # Welcome раз в 24 часа
         if self.welcome_svc.should_show_welcome(uid):
             self.welcome_svc.mark_welcome_shown(uid)
             self._send_welcome(uid)
             return
 
-        # 7. Молчание
         logger.debug(f"Silence: uid={uid}")
 
     # ----------------------------------------------------------
-    # MESSAGE_EVENT: инлайн-кнопки (payload в event.object)
+    # MESSAGE_EVENT
     # ----------------------------------------------------------
 
     def _handle_message_event(self, event):
         obj = event.object if isinstance(event.object, dict) else {}
         payload = obj.get("payload") or {}
+        if isinstance(payload, str):
+            try:
+                payload = json.loads(payload)
+            except Exception:
+                payload = {}
+
         uid = int(obj.get("user_id") or obj.get("peer_id") or 0)
         if not uid:
             return
 
-        # 1. ПЕРВЫМ ДЕЛОМ квитуем кнопку — снимаем крутилку
         self._answer_callback(obj)
 
-        # 2. Кнопка = контакт: юзер должен попасть в базу
         with session_scope() as s:
             UserService(UserRepository(s)).ensure_user_exists(uid)
 
+        if not self.vk.is_member(uid):
+            self.vk.send_messages([{
+                "peer_id": uid,
+                "message": self.msg_svc.build_subscribe_message(),
+            }])
+            return
         ptype = payload.get("type")
 
         if ptype == "event_info":
             event_key = payload.get("event_key", "")
+
             with session_scope() as s:
                 user = UserRepository(s).get_by_uid(uid)
+
             if user is None:
                 return
+
             text = self.msg_svc.render_event_info(user, event_key)
             if not text:
-                text = f"У тебя пока нет данных по событию «{event_key}»."
+                text = f'У тебя пока нет данных по событию "{event_key}".'
+
             self.vk.send_messages([{"peer_id": uid, "message": text}])
 
         elif ptype == "callmanager":
@@ -168,7 +192,6 @@ class BotApp:
             self._toggle_admin_call(uid, force_off=True)
 
     def _answer_callback(self, obj: dict, text: str = "Данные отправлены"):
-        """Квитирование нажатия callback-кнопки. Без этого кнопка крутится вечно."""
         try:
             self.vk.session.method("messages.sendMessageEventAnswer", {
                 "event_id": obj.get("event_id"),
@@ -183,7 +206,7 @@ class BotApp:
             logger.error(f"sendMessageEventAnswer failed: {e}")
 
     # ----------------------------------------------------------
-    # Payload из MESSAGE_NEW (нажатие НЕ-инлайн кнопки)
+    # Payload из MESSAGE_NEW
     # ----------------------------------------------------------
 
     @staticmethod
@@ -195,18 +218,21 @@ class BotApp:
                 raw = (event.object.get("message") or {}).get("payload")
             except Exception:
                 return None
+
         if isinstance(raw, dict):
             return raw
+
         try:
             return json.loads(raw)
         except Exception:
             return None
 
     # ----------------------------------------------------------
-    # Вызов админа: toggle + ignored-список
+    # Вызов админа
     # ----------------------------------------------------------
 
-    def _is_ignored(self, uid: int) -> bool:
+    @staticmethod
+    def _is_ignored(uid: int) -> bool:
         with session_scope() as s:
             return IgnoredRepository(s).is_ignored(uid)
 
@@ -226,7 +252,11 @@ class BotApp:
 
         if now_calling:
             keyboard = build_standard_keyboard([
-                {"label": "СПАСИБО АДМИН", "payload": {"type": "uncallmanager"}, "color": "negative"},
+                {
+                    "label": "СПАСИБО АДМИН",
+                    "payload": {"type": "uncallmanager"},
+                    "color": "negative",
+                },
             ])
             self.vk.send_messages([{
                 "peer_id": uid,
@@ -238,9 +268,13 @@ class BotApp:
                 for a in settings.admin_ids
             ])
             logger.info(f"Admin called by uid={uid}")
-        else:
+        elif was_calling:
             keyboard = build_standard_keyboard([
-                {"label": "ПОЗВАТЬ АДМИНА", "payload": {"type": "callmanager"}, "color": "positive"},
+                {
+                    "label": "ПОЗВАТЬ АДМИНА",
+                    "payload": {"type": "callmanager"},
+                    "color": "positive",
+                },
             ])
             self.vk.send_messages([{
                 "peer_id": uid,
@@ -252,6 +286,13 @@ class BotApp:
                 for a in settings.admin_ids
             ])
             logger.info(f"Admin call cancelled by uid={uid}")
+        else:
+            # Сюда попадаем, если вызова не было, а нажали "СПАСИБО АДМИН"
+            if force_off:
+                self.vk.send_messages([{
+                    "peer_id": uid,
+                    "message": "Вызов админа уже снят.",
+                }])
 
     # ----------------------------------------------------------
     # Админские команды
@@ -275,7 +316,7 @@ class BotApp:
             if len(parts) < 3:
                 return "Использование: sender <условие> <сообщение>"
             condition = parts[1]
-            message = msg.split(None, 2)[2]  # всё после условия
+            message = msg.split(None, 2)[2]
             return self.admin_svc.sender(uid, condition, message)
 
         if cmd == "query":
@@ -291,10 +332,32 @@ class BotApp:
         if cmd == "migrate":
             if not settings.enable_migration:
                 return "Миграция отключена. Установи ENABLE_MIGRATION=1 и перезапусти бота."
-            from vkbot.cli.migrate import run_migration
-            path = msg.removeprefix("migrate").strip() or "subscribers/users.txt"
+
+            raw_path = msg.removeprefix("migrate").strip() or "users.txt"
+            raw_path = raw_path.replace("\\", "/")
+
+            if raw_path.startswith("./"):
+                raw_path = raw_path[2:]
+
+            if raw_path.startswith("/"):
+                return "Миграция разрешена только из каталога vkbot/bot/subscribers/"
+
+            if raw_path.startswith("vkbot/bot/subscribers/"):
+                raw_path = raw_path[len("vkbot/bot/subscribers/"):]
+            elif raw_path.startswith("subscribers/"):
+                raw_path = raw_path[len("subscribers/"):]
+
+            base = (settings.base_dir / "vkbot" / "bot" / "subscribers").resolve()
+            target = (base / raw_path).resolve()
+
+            if base != target and base not in target.parents:
+                return "Миграция разрешена только из каталога vkbot/bot/subscribers/"
+
+            if not target.is_file():
+                return f"Файл не найден: {target}"
+
             try:
-                st = run_migration(path)
+                st = run_migration(str(target))
                 return (
                     f"Импортировано: {st['imported']}\n"
                     f"Raw (soft issues): {st['raw']}\n"
@@ -310,11 +373,29 @@ class BotApp:
     # ----------------------------------------------------------
 
     def _send_welcome(self, uid: int):
-        text = self.msg_svc.build_welcome_text()
+        with session_scope() as s:
+            user = UserRepository(s).get_by_uid(uid)
 
-        # Обычная кнопка АДМИН внизу
+        allowed_keys: set[str] = set()
+
+        if user is not None:
+            allowed_keys = {
+                event_key
+                for event_key, event_data in user.met.items()
+                if event_data
+            }
+
+        events_keyboard = build_welcome_keyboard(allowed_keys)
+        has_events = bool(events_keyboard)
+
+        text = self.msg_svc.build_welcome_text(has_events=has_events)
+
         admin_keyboard = build_standard_keyboard([
-            {"label": "ПОЗВАТЬ АДМИНА", "payload": {"type": "callmanager"}, "color": "positive"},
+            {
+                "label": "ПОЗВАТЬ АДМИНА",
+                "payload": {"type": "callmanager"},
+                "color": "positive",
+            },
         ])
         self.vk.send_messages([{
             "peer_id": uid,
@@ -322,12 +403,12 @@ class BotApp:
             "keyboard": admin_keyboard,
         }])
 
-        # Инлайн-кнопки ивентов отдельным сообщением
-        self.vk.send_messages([{
-            "peer_id": uid,
-            "message": "Актуальные события:",
-            "keyboard": build_welcome_keyboard(),
-        }])
+        if has_events:
+            self.vk.send_messages([{
+                "peer_id": uid,
+                "message": "Твои события:",
+                "keyboard": events_keyboard,
+            }])
 
     # ----------------------------------------------------------
     # Инъекции
@@ -335,10 +416,9 @@ class BotApp:
 
     def _inject_all_events(self):
         logger.info("Starting event injection...")
-        with session_scope() as s:
-            user_svc = UserService(UserRepository(s))
-            event_svc = EventService(user_svc, vk_client=self.vk)
-            results = event_svc.inject_all_active()
+
+        event_svc = EventService(user_service=None, vk_client=self.vk)
+        results = event_svc.inject_all_active()
 
         for key, stats in results.items():
             logger.info(

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import datetime
+
 from sqlalchemy import BigInteger, Boolean, Integer, String, Text, DateTime, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func
@@ -9,47 +11,68 @@ from .event_registry import EVENT_REGISTRY, EventDef
 
 
 # ============================================================
-# Базовые таблицы (пишутся вручную, они стабильны)
+# Базовые таблицы
 # ============================================================
+
 
 class UserModel(Base):
     __tablename__ = "users"
 
     isu: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=False)
-    uid: Mapped[int] = mapped_column(BigInteger, nullable=False, index=True)
+    uid: Mapped[int] = mapped_column(BigInteger, nullable=False, index=True, unique=True)
     fio: Mapped[str] = mapped_column(String(255), default="")
     grp: Mapped[str] = mapped_column(String(64), default="")
     nck: Mapped[str] = mapped_column(String(64), default="")
-    created_at: Mapped[str | None] = mapped_column(DateTime, server_default=func.now())
-    last_seen_at: Mapped[str | None] = mapped_column(DateTime, nullable=True)
+
+    created_at: Mapped[datetime | None] = mapped_column(
+        DateTime,
+        server_default=func.now(),
+    )
 
 
 class IgnoredUserModel(Base):
     __tablename__ = "ignored_users"
+
     uid: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     reason: Mapped[str] = mapped_column(String(255), default="")
 
 
 class KVStoreModel(Base):
     __tablename__ = "kv_store"
+
     k: Mapped[str] = mapped_column(String(128), primary_key=True)
     v: Mapped[str] = mapped_column(Text, default="")
 
 
 class UsersRawLineModel(Base):
     __tablename__ = "users_raw_lines"
+
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     line_no: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
     raw_line: Mapped[str] = mapped_column(Text, nullable=False)
+
     isu: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
     uid: Mapped[int | None] = mapped_column(BigInteger, nullable=True, index=True)
+
     fio: Mapped[str] = mapped_column(String(255), default="")
     grp: Mapped[str] = mapped_column(String(64), default="")
     nck: Mapped[str] = mapped_column(String(64), default="")
     met_json: Mapped[str] = mapped_column(Text, default="")
+
     status: Mapped[str] = mapped_column(String(32), default="raw")
     error: Mapped[str] = mapped_column(Text, default="")
-    created_at: Mapped[str | None] = mapped_column(DateTime, server_default=func.now())
+
+    created_at: Mapped[datetime | None] = mapped_column(
+        DateTime,
+        server_default=func.now(),
+    )
+
+
+class SpecialIsuCounterModel(Base):
+    __tablename__ = "special_isu_counter"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=False)
+    next_isu: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
 
 # ============================================================
@@ -58,11 +81,6 @@ class UsersRawLineModel(Base):
 
 
 def _build_event_table(event: EventDef) -> type:
-    """
-    Генерирует ORM-модель для ивента из его декларации.
-    Вызывается один раз при импорте модуля.
-    """
-    # Базовые атрибуты таблицы
     attrs: dict = {
         "__tablename__": event.table_name,
         "isu": mapped_column(
@@ -73,7 +91,6 @@ def _build_event_table(event: EventDef) -> type:
         ),
     }
 
-    # Добавляем колонки из декларации
     for field_def in event.fields:
         default = field_def.default
 
@@ -84,13 +101,11 @@ def _build_event_table(event: EventDef) -> type:
         elif field_def.type == "bool":
             attrs[field_def.name] = mapped_column(Boolean, default=bool(default))
 
-    # Создаём класс динамически
     cls_name = f"User{event.key.capitalize()}Model"
     model_cls = type(cls_name, (Base,), attrs)
     return model_cls
 
 
-# Генерируем все модели и сохраняем ссылки
 EVENT_MODELS: dict[str, type] = {}
 
 for _event_def in EVENT_REGISTRY.values():
@@ -99,5 +114,4 @@ for _event_def in EVENT_REGISTRY.values():
 
 
 def get_event_model(event_key: str):
-    """Достать ORM-модель по ключу ивента."""
     return EVENT_MODELS.get(event_key)

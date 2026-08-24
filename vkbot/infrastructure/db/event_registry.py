@@ -2,6 +2,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any
+from vkbot.config import settings
+
+# хз, почему такое название у переменной, legacy хрень
+SUBSCRIBERS_DIR = settings.base_dir / "vkbot" / "bot" / "subscribers"
 
 
 @dataclass(frozen=True)
@@ -72,19 +76,19 @@ def get_active_events() -> list[EventDef]:
 
 register_event(EventDef(
     key="e26",
-    title="ЕГЭ по майнкрафту",
+    title="ЕГЭ по майнкрафту 26",
     active=False,
     inject_url="https://docs.google.com/spreadsheets/d/11aRURg_RU-WwaMs19xh5yE-_epG8Ea5fW-N8HGKBFZc/export?format=tsv&gid=938113370",
-    inject_file="./subscribers/ege26.txt",
+    inject_file=str(SUBSCRIBERS_DIR / "e26.txt"),
     fields=(
-        FieldDef("uid", "int", 0),
-        FieldDef("fio", "str", ""),
-        FieldDef("nck", "str", ""),
+        FieldDef("uid", "int", 0, label="VK ID"),
+        FieldDef("fio", "str", "", label="ФИО"),
+        FieldDef("nck", "str", "", label="Ник"),
         FieldDef("clk", "str", "", label="Время сдачи"),
         FieldDef("sum", "int", 0, label="Баллы (вторичные)"),
         FieldDef("plc", "int", 0, label="Место"),
         # Задания z01..z20
-        *(FieldDef(f"z{i:02d}", "int", 0) for i in range(1, 21)),
+        *(FieldDef(f"z{i:02d}", "int", 0, label=f"Баллы за {i:02d} задание") for i in range(1, 21)),
     ),
 ))
 
@@ -93,11 +97,11 @@ register_event(EventDef(
     title="Ягодное 2026",
     active=False,
     inject_url="https://docs.google.com/spreadsheets/d/15g_s2MciovUVVrDtj6y-u-I3SHZ5X7u3gLGPfHzTIPg/export?format=tsv&gid=1986446860",
-    inject_file="./subscribers/yagodnoe26.txt",
+    inject_file=str(SUBSCRIBERS_DIR / "y26.txt"),
     fields=(
-        FieldDef("uid", "int", 0),
-        FieldDef("fio", "str", ""),
-        FieldDef("nck", "str", ""),
+        FieldDef("uid", "int", 0, label="VK ID"),
+        FieldDef("fio", "str", "", label="ФИО"),
+        FieldDef("nck", "str", "", label="Ник"),
         FieldDef("nmb", "str", "", label="Номер телефона"),
         FieldDef("bed", "bool", False, label="Берёшь бельё"),
         FieldDef("liv", "str", "", label="Домик"),
@@ -111,10 +115,11 @@ register_event(EventDef(
 register_event(EventDef(
     key="y25",
     title="Ягодное 2025",
+    inject_file=str(SUBSCRIBERS_DIR / "y25.txt"),
     active=False,
     fields=(
-        FieldDef("tsp", "int", 0),
-        FieldDef("nck", "str", ""),
+        FieldDef("tsp", "int", 0, label='Timestamp регистрации'),
+        FieldDef("nck", "str", "", label="Ник"),
         FieldDef("nmb", "str", "", label="Номер телефона"),
         FieldDef("bed", "bool", False, label="Берёшь бельё"),
         FieldDef("way", "int", 0, label="Как добираешься"),
@@ -126,14 +131,14 @@ register_event(EventDef(
 
 register_event(EventDef(
     key="a25",
-    title="Майнокиада",
+    title="Майнокиада осень 25",
     active=False,
-    inject_file="./subscribers/a25.txt",
+    inject_file=str(SUBSCRIBERS_DIR / "a25.txt"),
     fields=(
-        FieldDef("fio", "str", ""),
-        FieldDef("sts", "bool", False, label="Наш"),
-        FieldDef("uid", "int", 0),
-        FieldDef("nck", "str", ""),
+        FieldDef("fio", "str", "", label="ФИО"),
+        FieldDef("sts", "bool", False, label="Из ИТМО"),
+        FieldDef("uid", "int", 0, label="VK ID"),
+        FieldDef("nck", "str", "", label="Ник"),
         FieldDef("cmd", "str", "", label="Команда"),
         FieldDef("cid", "int", 0, label="VK капитана"),
         FieldDef("cap", "str", "", label="Ник капитана"),
@@ -148,11 +153,12 @@ register_event(EventDef(
 
 register_event(EventDef(
     key="s25",
-    title="Спартакиада весна 2025",
+    title="Спартакиада весна 25",
+    inject_file=str(SUBSCRIBERS_DIR / "s25.txt"),
     active=False,
     fields=(
-        FieldDef("tsp", "int", 0),
-        FieldDef("nck", "str", ""),
+        FieldDef("tsp", "int", 0, label='Timestamp регистрации'),
+        FieldDef("nck", "str", "", label="Ник"),
         FieldDef("wr1", "bool", False, label="Прошёл в AceRace"),
         FieldDef("rr1", "int", 0, label="Рекорд BlockParty"),
         FieldDef("wr2", "bool", False, label="Прошёл в финал"),
@@ -163,11 +169,12 @@ register_event(EventDef(
 
 register_event(EventDef(
     key="a24",
-    title="Спартакиада осень 2024",
+    title="Спартакиада осень 24",
+    inject_file=str(SUBSCRIBERS_DIR / "a24.txt"),
     active=False,
     fields=(
-        FieldDef("tsp", "int", 0),
-        FieldDef("nck", "str", ""),
+        FieldDef("tsp", "int", 0, label='Timestamp регистрации'),
+        FieldDef("nck", "str", "", label="Ник"),
         FieldDef("lr1", "bool", False, label="Все попытки использованы"),
         FieldDef("wr1", "bool", False, label="Прошёл во 2 этап"),
         FieldDef("wr2", "bool", False, label="Прошёл в финал"),

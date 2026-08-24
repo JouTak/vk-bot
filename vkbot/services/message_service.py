@@ -116,7 +116,7 @@ class MessageService:
 
         if liv and liv != "-" and liv.lower() != "пока пусто":
             parts.append(f"\nГде ты живёшь:\n{liv}")
-            mates = self._get_y26_domik_mates(liv, user.isu)
+            mates = self._get_y26_house_mates(liv, user.isu)
             if mates:
                 parts.append(f"\nС кем ты живешь в этом домике:\n{mates}")
 
@@ -180,10 +180,17 @@ class MessageService:
     # Welcome message
     # ----------------------------------------------------------
 
-    def build_welcome_text(self) -> str:
+    def build_welcome_text(self, has_events: bool = True) -> str:
+        if has_events:
+            return (
+                "Привет! Мы клуб любителей Майнкрафта ITMOcraft 🎮\n"
+                "Нажми на кнопки ниже, чтобы узнать информацию о событиях.\n"
+                "Если есть вопросы — напиши АДМИН."
+            )
+
         return (
             "Привет! Мы клуб любителей Майнкрафта ITMOcraft 🎮\n"
-            "Нажми на кнопки ниже, чтобы узнать информацию о событиях.\n"
+            "Пока у тебя нет событий с доступными данными.\n"
             "Если есть вопросы — напиши АДМИН."
         )
 
@@ -199,7 +206,7 @@ class MessageService:
     # ----------------------------------------------------------
 
     @staticmethod
-    def _get_y26_domik_mates(house: str, exclude_isu: int) -> str:
+    def _get_y26_house_mates(house: str, exclude_isu: int) -> str:
         if not house or house.strip().lower() in ("", "-", "пока пусто"):
             return ""
         model = get_event_model("y26")
@@ -236,7 +243,7 @@ class MessageService:
         if isinstance(value, bool):
             return "Да" if value else "Нет"
         if isinstance(value, str):
-            return "Да" if value.lower() in ("1", "true", "yes", "да") else "Нет"
+            return "Да" if value.lower() in {"1", "true", "yes", "да"} else "Нет"
         return "Да" if value else "Нет"
 
     @staticmethod

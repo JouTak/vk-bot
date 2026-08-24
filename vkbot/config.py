@@ -11,7 +11,6 @@ class Settings(BaseSettings):
 
     # DB
     database_url: str
-    use_database: bool = True
 
     # Admins
     admin_ids: list[int] = Field(default_factory=list)

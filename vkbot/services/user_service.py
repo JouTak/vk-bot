@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from loguru import logger
+from sqlalchemy.exc import IntegrityError
 
 from vkbot.domain.user import User
 from vkbot.domain.rules import is_real_isu, is_valid_uid
@@ -13,18 +14,24 @@ class UserService:
     def __init__(self, repo: UserRepository):
         self.repo = repo
 
-    def ensure_user_exists(self, uid: int, fio: str = "") -> User:
+    def ensure_user_exists(self, uid: int, fio: str = "") -> None:
         """
-        Вызывается на КАЖДОЕ входящее сообщение из ЛС.
-        Гарантирует что юзер есть в базе.
+        Вызывается на каждое входящее сообщение из ЛС.
+        Гарантирует, что юзер есть в базе.
         """
-        existing = self.repo.get_by_uid(uid)
-        if existing:
-            return existing
+        if self.repo.exists_by_uid(uid):
+            return
 
-        user = self.repo.add_with_auto_isu(uid=uid, fio=fio)
-        logger.info(f"Auto-added new user: uid={uid}, isu={user.isu}")
-        return user
+        try:
+            user = self.repo.add_with_auto_isu(uid=uid, fio=fio)
+            logger.info(f"Auto-added new user: uid={uid}, isu={user.isu}")
+        except IntegrityError:
+            self.repo.session.rollback()
+
+            if self.repo.exists_by_uid(uid):
+                return
+
+            raise
 
     def merge_injection_data(
             self,
@@ -36,14 +43,6 @@ class UserService:
             event_key: str,
             event_data: dict,
     ) -> User:
-        """
-        Инъекция из внешнего источника. ISU — источник истины.
-
-        - Нашли по настоящему ISU        -> актуализируем uid/fio/grp/nck
-        - Нашли по vkid, принесли настоящий ISU (был спец) -> меняем ISU + актуализируем поля
-        - Нашли по vkid, ISU спец/нет    -> актуализируем поля, ISU не трогаем
-        - Не нашли                       -> создаём
-        """
         user = None
 
         # 1) Поиск по настоящему ISU
@@ -54,7 +53,6 @@ class UserService:
         if user is None and is_valid_uid(uid):
             found = self.repo.get_by_uid(uid)
             if found is not None:
-                # Спец-ISU заменяется на настоящий из инъекции
                 if (
                         isu is not None
                         and is_real_isu(isu)
@@ -72,7 +70,6 @@ class UserService:
             )
             user = User(isu=new_isu, uid=uid if uid else 0)
 
-        # Актуализация базовых полей (инъекция свежее; пустые значения не затирают)
         if is_valid_uid(uid):
             user.uid = uid
         if fio:
@@ -82,7 +79,6 @@ class UserService:
         if nck:
             user.nck = nck
 
-        # Данные ивента — всегда обновляются
         user.met[event_key] = event_data
 
         return self.repo.upsert(user)

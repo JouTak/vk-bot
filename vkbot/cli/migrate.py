@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import argparse
 import json
+from pathlib import Path
 
 from sqlalchemy.orm import Session
 
+from vkbot.config import settings
 from vkbot.domain.user import User
 from vkbot.infrastructure.db.engine import init_engine, session_scope
 from vkbot.infrastructure.db.models import UsersRawLineModel
@@ -109,13 +111,40 @@ def run_migration(users_txt: str) -> dict:
     return stats
 
 
+def _default_users_txt() -> str:
+    return str(settings.base_dir / "vkbot" / "bot" / "subscribers" / "users.txt")
+
+
 def main():
     p = argparse.ArgumentParser(description="Import legacy users.txt into DB")
-    p.add_argument("--users-txt", default="subscribers/users.txt")
+    p.add_argument("--users-txt", default=_default_users_txt())
     args = p.parse_args()
 
+    path = Path(args.users_txt)
+
+    if not path.is_absolute():
+        # Если передали просто имя файла, сначала ищем его в стандартной папке
+        default_dir = Path(_default_users_txt()).parent
+        candidate = default_dir / path
+
+        if candidate.is_file():
+            path = candidate
+        else:
+            path = Path.cwd() / path
+
+    if not path.is_file():
+        # Последний шанс: ищем рядом с проектом
+        candidate2 = settings.base_dir / "vkbot" / "bot" / "subscribers" / path.name
+        if candidate2.is_file():
+            path = candidate2
+
+    if not path.is_file():
+        raise SystemExit(f"Файл не найден: {path}")
+
     init_engine()
-    stats = run_migration(args.users_txt)
+
+    stats = run_migration(str(path))
+
     print(f"Imported: {stats['imported']}")
     print(f"Raw (soft issues): {stats['raw']}")
     print(f"Errors: {stats['errors']}")

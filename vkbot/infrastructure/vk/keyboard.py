@@ -5,13 +5,25 @@ from vk_api.keyboard import VkKeyboard, VkKeyboardColor
 from vkbot.infrastructure.db.event_registry import get_all_events
 
 
-def build_welcome_keyboard() -> str:
+def build_welcome_keyboard(allowed_event_keys: set[str] | None = None) -> str:
     """
-    Инлайн-клавиатура с кнопками ВСЕХ ивентов.
-    active=False влияет только на инъекции (старт/reload),
-    но не на видимость кнопок.
+    Инлайн-клавиатура с кнопками ивентов.
+
+    Если allowed_event_keys передан, показываются только разрешённые ивенты.
+    Если разрешённых ивентов нет, возвращается пустая строка.
     """
     events = get_all_events()
+
+    if allowed_event_keys is not None:
+        events = [
+            event_def
+            for event_def in events
+            if event_def.key in allowed_event_keys
+        ]
+
+    if not events:
+        return ""
+
     keyboard = VkKeyboard(inline=True)
 
     for i, event_def in enumerate(events):
@@ -30,15 +42,18 @@ def build_welcome_keyboard() -> str:
 def build_standard_keyboard(buttons: list[dict]) -> str:
     """Обычная (не инлайн) клавиатура."""
     keyboard = VkKeyboard(inline=False)
+
     for btn in buttons:
         color = getattr(
             VkKeyboardColor,
             btn.get("color", "primary").upper(),
             VkKeyboardColor.PRIMARY,
         )
+
         keyboard.add_button(
             label=btn["label"],
             payload=btn.get("payload", {}),
             color=color,
         )
+
     return keyboard.get_keyboard()

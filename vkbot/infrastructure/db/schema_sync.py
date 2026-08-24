@@ -13,23 +13,21 @@ def sync_schema(engine) -> None:
     with engine.begin() as conn:
         if insp.has_table("users"):
             cols = {c["name"] for c in insp.get_columns("users")}
+
             if "created_at" not in cols:
                 logger.info("schema_sync: ADD users.created_at")
                 conn.execute(text(
                     "ALTER TABLE users ADD COLUMN created_at DATETIME DEFAULT CURRENT_TIMESTAMP"
                 ))
-            if "last_seen_at" not in cols:
-                logger.info("schema_sync: ADD users.last_seen_at")
-                conn.execute(text(
-                    "ALTER TABLE users ADD COLUMN last_seen_at DATETIME NULL"
-                ))
 
         for event_def in EVENT_REGISTRY.values():
             table_name = event_def.table_name
+
             if not insp.has_table(table_name):
-                continue  # create_all уже создал
+                continue
 
             existing = {c["name"] for c in insp.get_columns(table_name)}
+
             for field_def in event_def.fields:
                 if field_def.name in existing:
                     continue
@@ -53,6 +51,7 @@ def sync_schema(engine) -> None:
 
         if insp.has_table("ignored_users"):
             cols = {c["name"] for c in insp.get_columns("ignored_users")}
+
             if "reason" not in cols:
                 logger.info("schema_sync: ADD ignored_users.reason")
                 conn.execute(text(
