@@ -54,7 +54,7 @@ class AdminService:
             return "Совпадений: 0. Никому не отправлено."
 
         extra_resolver = None
-        extra_keys = TemplateRenderer.extra_keys_from_segments(compiled)
+        extra_keys = TemplateRenderer.used_extra_keys(compiled)
 
         if "fmt.y26_mates" in extra_keys:
             house_map = self._build_y26_house_map(users)

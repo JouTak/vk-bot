@@ -317,16 +317,41 @@ class BotApp:
             return self.admin_svc.reload(uid)
 
         if cmd == "sender":
-            if len(parts) < 3:
-                return "Использование: sender <условие> <сообщение>"
-            condition = parts[1]
-            message = msg.split(None, 2)[2]
-            return self.admin_svc.sender(uid, condition, message)
+            rest_parts = msg.split(None, 1)
+
+            if len(rest_parts) < 2:
+                return "Использование:\nsender <условие>\n<шаблон>"
+
+            rest = rest_parts[1]
+
+            if "\n" not in rest:
+                return "Использование:\nsender <условие>\n<шаблон>"
+
+            condition, template = rest.split("\n", 1)
+
+            condition = condition.strip()
+            template = template.lstrip("\n")
+
+            if not condition:
+                return "Условие не может быть пустым."
+
+            if not template.strip():
+                return "Шаблон не может быть пустым."
+
+            return self.admin_svc.sender(uid, condition, template)
 
         if cmd == "query":
-            if len(parts) < 2:
+            rest_parts = msg.split(None, 1)
+
+            if len(rest_parts) < 2:
                 return "Использование: query <условие>"
-            condition = parts[1]
+
+            rest = rest_parts[1]
+            condition = rest.split("\n", 1)[0].strip()
+
+            if not condition:
+                return "Условие не может быть пустым."
+
             return self.admin_svc.query(uid, condition)
 
         if cmd == "db":

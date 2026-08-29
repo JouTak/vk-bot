@@ -40,6 +40,11 @@ class Token:
 COMPARE_OPS = ("==", "!=", ">>", ">=", "<<", "<=")
 EXIST_OPS = ("->", "!>")
 BASE_FIELDS = ("isu", "uid", "fio", "grp", "nck")
+# Служебные поля, которые существуют для шаблонизатора,
+# но не являются обычными полями БД.
+EXTRA_FIELDS = (
+    "fmt.y26_mates",
+)
 
 BOOL_ACCEPTED_VALUES = {
     "0",
@@ -194,11 +199,13 @@ def _read_word(condition: str, start: int) -> tuple[Token, int]:
 
 
 def _is_field_path(raw: str) -> bool:
-    """Проверяет, является ли строка базовым полем или полем вида met.<event>.<field>."""
     if raw in BASE_FIELDS:
         return True
 
     if raw.startswith("met."):
+        return True
+
+    if raw.startswith("fmt."):
         return True
 
     return False
@@ -447,7 +454,14 @@ def validate_field_path(field_path: str) -> list[str]:
             errors.append(
                 f"Неизвестное поле '{field_name}' в '{event_key}'. Доступные: {available}"
             )
-
+    elif parts[0] == "fmt":
+        if field_path not in EXTRA_FIELDS:
+            available = ", ".join(EXTRA_FIELDS)
+            errors.append(
+                f"Неизвестный служебный ключ: '{field_path}'. "
+                f"Доступные: {available}"
+            )
+        return errors
     elif parts[0] not in BASE_FIELDS:
         available = ", ".join(BASE_FIELDS)
         errors.append(f"Неизвестное поле: '{field_path}'. Доступные: {available}")
@@ -458,6 +472,9 @@ def validate_field_path(field_path: str) -> list[str]:
 def get_field_type(field_path: str) -> str | None:
     """Возвращает тип поля или None, если поле неизвестно."""
     parts = field_path.split(".")
+
+    if parts[0] == "fmt":
+        return "str"
 
     if parts[0] == "met":
         if len(parts) != 3:
@@ -573,6 +590,10 @@ def _validate_ast_fields(node: ASTNode) -> list[str]:
 def get_field_value(user: User, field_path: str) -> Any:
     """Возвращает значение поля пользователя по пути."""
     parts = field_path.split(".")
+
+    if parts[0] == "fmt":
+        # Без экстра-резолвера служебные поля считаем пустыми.
+        return ""
 
     if parts[0] == "met":
         if len(parts) != 3:

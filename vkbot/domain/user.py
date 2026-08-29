@@ -1,7 +1,7 @@
 from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
-from rules import is_real_isu, is_valid_uid
+from vkbot.domain.rules import is_real_isu, is_valid_uid
 
 
 @dataclass
