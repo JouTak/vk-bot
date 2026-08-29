@@ -21,6 +21,7 @@ class EventService:
     """Генеричная инъекция данных ивентов из внешних источников."""
 
     def __init__(self, user_service: UserService | None = None, vk_client=None):
+        """Сохраняет сервис пользователей и VK-клиент."""
         self.user_service = user_service
         self.vk = vk_client
 
@@ -188,6 +189,8 @@ class EventService:
         vk_link_to_uid: dict[str, int],
         stats: dict,
     ) -> dict[str, Any] | None:
+        """Готовит одну строку ивента к записи в БД, пропуская некорректные."""
+
         def get_col(idx: int | None, default: str = "") -> str:
             if idx is None or idx >= len(parts):
                 return default

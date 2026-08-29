@@ -16,6 +16,7 @@ LEGACY_ALIASES = {"s24": "a24"}
 
 
 def _soft_issues(uid, grp, nck, met_ok: bool) -> list[str]:
+    """Возвращает список мягких ошибок валидации legacy-строки."""
     issues = []
     if uid is not None and 0 <= uid <= 1:
         issues.append("uid_invalid_0_1")
@@ -40,6 +41,7 @@ def _save_raw(
         s: Session, line_no: int, raw: str,
         isu, uid, fio, grp, nck, met_json, status: str, error: str,
 ) -> None:
+    """Сохраняет или обновляет сырую строку импорта в таблице пользователей."""
     row = (
         s.query(UsersRawLineModel)
         .filter_by(line_no=line_no, raw_line=raw)
@@ -60,6 +62,7 @@ def _save_raw(
 
 
 def run_migration(users_txt: str) -> dict:
+    """Импортирует пользователей из legacy-файла users.txt и возвращает статистику."""
     stats = {"imported": 0, "raw": 0, "errors": 0}
 
     with open(users_txt, "r", encoding="utf-8") as f:
@@ -112,10 +115,12 @@ def run_migration(users_txt: str) -> dict:
 
 
 def _default_users_txt() -> str:
+    """Возвращает путь к стандартному файлу users.txt."""
     return str(settings.base_dir / "vkbot" / "bot" / "subscribers" / "users.txt")
 
 
 def main():
+    """Точка входа CLI для миграции пользователей."""
     p = argparse.ArgumentParser(description="Import legacy users.txt into DB")
     p.add_argument("--users-txt", default=_default_users_txt())
     args = p.parse_args()

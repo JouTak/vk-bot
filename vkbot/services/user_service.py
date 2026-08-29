@@ -12,6 +12,7 @@ class UserService:
     """Бизнес-логика работы с юзерами."""
 
     def __init__(self, repo: UserRepository):
+        """Сохраняет репозиторий пользователей."""
         self.repo = repo
 
     def ensure_user_exists(self, uid: int, fio: str = "") -> None:
@@ -43,6 +44,7 @@ class UserService:
             event_key: str,
             event_data: dict,
     ) -> User:
+        """Сливает данные инъекции ивента с существующим пользователем или создаёт нового."""
         user = None
 
         # 1) Поиск по настоящему ISU

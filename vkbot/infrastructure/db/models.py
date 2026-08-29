@@ -81,6 +81,7 @@ class SpecialIsuCounterModel(Base):
 
 
 def _build_event_table(event: EventDef) -> type:
+    """Динамически создаёт ORM-модель таблицы ивента из декларации."""
     attrs: dict = {
         "__tablename__": event.table_name,
         "isu": mapped_column(
@@ -114,4 +115,5 @@ for _event_def in EVENT_REGISTRY.values():
 
 
 def get_event_model(event_key: str):
+    """Возвращает ORM-модель ивента по ключу."""
     return EVENT_MODELS.get(event_key)

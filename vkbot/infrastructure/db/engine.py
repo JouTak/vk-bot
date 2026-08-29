@@ -20,6 +20,7 @@ _SessionLocal: sessionmaker | None = None
 
 
 def init_engine() -> None:
+    """Создаёт движок БД, сессии и синхронизирует схему."""
     global _engine, _SessionLocal
 
     _engine = create_engine(
@@ -43,6 +44,7 @@ def init_engine() -> None:
 
 
 def get_engine():
+    """Возвращает движок БД, при необходимости инициализирует его."""
     if _engine is None:
         init_engine()
     return _engine
@@ -50,6 +52,7 @@ def get_engine():
 
 @contextmanager
 def session_scope() -> Generator[Session, None, None]:
+    """Контекстный менеджер сессии БД с коммитом и откатом."""
     if _SessionLocal is None:
         init_engine()
     session = _SessionLocal()

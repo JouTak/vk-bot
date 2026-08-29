@@ -102,6 +102,7 @@ class MessageService:
     # ----------------------------------------------------------
 
     def _format_e26(self, user: User, data: dict) -> str:
+        """Форматирует сообщение для пользователя по данным ЕГЭ по майнкрафту 26."""
         fio = data.get("fio", "")
         nck = data.get("nck", "")
         clk = data.get("clk", "")
@@ -138,6 +139,7 @@ class MessageService:
         return "\n".join(parts)
 
     def _format_y26(self, user: User, data: dict) -> str:
+        """Форматирует сообщение для пользователя по данным Ягодного 2026."""
         parts = ["Привет! Вот твои данные по выезду в Ягодное:"]
 
         nck = data.get("nck", "")
@@ -171,6 +173,7 @@ class MessageService:
         return "\n".join(parts)
 
     def _format_y25(self, user: User, data: dict) -> str:
+        """Форматирует сообщение для пользователя по данным Ягодного 2025."""
         parts = ["Вот твои данные по выезду в Ягодное 2025!"]
         parts.append(f"Едешь ли ты: {self._safe_pick(self.UGO2TEXT, data.get('ugo', 0), str(data.get('ugo', '')))}")
         parts.append(f"Ник: {user.nck or data.get('nck') or '[НЕТ ДАННЫХ]'}")
@@ -191,6 +194,7 @@ class MessageService:
         return "\n".join(parts)
 
     def _format_s25(self, user: User, data: dict) -> str:
+        """Форматирует сообщение для пользователя по данным весенней Спартакиады 2025."""
         parts = ["Вот твои данные за весеннюю Спартакиаду по Майнкрафту 2025!"]
         if user.has_real_isu:
             parts.append(f"ИСУ: {user.isu}")
@@ -208,6 +212,7 @@ class MessageService:
         return "\n".join(parts)
 
     def _format_a24(self, user: User, data: dict) -> str:
+        """Форматирует сообщение для пользователя по данным осенней Спартакиады 2024."""
         parts = ["Вот твои данные за осеннюю Спартакиаду по Майнкрафту 2024!"]
         parts.append(f"Ник: {user.nck or data.get('nck') or '[НЕТ ДАННЫХ]'}")
         parts.append("Участвуешь ли ты в первом этапе: Да")
@@ -227,6 +232,7 @@ class MessageService:
     # ----------------------------------------------------------
 
     def build_welcome_text(self, has_events: bool = True) -> str:
+        """Собирает текст информационного приветственного сообщения."""
         text = (
             "Привет! Это информационный бот клуба ITMOcraft 🎮\n\n"
             "Мы рассылаем данные по ивентам, выездам и соревнованиям.\n"
@@ -244,6 +250,7 @@ class MessageService:
         return text
 
     def build_subscribe_message(self) -> str:
+        """Возвращает сообщение с просьбой подписаться на группу."""
         return (
             "Привет! Для получения информации подпишись на группу:\n"
             "https://vk.com/itmocraft\n"
@@ -256,6 +263,7 @@ class MessageService:
 
     @staticmethod
     def _get_y26_house_mates(house: str, exclude_isu: int) -> str:
+        """Возвращает строку с никами соседей по домику в Ягодном 2026."""
         if not house or house.strip().lower() in ("", "-", "пока пусто"):
             return ""
         model = get_event_model("y26")
@@ -282,6 +290,7 @@ class MessageService:
 
     @staticmethod
     def _safe_pick(mapping: tuple[str, ...], idx, fallback: str = "") -> str:
+        """Безопасно выбирает текст из кортежа по индексу."""
         try:
             return mapping[int(idx)]
         except (IndexError, ValueError, TypeError):
@@ -289,6 +298,7 @@ class MessageService:
 
     @staticmethod
     def _b2t(value) -> str:
+        """Преобразует булево значение в текст Да/Нет."""
         if isinstance(value, bool):
             return "Да" if value else "Нет"
         if isinstance(value, str):
@@ -312,6 +322,7 @@ class MessageService:
 
     @staticmethod
     def _display_value(value, field_type: str) -> str:
+        """Преобразует значение поля в строку для вывода."""
         if isinstance(value, bool):
             return "Да" if value else "Нет"
         return str(value)

@@ -22,6 +22,7 @@ class AdminService:
     DB_QUERY_ROW_COUNT_LIMIT = 50
 
     def __init__(self, perms: PermissionChecker, vk_client):
+        """Сохраняет проверку прав и VK-клиент."""
         self.perms = perms
         self.vk = vk_client
 
@@ -30,6 +31,7 @@ class AdminService:
     # ----------------------------------------------------------
 
     def sender(self, admin_uid: int, condition: str, message: str) -> str:
+        """Выполняет шаблонную рассылку пользователям, подходящим под условие."""
         if not self.perms.is_admin(admin_uid):
             return "Нет доступа"  # ideally unreachable, but double-check
 
@@ -110,6 +112,7 @@ class AdminService:
     # ----------------------------------------------------------
 
     def query(self, admin_uid: int, condition: str) -> str:
+        """Возвращает список пользователей, подходящих под условие, без отправки сообщений."""
         if not self.perms.is_admin(admin_uid):
             return "Нет доступа"  # ideally unreachable, but double-check
 
@@ -143,6 +146,7 @@ class AdminService:
     # ----------------------------------------------------------
 
     def db_query(self, admin_uid: int, sql: str) -> str:
+        """Выполняет сырой SQL-запрос и возвращает результат администратору."""
         if not self.perms.is_admin(admin_uid):
             return "Нет доступа"  # ideally unreachable, but double-check
 
@@ -189,6 +193,7 @@ class AdminService:
     # ----------------------------------------------------------
 
     def reload(self, admin_uid: int) -> str:
+        """Повторно инъектирует данные всех активных ивентов."""
         if not self.perms.is_admin(admin_uid):
             return "Нет доступа"  # ideally unreachable, but double-check
 
@@ -212,6 +217,7 @@ class AdminService:
 
     @staticmethod
     def _load_all_users() -> list[User]:
+        """Загружает всех пользователей из БД вместе с данными ивентов."""
         with session_scope() as s:
             return UserRepository(s).list_all_users()
 

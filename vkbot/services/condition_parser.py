@@ -62,6 +62,7 @@ class LexerError(Exception):
 
 
 def tokenize(condition: str) -> list[Token]:
+    """Разбивает строку условия на токены."""
     tokens: list[Token] = []
     i = 0
     n = len(condition)
@@ -117,6 +118,7 @@ def tokenize(condition: str) -> list[Token]:
 
 
 def _read_quoted_string(condition: str, start: int) -> tuple[Token, int]:
+    """Читает строку в кавычках с поддержкой экранирования."""
     quote_char = condition[start]
     i = start + 1
     n = len(condition)
@@ -164,6 +166,7 @@ def _read_quoted_string(condition: str, start: int) -> tuple[Token, int]:
 
 
 def _read_word(condition: str, start: int) -> tuple[Token, int]:
+    """Читает слово до разделителя и определяет, поле это или значение."""
     i = start
     n = len(condition)
 
@@ -191,6 +194,7 @@ def _read_word(condition: str, start: int) -> tuple[Token, int]:
 
 
 def _is_field_path(raw: str) -> bool:
+    """Проверяет, является ли строка базовым полем или полем вида met.<event>.<field>."""
     if raw in BASE_FIELDS:
         return True
 
@@ -253,18 +257,22 @@ class ParseError(Exception):
 
 class Parser:
     def __init__(self, tokens: list[Token]):
+        """Сохраняет список токенов для разбора."""
         self.tokens = tokens
         self.pos = 0
 
     def peek(self) -> Token:
+        """Возвращает текущий токен без продвижения."""
         return self.tokens[self.pos]
 
     def advance(self) -> Token:
+        """Возвращает текущий токен и переходит к следующему."""
         token = self.tokens[self.pos]
         self.pos += 1
         return token
 
     def expect(self, token_type: TokenType) -> Token:
+        """Ожидает токен указанного типа, иначе бросает ошибку парсинга."""
         token = self.peek()
 
         if token.type != token_type:
@@ -276,6 +284,7 @@ class Parser:
         return self.advance()
 
     def parse(self) -> ASTNode:
+        """Разбирает полное условие и возвращает корень AST."""
         node = self.parse_or_expr()
 
         if self.peek().type != TokenType.EOF:
@@ -288,6 +297,7 @@ class Parser:
         return node
 
     def parse_or_expr(self) -> ASTNode:
+        """Разбирает выражения с оператором ИЛИ."""
         left = self.parse_and_expr()
 
         while self.peek().type == TokenType.OP_OR:
@@ -298,6 +308,7 @@ class Parser:
         return left
 
     def parse_and_expr(self) -> ASTNode:
+        """Разбирает выражения с оператором И."""
         left = self.parse_primary()
 
         while self.peek().type == TokenType.OP_AND:
@@ -308,6 +319,7 @@ class Parser:
         return left
 
     def parse_primary(self) -> ASTNode:
+        """Разбирает первичный элемент: скобки, сравнение или существование ивента."""
         token = self.peek()
 
         if token.type == TokenType.LPAREN:
@@ -328,8 +340,8 @@ class Parser:
                 target_token = self.peek()
 
                 if (
-                    target_token.type != TokenType.VALUE
-                    or str(target_token.value).strip().lower() != "met"
+                        target_token.type != TokenType.VALUE
+                        or str(target_token.value).strip().lower() != "met"
                 ):
                     raise ParseError(
                         "Ожидалось 'met' после оператора существования",
@@ -377,8 +389,8 @@ class Parser:
                 target_token = self.peek()
 
                 if (
-                    target_token.type != TokenType.VALUE
-                    or str(target_token.value).strip().lower() != "met"
+                        target_token.type != TokenType.VALUE
+                        or str(target_token.value).strip().lower() != "met"
                 ):
                     raise ParseError(
                         "Ожидалось 'met' после оператора существования",
@@ -409,6 +421,7 @@ class Parser:
 
 
 def validate_field_path(field_path: str) -> list[str]:
+    """Проверяет существование поля или поля ивента."""
     errors: list[str] = []
     parts = field_path.split(".")
 
@@ -443,6 +456,7 @@ def validate_field_path(field_path: str) -> list[str]:
 
 
 def get_field_type(field_path: str) -> str | None:
+    """Возвращает тип поля или None, если поле неизвестно."""
     parts = field_path.split(".")
 
     if parts[0] == "met":
@@ -472,6 +486,7 @@ def get_field_type(field_path: str) -> str | None:
 
 
 def validate_value_type(raw: str, field_type: str) -> str | None:
+    """Проверяет, что строковое значение подходит типу поля."""
     raw = str(raw).strip()
 
     if field_type == "int":
@@ -491,6 +506,7 @@ def validate_value_type(raw: str, field_type: str) -> str | None:
 
 
 def validate_condition(condition: str) -> list[str]:
+    """Полностью проверяет условие: синтаксис, парсинг и поля."""
     errors: list[str] = []
 
     if not condition.strip():
@@ -513,6 +529,7 @@ def validate_condition(condition: str) -> list[str]:
 
 
 def _validate_ast_fields(node: ASTNode) -> list[str]:
+    """Рекурсивно проверяет поля и значения внутри AST."""
     errors: list[str] = []
 
     if isinstance(node, CompareNode):
@@ -554,6 +571,7 @@ def _validate_ast_fields(node: ASTNode) -> list[str]:
 
 
 def get_field_value(user: User, field_path: str) -> Any:
+    """Возвращает значение поля пользователя по пути."""
     parts = field_path.split(".")
 
     if parts[0] == "met":
@@ -587,6 +605,7 @@ def get_field_value(user: User, field_path: str) -> Any:
 
 
 def coerce_value(raw: str, actual_value: Any) -> Any:
+    """Приводит строковое значение из условия к типу фактического значения."""
     if isinstance(actual_value, bool):
         return str(raw).strip().lower() in ("1", "true", "yes", "да", "+")
 
@@ -600,6 +619,7 @@ def coerce_value(raw: str, actual_value: Any) -> Any:
 
 
 def evaluate_node(user: User, node: ASTNode) -> bool:
+    """Вычисляет AST-узел для конкретного пользователя."""
     if isinstance(node, OrNode):
         return evaluate_node(user, node.left) or evaluate_node(user, node.right)
 
@@ -651,6 +671,7 @@ def evaluate_node(user: User, node: ASTNode) -> bool:
 
 
 def evaluate_condition(user: User, condition: str) -> bool:
+    """Вычисляет строку условия для пользователя; при ошибке возвращает False."""
     try:
         tokens = tokenize(condition)
         parser = Parser(tokens)
@@ -666,9 +687,10 @@ def evaluate_condition(user: User, condition: str) -> bool:
 
 
 def check_and_evaluate(
-    users: list[User],
-    condition: str,
+        users: list[User],
+        condition: str,
 ) -> tuple[list[User], list[str]]:
+    """Проверяет условие и возвращает список подходящих пользователей и ошибки."""
     errors = validate_condition(condition)
 
     if errors:

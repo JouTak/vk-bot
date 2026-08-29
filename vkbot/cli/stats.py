@@ -8,6 +8,7 @@ from vkbot.infrastructure.db.models import EVENT_MODELS, UserModel, UsersRawLine
 
 
 def main():
+    """Выводит статистику по пользователям, сырым строкам и ивентам."""
     init_engine()
     with session_scope() as s:
         users_total = int(s.execute(

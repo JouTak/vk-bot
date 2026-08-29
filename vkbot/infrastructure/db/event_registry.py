@@ -32,13 +32,16 @@ class EventDef:
 
     @property
     def table_name(self) -> str:
+        """Возвращает имя таблицы ивента в БД."""
         return f"user_{self.key}"
 
     @property
     def field_names(self) -> tuple[str, ...]:
+        """Возвращает кортеж имён всех полей ивента."""
         return tuple(f.name for f in self.fields)
 
     def get_field(self, name: str) -> FieldDef | None:
+        """Ищет декларацию поля ивента по имени."""
         for f in self.fields:
             if f.name == name:
                 return f
@@ -59,14 +62,17 @@ def register_event(event: EventDef) -> EventDef:
 
 
 def get_event(key: str) -> EventDef | None:
+    """Возвращает декларацию ивента по ключу или None."""
     return EVENT_REGISTRY.get(key)
 
 
 def get_all_events() -> list[EventDef]:
+    """Возвращает декларации всех ивентов"""
     return list(EVENT_REGISTRY.values())
 
 
 def get_active_events() -> list[EventDef]:
+    """Возвращает список активных ивентов для инъекций."""
     return [e for e in EVENT_REGISTRY.values() if e.active]
 
 

@@ -39,6 +39,7 @@ class TemplateRenderer:
     # ----------------------------------------------------------
     @classmethod
     def validate(cls, template: str) -> list[str]:
+        """Проверяет шаблон сообщения и возвращает список ошибок."""
         errors: list[str] = []
         for seg in cls.compile(template):
             kind = seg[0]
@@ -70,6 +71,7 @@ class TemplateRenderer:
             user: User,
             extra_resolver: ExtraResolver | None = None,
     ) -> str:
+        """Компилирует шаблон и сразу рендерит его для пользователя."""
         compiled = cls.compile(template)
         return cls.render(compiled, user, extra_resolver)
 
@@ -80,6 +82,7 @@ class TemplateRenderer:
             user: User,
             extra_resolver: ExtraResolver | None = None,
     ) -> str:
+        """Рендерит ранее скомпилированные сегменты шаблона для пользователя."""
         out: list[str] = []
         for seg in segments:
             kind = seg[0]
@@ -173,10 +176,12 @@ class TemplateRenderer:
 
     @classmethod
     def used_extra_keys(cls, template: str) -> set[str]:
+        """Возвращает множество служебных ключей, используемых в шаблоне."""
         return cls.extra_keys_from_segments(cls.compile(template))
 
     @classmethod
     def extra_keys_from_segments(cls, segments) -> set[str]:
+        """Возвращает множество служебных ключей из скомпилированных сегментов."""
         keys: set[str] = set()
 
         for seg in segments:
@@ -205,6 +210,7 @@ class TemplateRenderer:
     # ----------------------------------------------------------
     @classmethod
     def _validate_placeholders_in_text(cls, text: str) -> list[str]:
+        """Проверяет плейсхолдеры, встречающиеся в правой части привязки."""
         errors: list[str] = []
         for match in cls.PLACEHOLDER_RE.finditer(text):
             key = match.group(1).strip()
@@ -214,6 +220,7 @@ class TemplateRenderer:
 
     @classmethod
     def _is_known_extra_key(cls, key: str) -> bool:
+        """Проверяет, входит ли ключ в список известных служебных ключей."""
         return key in cls.KNOWN_EXTRA_KEYS
 
     # ----------------------------------------------------------
@@ -241,6 +248,8 @@ class TemplateRenderer:
             user: User,
             extra_resolver: ExtraResolver | None = None,
     ) -> str:
+        """Заменяет простые плейсхолдеры в тексте на значения пользователя."""
+
         def repl(m: re.Match) -> str:
             resolved = cls._resolve_placeholder(
                 user,

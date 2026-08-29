@@ -12,7 +12,10 @@ from ..event_registry import get_event
 
 
 class UserRepository:
+    """Репозиторий пользователей и данных ивентов."""
+
     def __init__(self, session: Session):
+        """Сохраняет сессию БД."""
         self.session = session
 
     # ----------------------------------------------------------
@@ -20,6 +23,7 @@ class UserRepository:
     # ----------------------------------------------------------
 
     def get_by_isu(self, isu: int) -> User | None:
+        """Возвращает пользователя по ISU или None."""
         row = self.session.execute(
             select(UserModel).where(UserModel.isu == isu)
         ).scalar_one_or_none()
@@ -30,6 +34,7 @@ class UserRepository:
         return self._to_domain(row)
 
     def get_by_uid(self, uid: int) -> User | None:
+        """Возвращает пользователя по VK ID или None."""
         row = self.session.execute(
             select(UserModel)
             .where(UserModel.uid == uid)
@@ -42,6 +47,7 @@ class UserRepository:
         return self._to_domain(row)
 
     def exists_by_uid(self, uid: int) -> bool:
+        """Возвращает, существует ли пользователь с данным uid"""
         row = self.session.execute(
             select(UserModel.isu)
             .where(UserModel.uid == uid)
@@ -51,6 +57,7 @@ class UserRepository:
         return row is not None
 
     def _to_domain(self, row: UserModel) -> User:
+        """Преобразует ORM-модель пользователя в доменный объект вместе с ивентами."""
         met: dict[str, dict[str, Any]] = {}
 
         for event_key, model_cls in EVENT_MODELS.items():
@@ -121,6 +128,7 @@ class UserRepository:
         return True
 
     def upsert(self, user: User, merge_events: bool = True) -> User:
+        """Создаёт или обновляет пользователя и связанные данные ивентов."""
         row = self.session.get(UserModel, user.isu)
 
         if row is None:
@@ -163,6 +171,7 @@ class UserRepository:
         nck: str = "",
         met: dict[str, Any] | None = None,
     ) -> User:
+        """Создаёт нового пользователя со свободным служебным ISU."""
         new_isu = self.next_special_isu()
         user = User(isu=new_isu, uid=uid, fio=fio, grp=grp, nck=nck, met=met or {})
         return self.upsert(user)
@@ -172,6 +181,7 @@ class UserRepository:
     # ----------------------------------------------------------
 
     def list_all_users(self) -> list[User]:
+        """Возвращает список из доменных объектов вместе с ивентами всех пользователей."""
         rows = self.session.execute(select(UserModel)).scalars().all()
 
         event_rows: dict[str, dict[int, object]] = {}
@@ -250,6 +260,7 @@ class UserRepository:
 
     @staticmethod
     def _coerce(value: Any, field_type: str) -> Any:
+        """Приводит значение к типу поля ивента."""
         if field_type == "int":
             try:
                 return int(value) if value is not None else 0

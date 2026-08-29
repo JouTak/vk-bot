@@ -28,6 +28,7 @@ from vkbot.cli.migrate import run_migration
 
 class BotApp:
     def __init__(self):
+        """Инициализирует БД, VK-клиент, longpoll и сервисы."""
         init_engine()
 
         self.vk = VKClient(settings.bot_token, settings.group_id)
@@ -48,6 +49,7 @@ class BotApp:
     # ----------------------------------------------------------
 
     def run(self):
+        """Запускает инъекцию активных ивентов и основной цикл обработки событий."""
         self._inject_all_events()
 
         logger.info("Starting longpoll loop")
@@ -76,6 +78,7 @@ class BotApp:
     # ----------------------------------------------------------
 
     def _process_event(self, event):
+        """Маршрутизирует входящее событие VK в соответствующий обработчик."""
         if event.type == VkBotEventType.MESSAGE_NEW:
             self._handle_message_new(event)
         elif event.type == VkBotEventType.MESSAGE_EVENT:
@@ -86,6 +89,7 @@ class BotApp:
     # ----------------------------------------------------------
 
     def _handle_message_new(self, event):
+        """Обрабатывает обычные сообщения: подписку, кнопки, админ-команды и welcome."""
         if getattr(event, "from_chat", False):
             return
 
@@ -150,6 +154,7 @@ class BotApp:
     # ----------------------------------------------------------
 
     def _handle_message_event(self, event):
+        """Обрабатывает нажатия инлайн-кнопок и колбэки VK."""
         obj = event.object if isinstance(event.object, dict) else {}
         payload = obj.get("payload") or {}
         if isinstance(payload, str):
@@ -197,6 +202,7 @@ class BotApp:
             self._toggle_admin_call(uid, force_off=True)
 
     def _answer_callback(self, obj: dict, text: str = "Данные отправлены"):
+        """Отправляет служебный ответ на колбэк инлайн-кнопки."""
         try:
             self.vk.session.method("messages.sendMessageEventAnswer", {
                 "event_id": obj.get("event_id"),
@@ -216,6 +222,7 @@ class BotApp:
 
     @staticmethod
     def _extract_payload(event) -> dict | None:
+        """Достаёт и парсит payload из MESSAGE_NEW, если он есть."""
         try:
             raw: str | None = getattr(event.message, "payload", None)
         except Exception:
@@ -238,10 +245,12 @@ class BotApp:
 
     @staticmethod
     def _is_ignored(uid: int) -> bool:
+        """Проверяет, находится ли пользователь в режиме ожидания админа."""
         with session_scope() as s:
             return IgnoredRepository(s).is_ignored(uid)
 
     def _toggle_admin_call(self, uid: int, force_off: bool = False):
+        """Включает или отключает вызов админа и рассылает уведомления."""
         first, last = self.vk.get_user_info(uid)
         fio = f"{first} {last}".strip() or f"id{uid}"
         link = f"https://vk.com/gim{settings.group_id}?sel={uid}"
@@ -293,6 +302,7 @@ class BotApp:
     # ----------------------------------------------------------
 
     def _handle_admin_command(self, uid: int, msg: str) -> str | None:
+        """Разбирает и выполняет админскую команду из ЛС."""
         parts = msg.split()
         if not parts:
             return None
@@ -368,12 +378,14 @@ class BotApp:
 
     @staticmethod
     def _send_ok(results: list) -> bool:
+        """Проверяет, смогло ли отправиться сообщение."""
         return bool(results) and all(
             not (isinstance(r, dict) and r.get("error"))
             for r in results
         )
 
     def _send_welcome(self, uid: int) -> bool:
+        """Отправляет приветственное сообщение и клавиатуру событий; возвращает успех отправки."""
         with session_scope() as s:
             user = UserRepository(s).get_by_uid(uid)
             admin_called = IgnoredRepository(s).is_ignored(uid)
@@ -421,6 +433,7 @@ class BotApp:
     # ----------------------------------------------------------
 
     def _inject_all_events(self):
+        """Инъектирует данные всех активных ивентов при старте."""
         logger.info("Starting event injection...")
 
         event_svc = EventService(user_service=None, vk_client=self.vk)
@@ -438,6 +451,7 @@ class BotApp:
 
 
 def setup_logging():
+    """Настраивает логирование в консоль и файл."""
     logger.remove()
     logger.add(sys.stderr, level=settings.log_level)
     try:
@@ -452,6 +466,7 @@ def setup_logging():
 
 
 def main():
+    """Создаёт и запускает приложение бота."""
     setup_logging()
     app = BotApp()
     app.run()

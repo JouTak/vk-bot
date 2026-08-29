@@ -40,6 +40,7 @@ def _validate(row) -> str | None:
 
 
 def _list_problems(limit: int = 50) -> list:
+    """Возвращает список строк пользователей с ошибками для ручного исправления."""
     with session_scope() as s:
         rows = s.execute(
             sa.select(UsersRawLineModel)
@@ -54,12 +55,14 @@ def _list_problems(limit: int = 50) -> list:
 
 
 def _prompt_keep(text: str, current) -> str:
+    """Запрашивает новое значение поля, оставляя старое при пустом вводе."""
     cur = "" if current is None else str(current)
     v = input(f"{text} [{cur}]: ").strip()
     return v if v else cur
 
 
 def _edit(row_id: int) -> None:
+    """Открывает интерактивное редактирование одной проблемной строки и применяет результат."""
     with session_scope() as s:
         row = s.get(UsersRawLineModel, row_id)
         if not row:
@@ -111,6 +114,7 @@ def _edit(row_id: int) -> None:
 
 
 def main():
+    """Запускает консольную панель исправления проблемных строк."""
     init_engine()
     while True:
         items = _list_problems()

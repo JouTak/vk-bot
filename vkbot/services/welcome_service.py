@@ -10,6 +10,7 @@ class WelcomeService:
     """Управление частотой приветственных сообщений (раз в 24 часа)."""
 
     def should_show_welcome(self, uid: int) -> bool:
+        """Проверяет, прошло ли более 24 часов с последнего приветствия."""
         key = f"last_welcome:{uid}"
         with session_scope() as s:
             row = s.get(KVStoreModel, key)
@@ -22,6 +23,7 @@ class WelcomeService:
                 return True
 
     def mark_welcome_shown(self, uid: int) -> None:
+        """Сохраняет время показа приветствия пользователю."""
         key = f"last_welcome:{uid}"
         with session_scope() as s:
             row = s.get(KVStoreModel, key)

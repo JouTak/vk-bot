@@ -13,11 +13,13 @@ class VKClient:
     """Обёртка над VK API. Знает только про отправку и резолвинг."""
 
     def __init__(self, token: str, group_id: int):
+        """Создаёт сессию VK API и сохраняет ID группы."""
         self.session = vk_api.VkApi(token=token)
         self.api = self.session.get_api()
         self.group_id = group_id
 
     def is_member(self, uid: int) -> bool:
+        """Проверяет подписку пользователя на группу."""
         try:
             return bool(self.session.method(
                 "groups.isMember",
@@ -113,6 +115,7 @@ class VKClient:
         return values.get("response") or [], values.get("execute_errors") or []
 
     def _get_access_token(self) -> str:
+        """Возвращает токен доступа из сессии VK."""
         raw = self.session.token
         if isinstance(raw, dict):
             return raw.get("access_token", "")
