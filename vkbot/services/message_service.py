@@ -13,6 +13,7 @@ class MessageService:
     Форматирование сообщений с conditional rendering.
     Заменяет все format_y26_message, format_e26_message и т.д.
     """
+    WIKI_URL = "https://wiki.joutak.ru"
     WAY2TEXT = ("На бесплатном трансфере от ГК", "Своим ходом (электричка)", "Своим ходом (на машине)")
     UGO2TEXT = ("Нет.", "Да, ты прошёл отбор, ждём оплату!", "Оплата дошла до нас, ты едешь!")
 
@@ -147,7 +148,8 @@ class MessageService:
 
     def _format_s25(self, user: User, data: dict) -> str:
         parts = ["Вот твои данные за весеннюю Спартакиаду по Майнкрафту 2025!"]
-        parts.append(f"ИСУ: {user.isu}")
+        if user.has_real_isu:
+            parts.append(f"ИСУ: {user.isu}")
         parts.append(f"Ник: {user.nck or data.get('nck') or '[НЕТ ДАННЫХ]'}")
         parts.append("Участвуешь ли ты в первом этапе (BlockParty): Да")
         parts.append(f"Проходишь ли в следующий этап (AceRace): {self._b2t(data.get('wr1', False))}")
@@ -181,18 +183,21 @@ class MessageService:
     # ----------------------------------------------------------
 
     def build_welcome_text(self, has_events: bool = True) -> str:
-        if has_events:
-            return (
-                "Привет! Мы клуб любителей Майнкрафта ITMOcraft 🎮\n"
-                "Нажми на кнопки ниже, чтобы узнать информацию о событиях.\n"
-                "Если есть вопросы — напиши АДМИН."
-            )
-
-        return (
-            "Привет! Мы клуб любителей Майнкрафта ITMOcraft 🎮\n"
-            "Пока у тебя нет событий с доступными данными.\n"
-            "Если есть вопросы — напиши АДМИН."
+        text = (
+            "Привет! Это информационный бот клуба ITMOcraft 🎮\n\n"
+            "Мы рассылаем данные по ивентам, выездам и соревнованиям.\n"
+            f"Полезные материалы и правила: {self.WIKI_URL}\n\n"
+            "Если ты написал в бот во время регистрации на сервер выживания, "
+            "с тобой свяжутся здесь после отправки формы.\n\n"
+            "Нажми «ИНФО», чтобы снова показать это сообщение."
         )
+
+        if has_events:
+            text += "\n\nНиже отдельным сообщением придут события, по которым у тебя есть данные."
+        else:
+            text += "\n\nПока у тебя нет событий с доступными данными."
+
+        return text
 
     def build_subscribe_message(self) -> str:
         return (

@@ -12,7 +12,7 @@ from vkbot.config import settings
 from vkbot.infrastructure.vk.client import VKClient
 from vkbot.infrastructure.vk.keyboard import (
     build_welcome_keyboard,
-    build_standard_keyboard,
+    build_main_menu_keyboard,
 )
 from vkbot.infrastructure.db.engine import init_engine, session_scope
 from vkbot.infrastructure.db.repositories.user_repo import UserRepository
@@ -94,21 +94,21 @@ class BotApp:
         ptype = (self._extract_payload(event) or {}).get("type")
         attachments = getattr(event.message, "attachments", None) or []
 
-        # Любое ЛС-сообщение гарантирует запись юзера
+        # 1. Гарантируем юзера
         with session_scope() as s:
             UserService(UserRepository(s)).ensure_user_exists(uid)
 
-        # Вложения игнорируем полностью
-        if attachments:
-            logger.debug(f"Attachment ignored: uid={uid}")
-            return
-
-        # Подписка
+        # 2. Сначала проверяем подписку
         if not self.vk.is_member(uid):
             self.vk.send_messages([{
                 "peer_id": uid,
                 "message": self.msg_svc.build_subscribe_message(),
             }])
+            return
+
+        # 3. Только потом игнорируем вложения
+        if attachments:
+            logger.debug(f"Attachment ignored: uid={uid}")
             return
 
         # Кнопки/слово АДМИН
@@ -118,6 +118,11 @@ class BotApp:
 
         if ptype == "callmanager" or "админ" in msg.lower():
             self._toggle_admin_call(uid)
+            return
+
+        if ptype == "info" or msg.lower() in {"инфо", "info"}:
+            if self._send_welcome(uid):
+                self.welcome_svc.mark_welcome_shown(uid)
             return
 
         # Админские команды
@@ -134,8 +139,8 @@ class BotApp:
 
         # Welcome раз в 24 часа
         if self.welcome_svc.should_show_welcome(uid):
-            self.welcome_svc.mark_welcome_shown(uid)
-            self._send_welcome(uid)
+            if self._send_welcome(uid):
+                self.welcome_svc.mark_welcome_shown(uid)
             return
 
         logger.debug(f"Silence: uid={uid}")
@@ -251,13 +256,7 @@ class BotApp:
                 repo.remove(uid)
 
         if now_calling:
-            keyboard = build_standard_keyboard([
-                {
-                    "label": "СПАСИБО АДМИН",
-                    "payload": {"type": "uncallmanager"},
-                    "color": "negative",
-                },
-            ])
+            keyboard = build_main_menu_keyboard(admin_called=True)
             self.vk.send_messages([{
                 "peer_id": uid,
                 "message": "Принято, сейчас позову! Напиши свою проблему следующим сообщением.",
@@ -269,13 +268,7 @@ class BotApp:
             ])
             logger.info(f"Admin called by uid={uid}")
         elif was_calling:
-            keyboard = build_standard_keyboard([
-                {
-                    "label": "ПОЗВАТЬ АДМИНА",
-                    "payload": {"type": "callmanager"},
-                    "color": "positive",
-                },
-            ])
+            keyboard = build_main_menu_keyboard(admin_called=False)
             self.vk.send_messages([{
                 "peer_id": uid,
                 "message": "Надеюсь, вопрос снят!",
@@ -292,6 +285,7 @@ class BotApp:
                 self.vk.send_messages([{
                     "peer_id": uid,
                     "message": "Вызов админа уже снят.",
+                    "keyboard": build_main_menu_keyboard(admin_called=False),
                 }])
 
     # ----------------------------------------------------------
@@ -372,43 +366,55 @@ class BotApp:
     # Welcome
     # ----------------------------------------------------------
 
-    def _send_welcome(self, uid: int):
+    @staticmethod
+    def _send_ok(results: list) -> bool:
+        return bool(results) and all(
+            not (isinstance(r, dict) and r.get("error"))
+            for r in results
+        )
+
+    def _send_welcome(self, uid: int) -> bool:
         with session_scope() as s:
             user = UserRepository(s).get_by_uid(uid)
+            admin_called = IgnoredRepository(s).is_ignored(uid)
 
-        allowed_keys: set[str] = set()
-
-        if user is not None:
-            allowed_keys = {
-                event_key
-                for event_key, event_data in user.met.items()
-                if event_data
-            }
+            allowed_keys: set[str] = set()
+            if user is not None:
+                allowed_keys = {
+                    event_key
+                    for event_key, event_data in user.met.items()
+                    if event_data
+                }
 
         events_keyboard = build_welcome_keyboard(allowed_keys)
         has_events = bool(events_keyboard)
 
         text = self.msg_svc.build_welcome_text(has_events=has_events)
+        admin_keyboard = build_main_menu_keyboard(admin_called=admin_called)
 
-        admin_keyboard = build_standard_keyboard([
-            {
-                "label": "ПОЗВАТЬ АДМИНА",
-                "payload": {"type": "callmanager"},
-                "color": "positive",
-            },
-        ])
-        self.vk.send_messages([{
+        main_results = self.vk.send_messages([{
             "peer_id": uid,
             "message": text,
             "keyboard": admin_keyboard,
         }])
 
+        if not self._send_ok(main_results):
+            logger.warning(f"Welcome main message failed: uid={uid}")
+            return False
+
         if has_events:
-            self.vk.send_messages([{
+            event_results = self.vk.send_messages([{
                 "peer_id": uid,
                 "message": "Твои события:",
                 "keyboard": events_keyboard,
             }])
+
+            if not self._send_ok(event_results):
+                logger.warning(f"Welcome events keyboard failed: uid={uid}")
+                # Основной инфо-сообщение уже ушло, поэтому можно не блокировать mark.
+                # Если хочешь строго, здесь можно сделать return False.
+
+        return True
 
     # ----------------------------------------------------------
     # Инъекции

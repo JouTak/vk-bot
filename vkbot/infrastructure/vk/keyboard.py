@@ -39,6 +39,38 @@ def build_welcome_keyboard(allowed_event_keys: set[str] | None = None) -> str:
     return keyboard.get_keyboard()
 
 
+def build_main_menu_keyboard(admin_called: bool = False) -> str:
+    """
+    Обычная неинлайн-клавиатура:
+    - ПОЗВАТЬ АДМИНА / СПАСИБО АДМИН
+    - ИНФО
+    """
+    keyboard = VkKeyboard(inline=False)
+
+    if admin_called:
+        keyboard.add_button(
+            label="СПАСИБО АДМИН",
+            payload={"type": "uncallmanager"},
+            color=VkKeyboardColor.NEGATIVE,
+        )
+    else:
+        keyboard.add_button(
+            label="ПОЗВАТЬ АДМИНА",
+            payload={"type": "callmanager"},
+            color=VkKeyboardColor.POSITIVE,
+        )
+
+    keyboard.add_line()
+
+    keyboard.add_button(
+        label="ИНФО",
+        payload={"type": "info"},
+        color=VkKeyboardColor.PRIMARY,
+    )
+
+    return keyboard.get_keyboard()
+
+
 def build_standard_keyboard(buttons: list[dict]) -> str:
     """Обычная (не инлайн) клавиатура."""
     keyboard = VkKeyboard(inline=False)
