@@ -201,6 +201,40 @@ class BotApp:
         elif ptype == "uncallmanager":
             self._toggle_admin_call(uid, force_off=True)
 
+        elif ptype == "events_page":
+            raw_page = payload.get("page", 0)
+
+            try:
+                page = int(raw_page)
+            except (TypeError, ValueError):
+                page = 0
+
+            with session_scope() as s:
+                user = UserRepository(s).get_by_uid(uid)
+
+            if user is None:
+                return
+
+            allowed_keys = {
+                event_key
+                for event_key, event_data in user.met.items()
+                if event_data
+            }
+
+            events_keyboard = build_welcome_keyboard(allowed_keys, page=page)
+
+            if events_keyboard:
+                self.vk.send_messages([{
+                    "peer_id": uid,
+                    "message": "Твои события:",
+                    "keyboard": events_keyboard,
+                }])
+            else:
+                self.vk.send_messages([{
+                    "peer_id": uid,
+                    "message": "Пока у тебя нет событий с доступными данными.",
+                }])
+
     def _answer_callback(self, obj: dict, text: str = "Данные отправлены"):
         """Отправляет служебный ответ на колбэк инлайн-кнопки."""
         try:
@@ -423,7 +457,7 @@ class BotApp:
                     if event_data
                 }
 
-        events_keyboard = build_welcome_keyboard(allowed_keys)
+        events_keyboard = build_welcome_keyboard(allowed_keys, page=0)
         has_events = bool(events_keyboard)
 
         text = self.msg_svc.build_welcome_text(has_events=has_events)

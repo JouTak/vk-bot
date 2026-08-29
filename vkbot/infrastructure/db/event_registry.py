@@ -30,6 +30,10 @@ class EventDef:
     active: bool = True
     info_template: str | None = None
 
+    # Короткое название для кнопки в клавиатуре.
+    # Если не задано, будет использован title.
+    button_title: str | None = None
+
     @property
     def table_name(self) -> str:
         """Возвращает имя таблицы ивента в БД."""
@@ -96,7 +100,8 @@ register_event(EventDef(
         # Задания z01..z20
         *(FieldDef(f"z{i:02d}", "int", 0, label=f"Баллы за {i:02d} задание") for i in range(1, 21)),
     ),
-    info_template=templates.E26_INFO_TEMPLATE
+    info_template=templates.E26_INFO_TEMPLATE,
+    button_title="ЕГЭ 2026"
 ))
 
 register_event(EventDef(
@@ -140,7 +145,8 @@ register_event(EventDef(
         FieldDef("wr3", "bool", False, label="Раунд 3 пройден"),
         FieldDef("brs", "bool", False, label="Баллы"),
     ),
-    info_template=templates.A25_INFO_TEMPLATE
+    info_template=templates.A25_INFO_TEMPLATE,
+    button_title="MK Осень 25"
 ))
 
 register_event(EventDef(
@@ -176,6 +182,7 @@ register_event(EventDef(
         FieldDef("fnl", "int", 0, label="Место в финале"),
     ),
     info_template=templates.S25_INFO_TEMPLATE,
+    button_title="MK Весна 25"
 ))
 
 register_event(EventDef(
@@ -192,5 +199,6 @@ register_event(EventDef(
         FieldDef("nyt", "bool", False, label="Ещё не отыграл финал"),
         FieldDef("fnl", "bool", False, label="Победил в финале"),
     ),
-    info_template=templates.A24_INFO_TEMPLATE
+    info_template=templates.A24_INFO_TEMPLATE,
+    button_title="MK Осень 24"
 ))

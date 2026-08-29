@@ -778,12 +778,21 @@ class TemplateRenderer:
         return i
 
     @staticmethod
+    def _is_ascii_word_char(ch: str) -> bool:
+        return ch.isascii() and (ch.isalnum() or ch == "_")
+
+    @staticmethod
     def _match_directive(s: str, i: int, directive: str) -> bool:
         """
         Проверяет, что в позиции i находится директива.
 
-        Директива должна заканчиваться границей слова,
-        чтобы $if не матчился на $iffoo.
+        Директива не должна сливаться с ASCII-словом:
+            $endif   -> не $end
+            $end123  -> не $end
+            $end_foo -> не $end
+
+        Но кириллица и другие не-ASCII символы считаются обычным текстом:
+            $endБерёшь -> $end + "Берёшь"
         """
         if not s.startswith(directive, i):
             return False
@@ -795,4 +804,4 @@ class TemplateRenderer:
 
         nxt = s[pos]
 
-        return not (nxt.isalnum() or nxt == "_")
+        return not TemplateRenderer._is_ascii_word_char(nxt)
