@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 from vkbot.config import settings
+import vkbot.infrastructure.db.templates as templates
 
 # хз, почему такое название у переменной, legacy хрень
 SUBSCRIBERS_DIR = settings.base_dir / "vkbot" / "bot" / "subscribers"
@@ -26,9 +27,8 @@ class EventDef:
     fields: tuple[FieldDef, ...]
     inject_url: str | None = None
     inject_file: str | None = None
-    # active управляет ТОЛЬКО инъекциями (старт бота и команда reload).
-    # Кнопки в welcome показывают все ивенты независимо от active.
     active: bool = True
+    info_template: str | None = None
 
     @property
     def table_name(self) -> str:
@@ -90,6 +90,7 @@ register_event(EventDef(
         # Задания z01..z20
         *(FieldDef(f"z{i:02d}", "int", 0, label=f"Баллы за {i:02d} задание") for i in range(1, 21)),
     ),
+    info_template=templates.E26_INFO_TEMPLATE
 ))
 
 register_event(EventDef(
@@ -110,23 +111,7 @@ register_event(EventDef(
         FieldDef("cst", "int", 0, label="Стоимость"),
         FieldDef("ugo", "bool", False, label="Одобрен"),
     ),
-))
-
-register_event(EventDef(
-    key="y25",
-    title="Ягодное 2025",
-    inject_file=str(SUBSCRIBERS_DIR / "y25.txt"),
-    active=False,
-    fields=(
-        FieldDef("tsp", "int", 0, label='Timestamp регистрации'),
-        FieldDef("nck", "str", "", label="Ник"),
-        FieldDef("nmb", "str", "", label="Номер телефона"),
-        FieldDef("bed", "bool", False, label="Берёшь бельё"),
-        FieldDef("way", "int", 0, label="Как добираешься"),
-        FieldDef("car", "str", "", label="Номер машины"),
-        FieldDef("liv", "str", "", label="Домик"),
-        FieldDef("ugo", "int", 0, label="Одобрен"),
-    ),
+    info_template=templates.Y26_INFO_TEMPLATE
 ))
 
 register_event(EventDef(
@@ -149,6 +134,25 @@ register_event(EventDef(
         FieldDef("wr3", "bool", False, label="Раунд 3 пройден"),
         FieldDef("brs", "bool", False, label="Баллы"),
     ),
+    info_template=templates.A25_INFO_TEMPLATE
+))
+
+register_event(EventDef(
+    key="y25",
+    title="Ягодное 2025",
+    inject_file=str(SUBSCRIBERS_DIR / "y25.txt"),
+    active=False,
+    fields=(
+        FieldDef("tsp", "int", 0, label='Timestamp регистрации'),
+        FieldDef("nck", "str", "", label="Ник"),
+        FieldDef("nmb", "str", "", label="Номер телефона"),
+        FieldDef("bed", "bool", False, label="Берёшь бельё"),
+        FieldDef("way", "int", 0, label="Как добираешься"),
+        FieldDef("car", "str", "", label="Номер машины"),
+        FieldDef("liv", "str", "", label="Домик"),
+        FieldDef("ugo", "int", 0, label="Одобрен"),
+    ),
+    info_template=templates.Y25_INFO_TEMPLATE
 ))
 
 register_event(EventDef(
@@ -165,6 +169,7 @@ register_event(EventDef(
         FieldDef("rr2", "int", 0, label="Рекорд AceRace"),
         FieldDef("fnl", "int", 0, label="Место в финале"),
     ),
+    info_template=templates.S25_INFO_TEMPLATE,
 ))
 
 register_event(EventDef(
@@ -181,4 +186,5 @@ register_event(EventDef(
         FieldDef("nyt", "bool", False, label="Ещё не отыграл финал"),
         FieldDef("fnl", "bool", False, label="Победил в финале"),
     ),
+    info_template=templates.A24_INFO_TEMPLATE
 ))

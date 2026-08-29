@@ -1,11 +1,16 @@
 from __future__ import annotations
 
+import re
+
+from loguru import logger
 from sqlalchemy import select
+
 from vkbot.domain.user import User
 from vkbot.domain.rules import is_real_isu, is_valid_uid
 from vkbot.infrastructure.db.event_registry import EventDef, get_event
 from vkbot.infrastructure.db.engine import session_scope
 from vkbot.infrastructure.db.models import get_event_model
+from vkbot.services.template_renderer import TemplateRenderer
 
 
 class MessageService:
@@ -20,7 +25,7 @@ class MessageService:
     def render_event_info(self, user: User, event_key: str) -> str:
         """
         Форматирует данные юзера по ивенту.
-        Возвращает готовое сообщение или пустую строку если данных нет.
+        Возвращает готовое сообщение или пустую строку, если данных нет.
         """
         event_def = get_event(event_key)
         if event_def is None:
@@ -30,13 +35,52 @@ class MessageService:
         if not event_data:
             return ""
 
-        # Для каждого ивента — свой шаблон
+        # Новый путь: декларативный шаблон ивента, как в sender.
+        if event_def.info_template:
+            errors = TemplateRenderer.validate(event_def.info_template)
+
+            if errors:
+                logger.error(
+                    f"Invalid info template for event '{event_key}': "
+                    + "; ".join(errors)
+                )
+            else:
+                text = TemplateRenderer.render_string(
+                    event_def.info_template,
+                    user,
+                    extra_resolver=self._resolve_extra_placeholder,
+                )
+
+                # Убираем возможные лишние пустые строки от пропущенных условий.
+                text = re.sub(r"\n{3,}", "\n\n", text).strip()
+
+                if text:
+                    return text
+
+        # Старый кастомный шаблон как fallback.
         template_fn = getattr(self, f"_format_{event_key}", None)
         if template_fn:
             return template_fn(user, event_data)
 
-        # Generic fallback: показываем все непустые поля
+        # Generic fallback: показываем все непустые поля.
         return self._format_generic(user, event_def, event_data)
+
+    def _resolve_extra_placeholder(self, key: str, user: User):
+        """
+        Служебные вычисляемые плейсхолдеры для шаблонов.
+        Используется только в пользовательском event_info.
+        """
+        if key == "fmt.y26_mates":
+            data = user.get_event_data("y26") or {}
+            liv = str(data.get("liv") or "").strip()
+
+            if liv.lower() in {"", "-", "пока пусто"}:
+                return False, ""
+
+            mates = self._get_y26_house_mates(liv, user.isu)
+            return bool(mates), mates
+
+        return None
 
     def _format_generic(self, user: User, event_def: EventDef, data: dict) -> str:
         """Универсальное форматирование для ивентов без кастомного шаблона."""

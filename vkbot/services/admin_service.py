@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import re
 
 from loguru import logger
 from sqlalchemy import text
@@ -12,15 +11,10 @@ from vkbot.infrastructure.db.engine import session_scope
 from vkbot.infrastructure.db.repositories.user_repo import UserRepository
 from vkbot.services.condition_parser import (
     check_and_evaluate,
-    validate_condition,
-    validate_field_path,
-    tokenize,
-    Parser,
-    evaluate_node,
-    ParseError,
-    LexerError,
+    validate_condition
 )
 from vkbot.services.event_service import EventService
+from vkbot.services.template_renderer import TemplateRenderer
 
 
 class AdminService:
@@ -43,11 +37,11 @@ class AdminService:
         if errors:
             return "Ошибки в условии:\n" + "\n".join(errors)
 
-        template_errors = self._validate_template(message)
+        template_errors = TemplateRenderer.validate(message)
         if template_errors:
             return "Ошибки в шаблоне:\n" + "\n".join(template_errors)
 
-        compiled = self._compile_template(message)
+        compiled = TemplateRenderer.compile(message)
 
         users = self._load_all_users()
         matched, eval_errors = check_and_evaluate(users, condition)
@@ -57,9 +51,21 @@ class AdminService:
         if not matched:
             return "Совпадений: 0. Никому не отправлено."
 
+        extra_resolver = None
+        extra_keys = TemplateRenderer.extra_keys_from_segments(compiled)
+
+        if "fmt.y26_mates" in extra_keys:
+            house_map = self._build_y26_house_map(users)
+            extra_resolver = self._make_y26_extra_resolver(house_map)
+            logger.debug(f"[sender] precomputed y26 houses: {len(house_map)}")
+
         actions = []
         for user in matched:
-            formatted = self._render_template(compiled, user)
+            formatted = TemplateRenderer.render(
+                compiled,
+                user,
+                extra_resolver=extra_resolver,
+            )
             actions.append({
                 "peer_id": user.uid,
                 "message": formatted,
@@ -209,176 +215,62 @@ class AdminService:
         with session_scope() as s:
             return UserRepository(s).list_all_users()
 
-    # ----------------------------------------------------------
-    # Шаблоны sender: {ключ|текст} и {условие|текст}
-    # ----------------------------------------------------------
+    @staticmethod
+    def _build_y26_house_map(users: list[User]) -> dict[str, list[tuple[int, str]]]:
+        """
+        Предвычисляет карту домиков для y26.
 
-    _KEY_RE = re.compile(r"^[\w.]+$", re.ASCII)
+        Формат:
+            {
+                "1": [(isu, nck), (isu, nck), ...],
+                "2": [(isu, nck), ...],
+            }
 
-    @classmethod
-    def _validate_template(cls, template: str) -> list[str]:
-        errors: list[str] = []
-        for seg in cls._compile_template(template):
-            kind = seg[0]
+        Используем уже загруженных users, чтобы не делать
+        отдельный запрос в БД на каждого пользователя.
+        """
+        house_map: dict[str, list[tuple[int, str]]] = {}
 
-            if kind == "ph":
-                if validate_field_path(seg[1].strip()):
-                    errors.append(f"Неизвестный ключ '{{{seg[1]}}}'")
+        for user in users:
+            data = user.get_event_data("y26")
+            if not data:
+                continue
 
-            elif kind == "bind":
-                _, bkind, payload, _right, raw = seg
-                if bkind == "key":
-                    if validate_field_path(payload):
-                        errors.append(f"Неизвестный ключ '{{{raw}}}'")
-                elif bkind == "error":
-                    errors.append(f"Не могу разобрать '{{{raw}}}': {payload}")
+            liv = str(data.get("liv") or "").strip().lower()
+            nck = str(data.get("nck") or "").strip()
 
-        return errors
+            if liv in {"", "-", "пока пусто"}:
+                continue
 
-    @classmethod
-    def _compile_template(cls, template: str) -> list:
-        """Разбивает шаблон на сегменты: текст / плейсхолдер / привязка."""
-        segments: list = []
-        i = 0
-        n = len(template)
+            if nck in {"", "-"}:
+                continue
 
-        while i < n:
-            start = template.find("{", i)
-            if start == -1:
-                segments.append(("text", template[i:]))
-                break
+            house_map.setdefault(liv, []).append((user.isu, nck))
 
-            if start > i:
-                segments.append(("text", template[i:start]))
+        for entries in house_map.values():
+            entries.sort(key=lambda item: item[1].lower())
 
-            # ищем парную закрывающую скобку с учётом вложенности
-            depth = 0
-            j = start
-            while j < n:
-                if template[j] == "{":
-                    depth += 1
-                elif template[j] == "}":
-                    depth -= 1
-                    if depth == 0:
-                        break
-                j += 1
-
-            if j >= n:  # незакрытая скобка — остальное как текст
-                segments.append(("text", template[start:]))
-                break
-
-            content = template[start + 1:j]
-            left, has_sep, right = cls._split_left_right(content)
-
-            if not has_sep:
-                segments.append(("ph", content))
-            else:
-                left_s = left.strip()
-                if cls._KEY_RE.fullmatch(left_s):
-                    segments.append(("bind", "key", left_s, right, content))
-                else:
-                    try:
-                        ast = Parser(tokenize(left_s)).parse()
-                        segments.append(("bind", "cond", ast, right, content))
-                    except (LexerError, ParseError) as e:
-                        segments.append(("bind", "error", str(e), right, content))
-
-            i = j + 1
-
-        return segments
+        return house_map
 
     @staticmethod
-    def _split_left_right(content: str) -> tuple[str, bool, str]:
-        """Первая '|' на нулевой глубине скобок — разделитель."""
-        depth = 0
-        for idx, ch in enumerate(content):
-            if ch == "(":
-                depth += 1
-            elif ch == ")":
-                depth = max(0, depth - 1)
-            elif ch == "|" and depth == 0:
-                return content[:idx], True, content[idx + 1:]
-        return content, False, ""
+    def _make_y26_extra_resolver(house_map: dict[str, list[tuple[int, str]]]):
+        """
+        Возвращает extra_resolver для TemplateRenderer.
+        """
 
-    @classmethod
-    def _render_template(cls, segments: list, user: User) -> str:
-        out: list[str] = []
+        def resolver(key: str, user: User):
+            if key != "fmt.y26_mates":
+                return None
 
-        for seg in segments:
-            kind = seg[0]
+            data = user.get_event_data("y26") or {}
+            liv = str(data.get("liv") or "").strip().lower()
 
-            if kind == "text":
-                out.append(seg[1])
+            if liv in {"", "-", "пока пусто"}:
+                return False, ""
 
-            elif kind == "ph":
-                resolved = cls._resolve_placeholder(user, seg[1].strip())
-                if resolved is None:
-                    out.append("{" + seg[1] + "}")  # неизвестный ключ — как есть
-                else:
-                    ok, value = resolved
-                    out.append(value if ok else "")
+            entries = house_map.get(liv, [])
+            mates = [nck for isu, nck in entries if isu != user.isu]
 
-            else:  # bind
-                _, bkind, payload, right, raw = seg
+            return bool(mates), ", ".join(mates)
 
-                if bkind == "key":
-                    resolved = cls._resolve_placeholder(user, payload)
-                    if resolved is None or not resolved[0]:
-                        continue
-                    if "{" in right:
-                        out.append(cls._render_placeholders(right, user))
-                    else:
-                        out.append(right + resolved[1])
-
-                elif bkind == "cond":
-                    if evaluate_node(user, payload):
-                        out.append(cls._render_placeholders(right, user))
-
-                else:  # error — оставляем как есть (не должно дойти после валидации)
-                    out.append("{" + raw + "}")
-
-        return "".join(out)
-
-    @classmethod
-    def _render_placeholders(cls, text: str, user: User) -> str:
-        def repl(m: re.Match) -> str:
-            resolved = cls._resolve_placeholder(user, m.group(1).strip())
-            if resolved is None:
-                return m.group(0)
-            ok, value = resolved
-            return value if ok else ""
-
-        return re.sub(r"\{([^{}|]+)\}", repl, text)
-
-    @staticmethod
-    def _resolve_placeholder(user: User, key: str):
-        """Возвращает (exists, value) или None, если ключ неизвестен."""
-        key = key.strip()
-
-        if key == "isu":
-            return user.has_real_isu, str(user.isu)
-
-        if key == "uid":
-            return user.has_valid_uid, str(user.uid)
-
-        if key in ("fio", "grp", "nck"):
-            v = (getattr(user, key, "") or "").strip()
-            return (bool(v) and v != "-"), v
-
-        if key.startswith("met."):
-            parts = key.split(".")
-            if len(parts) == 3:
-                data = user.get_event_data(parts[1])
-                raw = data.get(parts[2]) if data else None
-
-                if raw is None:
-                    return False, ""
-                if isinstance(raw, bool):
-                    return True, ("Да" if raw else "Нет")
-
-                s = str(raw).strip()
-                return (bool(s) and s != "-"), s
-
-            return False, ""
-
-        return None
+        return resolver
