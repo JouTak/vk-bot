@@ -18,7 +18,6 @@ dist/
 # logs
 *.log
 py.log
-source/py.log
 
 # cache / test artifacts
 .pytest_cache/
@@ -35,7 +34,6 @@ dump*.sql
 
 # dotenv / secrets
 .env
-.env.*
 
 # IDEs
 .idea/
@@ -48,14 +46,12 @@ dump*.sql
 Thumbs.db
 
 # --- Project-specific ---
-# local subscribers data / exports
-source/subscribers/
-/data/subscribers
-
 # misc local helper artifacts
-entrypoint.sh
+vkbot/bot/subscribers/*
+!vkbot/bot/subscribers/.gitkeep
 project_bundle.py
 project_bundle.txt
+temp.py
 
 # local/secret configs sometimes used in prod
 *.pem
