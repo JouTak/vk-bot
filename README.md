@@ -1,157 +1,717 @@
 # ITMOcraftBOT (VK Bot)
-VK bot for vk.com/itmocraft. Users are stored in **MySQL/MariaDB** (SQLAlchemy), not in a plain text file.
 
-## Requirements
-- Python 3.10+
-- MySQL/MariaDB
-- Real terminal (TTY) for interactive console tools
+Бот для сообщества [vk.com/itmocraft](https://vk.com/itmocraft).
 
-## Install
-```bash
-pip install -r source/requirements.txt
+Хранение данных — MySQL/MariaDB через SQLAlchemy 2.x.  
+Конфигурация — `.env` через `pydantic-settings`.
+
+---
+
+## Главная идея
+
+Ивент — это данные, а не код.
+
+Каждый ивент описывается декларацией в:
+
+```text
+vkbot/infrastructure/db/event_registry.py
 ```
 
-## Configuration
-Create `.env` (gitignored) or export env vars:
+Из декларации:
+
+- генерируется таблица в БД;
+- работают инъекции данных;
+- строятся пользовательские сообщения;
+- валидируются условия админских команд.
+
+---
+
+## Архитектура
+
+```text
+vkbot/
+├── config.py                  # конфиг из .env
+├── bot/
+│   └── app.py                 # точка входа: longpoll, роутинг, хендлеры
+├── domain/                    # чистый домен: User, правила ISU/UID, permissions
+├── services/                  # бизнес-логика:
+│   ├── admin_service.py       # sender, query, db, reload
+│   ├── condition_parser.py    # парсер условий
+│   ├── event_service.py       # инъекция ивентов
+│   ├── message_service.py     # сообщения пользователю
+│   ├── template_renderer.py   # новый шаблонизатор
+│   ├── user_service.py        # логика пользователей
+│   └── welcome_service.py     # welcome раз в 24 часа
+├── infrastructure/
+│   ├── db/                    # engine, модели, реестр ивентов, шаблоны
+│   ├── vk/                    # VK API клиент, клавиатуры
+│   └── sheets/                # TSV fetcher/parser для Google Sheets
+└── cli/                       # migrate, stats, fix_panel
+```
+
+---
+
+## Установка и запуск локально
+
+```bash
+pip install -r vkbot/requirements.txt
+cp .env.example .env
+python -m vkbot.bot.app
+```
+
+Файл `.env` нужно заполнить.
+
+---
+
+## Конфигурация `.env`
+
+| Переменная | Назначение |
+|---|---|
+| `BOT_TOKEN` | Токен бота ВКонтакте |
+| `GROUP_ID` | ID группы сообщества |
+| `DATABASE_URL` | Строка подключения к MySQL/MariaDB |
+| `ADMIN_IDS` | JSON-список VK ID администраторов |
+| `ENABLE_MIGRATION` | `1` — разрешить команду `migrate` |
+| `LOG_LEVEL` | Уровень логирования |
+| `LOG_PATH` | Путь к файлу логов |
+
+Пример:
+
 ```env
-BOT_TOKEN=...
-GROUP_ID=...
-STORAGE_BACKEND=db
-DATABASE_URL=mysql+pymysql://user:pass@127.0.0.1:3306/vk_bot?charset=utf8mb4
+BOT_TOKEN=vk1.a.xxx
+GROUP_ID=111111111
+DATABASE_URL=mysql+pymysql://root:pass@127.0.0.1:3306/vk_bot?charset=utf8mb4
+ADMIN_IDS=[987654321,123456789]
+ENABLE_MIGRATION=0
+LOG_LEVEL=INFO
+LOG_PATH=/app/data/py.log
 ```
 
-## Run bot
-```bash
-python -m source.main
+---
+
+## Поведение бота
+
+### Чаты
+
+Сообщения из чатов игнорируются.
+
+### Личные сообщения
+
+Любое сообщение или нажатие кнопки в ЛС гарантирует, что пользователь появляется в таблице `users`.
+
+Если пользователь внешний и настоящего ИСУ нет, ему автоматически выдаётся служебный ISU из диапазона `0..99999`.
+
+### Подписка
+
+Если пользователь не подписан на группу, бот отправляет сообщение с просьбой подписаться.
+
+Пока подписки нет, бот будет повторять это сообщение.
+
+### Вложения
+
+Вложения от подписанных пользователей игнорируются молча.
+
+Вложения от неподписанных пользователей вызывают сообщение о подписке.
+
+### Приветственное сообщение
+
+После первого обращения бот отправляет информационное сообщение.
+
+Повторно приветствие показывается не чаще одного раза в 24 часа.
+
+Отметка о показе ставится только после успешной отправки сообщения.
+
+### Кнопка «ИНФО»
+
+Кнопка `ИНФО` снова показывает информационное сообщение.
+
+### Вызов админа
+
+Сообщение `АДМИН` или кнопка `ПОЗВАТЬ АДМИНА` включают ожидание администратора.
+
+Пока ожидание активно, бот молчит для этого пользователя.
+
+Кнопка `СПАСИБО АДМИН` снимает вызов.
+
+---
+
+## Ивенты
+
+Новый ивент добавляется одной декларацией:
+
+```python
+register_event(EventDef(
+    key="y26",
+    title="Ягодное 2026",
+    active=False,
+    inject_url="...",
+    inject_file=str(SUBSCRIBERS_DIR / "y26.txt"),
+    fields=(
+        FieldDef("uid", "int", 0, label="VK ID"),
+        FieldDef("nck", "str", "", label="Ник"),
+        FieldDef("bed", "bool", False, label="Берёшь бельё"),
+    ),
+    info_template=templates.Y26_INFO_TEMPLATE,
+))
 ```
 
-## Maintenance console
-```bash
-python -m source.utils.tools.console
+### Параметры `EventDef`
+
+| Параметр | Назначение |
+|---|---|
+| `key` | Короткий ключ ивента |
+| `title` | Человекочитаемое название |
+| `fields` | Поля ивента |
+| `inject_url` | URL Google Sheets TSV |
+| `inject_file` | Локальный fallback-файл |
+| `active` | Инъекция при старте и по `reload` |
+| `info_template` | Пользовательский шаблон сообщения |
+
+### `active`
+
+Флаг `active` влияет только на инъекции данных:
+
+- при старте бота;
+- по команде `reload`.
+
+На кнопки ивентов у пользователя он не влияет.
+
+Кнопки показываются только для тех ивентов, в которых у пользователя есть данные.
+
+### Пользовательские сообщения ивентов
+
+Пользовательское сообщение задаётся через:
+
+```python
+info_template=templates.S25_INFO_TEMPLATE
 ```
 
-What’s inside:
-- **Users DB** — find/add/update/delete users
-- **Import users.txt -> DB** — parse legacy file and merge it into DB (+ creates/updates Fix panel)
-- **Reset DB** — drop bot tables (double confirm)
-- **Fix panel** — review/fix flagged rows (`users_raw_lines`) + apply to mark row as fixed
-- **DB stats** — compact summary + top fix reasons
+Шаблоны лежат в:
 
-### Import (users.txt -> DB)
-```bash
-python -m source.utils.tools.cli.migrate_from_txt
-```
-
-With explicit paths:
-```bash
-python -m source.utils.tools.cli.migrate_from_txt \
-  --db-url 'mysql+pymysql://user:pass@127.0.0.1:3306/vk_bot?charset=utf8mb4' \
-  --users-txt source/subscribers/users.txt
-```
-
-Rules:
-- Rows are merged into normalized tables (`users` + event tables).
-- Existing event data is not deleted just because the incoming `users.txt` row does not contain that event key.
-- Known current event keys use typed tables: `a24`, `s25`, `y25`, `a25`, `y26`.
-- Y26 uses short keys: `uid` (VK ID), `liv` (living with), `way` (transport), `chk` (payment), `cst` (cost), `ugo` (approved).
-- Legacy/future event keys that do not have a typed table, for example `s24` or `y24`, are stored as-is in `user_events` and returned back in `met` under the same key.
-- If a DB user already has `a25`, legacy import keeps the DB base fields (`uid`, `fio`, `grp`, `nck`) as newer data unless the incoming row itself contains `a25`.
-- Rows that need attention are additionally stored in `users_raw_lines` and appear in Fix panel (examples: uid=0/1, unusual grp, invalid nck, invalid met_json).
-- `verify_import` checks that DB state matches the classification rules.
-
-### Import in Docker
-Find the bot service name:
-```bash
-docker compose ps
-```
-
-If the bot container is already running:
-```bash
-docker compose cp ./users.txt <bot-service>:/app/source/subscribers/users.txt
-
-docker compose exec <bot-service> python -m source.utils.tools.cli.migrate_from_txt \
-  --users-txt /app/source/subscribers/users.txt
-```
-
-If the container does not already have DB env variables:
-```bash
-docker compose exec \
-  -e STORAGE_BACKEND=db \
-  -e DATABASE_URL='mysql+pymysql://user:pass@mariadb:3306/vk_bot?charset=utf8mb4' \
-  <bot-service> \
-  python -m source.utils.tools.cli.migrate_from_txt \
-  --users-txt /app/source/subscribers/users.txt
-```
-
-If the bot container is not running:
-```bash
-docker compose run --rm \
-  -v "$PWD/users.txt:/app/source/subscribers/users.txt:ro" \
-  <bot-service> \
-  python -m source.utils.tools.cli.migrate_from_txt \
-  --users-txt /app/source/subscribers/users.txt
-```
-
-Before importing production data, make a DB dump:
-```bash
-docker compose exec <db-service> mysqldump -u <db-user> -p <db-name> > vk_bot_before_legacy_merge.sql
-```
-
-### Fix panel
-Picker:
-```bash
-python -m source.utils.tools.cli.raw_pick
-```
-
-Editor:
-```bash
-python -m source.utils.tools.cli.raw_edit <raw_id>
-```
-
-A row disappears from Fix panel only after it becomes valid for current rules and is marked as `status=ok`.
-
-### Verify import
-```bash
-python -m source.utils.tools.cli.verify_import
-```
-
-## Sender (admin broadcast)
-Sender is an admin command handled by the bot (see `source/bot.py`).
-
-Syntax:
 ```text
-sender <condition> <message>
+vkbot/infrastructure/db/templates.py
 ```
 
-Operators:
-- `&` — AND
-- `|` — OR
-- `->` — key exists
-- `!>` — key does NOT exist
-- `==`, `!=`, `>>`, `>=`, `<<`, `<=` — comparisons
+Если шаблона нет или он некорректен, бот попробует старый кастомный форматтер `_format_<key>()`, а затем генеричный вывод полей.
 
-Fields:
-- Base: `isu`, `uid`, `fio`, `grp`, `nck`
-- Met fields: `met.<event>.<key>` (events: `a24`, `s25`, `y25`, `a25`, `y26`)
+---
 
-Y26 keys:
-- `uid` — VK ID (0 = missing, 1 = unresolved)
-- `fio`, `nck`, `nmb` — ФИО, никнейм, телефон
-- `bed` — постельное бельё (bool)
-- `liv` — с кем в домике (string)
-- `way` — способ добраться (string)
-- `chk` — оплата получена (bool)
-- `cst` — стоимость (int)
-- `ugo` — одобрен (bool)
+## Новый шаблонизатор
 
-Example:
+Старый синтаксис вида:
+
 ```text
-sender met.y25.ugo==2 Привет! Ты едешь в Ягодное.
+{ключ|текст}
+{условие|текст}
 ```
 
-Note:
-- Users with `uid` 0/1 are skipped by sender (legacy semantics).
+больше не используется.
 
-## Repo hygiene / secrets
-- `.env` is gitignored.
-- `source/subscribers/` is gitignored (local legacy data).
+Теперь используются:
+
+- плейсхолдеры;
+- блоки `$if`.
+
+---
+
+## Плейсхолдеры
+
+Доступны базовые поля:
+
+```text
+{isu}
+{uid}
+{fio}
+{grp}
+{nck}
+```
+
+Поля ивентов:
+
+```text
+{met.<ивент>.<поле>}
+```
+
+Примеры:
+
+```text
+{met.y26.nck}
+{met.e26.plc}
+{met.a24.lr1}
+```
+
+Служебные вычисляемые поля:
+
+```text
+{fmt.y26_mates}
+```
+
+Если значения нет, плейсхолдер подставляется пустой строкой.
+
+Для `{isu}` настоящий ИСУ показывается, а служебный ИСУ `0..99999` не показывается.
+
+---
+
+## Условия `$if`
+
+Формат:
+
+```text
+$if (условие)
+$then "текст, если истина"
+$else "текст, если ложь"
+$end
+```
+
+`$else` можно не писать.
+
+Пример:
+
+```text
+$if (met.y26.chk) $then "Оплата получена" $else "Оплата пока не получена" $end
+```
+
+Ветки `$then` и `$else` всегда пишутся в кавычках:
+
+```text
+"..."
+'...'
+```
+
+---
+
+## Вложенные `$if`
+
+Внутри веток можно писать другие `$if`.
+
+Пример:
+
+```text
+$if (a24->met)
+$then "Баллы: $if (met.a24.lr1) $then 'Да' $else 'Нет' $end"
+$else "Ты не участвовал в осенней спартакиаде 2024"
+$end
+```
+
+---
+
+## Условия внутри `$if`
+
+Внутри `$if` используется тот же синтаксис условий, что и в `sender` / `query`.
+
+Примеры:
+
+```text
+$if (met.y26.chk == 1) $then "Оплачено" $end
+$if (met.y26.bed != 1) $then "Бельё не взято" $end
+$if (met.e26.plc >> 0) $then "Место: {met.e26.plc}" $end
+$if (y26->met) $then "Есть данные по Ягодному" $end
+$if (met.y26.chk == 1 & met.y26.bed == 1) $then "Оплачено и бельё взято" $end
+```
+
+Условия пишутся в скобках.
+
+Внутри условий можно использовать пробелы и переносы строк:
+
+```text
+$if (
+    met.y26.chk == 1
+    &
+    met.y26.bed == 1
+)
+$then "Оплачено и бельё взято"
+$end
+```
+
+---
+
+## Переносы строк и `\`
+
+Если перед переводом строки стоит `\`, то такая пара удаляется.
+
+Пример:
+
+```text
+Привет \
+{fio}
+```
+
+Фактически шаблон станет:
+
+```text
+Привет {fio}
+```
+
+Это нужно, чтобы переносить длинные шаблоны и служебные директивы, не добавляя лишние переводы строк в итоговое сообщение.
+
+Пример:
+
+```text
+Привет \
+$if (met.y26.chk) \
+$then "оплачен" \
+$else "не оплачен" \
+$end
+```
+
+Может вывестись как:
+
+```text
+Привет оплачен
+```
+
+или:
+
+```text
+Привет не оплачен
+```
+
+---
+
+## Экранирование
+
+### Литерал `$`
+
+Чтобы вывести символ `$`, используй:
+
+```text
+$$
+```
+
+Пример:
+
+```text
+$$if
+```
+
+Выведет:
+
+```text
+$if
+```
+
+### Фигурные скобки
+
+Чтобы вывести литеральные фигурные скобки, используй:
+
+```text
+\{
+\}
+```
+
+### Внутри строк
+
+Внутри строк в ветках `$then` / `$else` поддерживаются:
+
+```text
+\"
+\'
+\\
+\n
+\t
+```
+
+Пример:
+
+```text
+$then "Он написал \"АДМИН\""
+```
+
+---
+
+## Служебные поля `fmt.*`
+
+Сейчас есть одно служебное поле:
+
+```text
+{fmt.y26_mates}
+```
+
+Оно возвращает список соседей по домику для Ягодного 2026.
+
+Пример:
+
+```text
+$if (fmt.y26_mates != "")
+$then "С кем ты живешь в этом домике: {fmt.y26_mates}"
+$end
+```
+
+В админской рассылке `sender` данные для `fmt.y26_mates` предвычисляются один раз на всю рассылку, а не запрашиваются отдельно для каждого пользователя.
+
+---
+
+## Админ-команды
+
+Команды доступны только администраторам из `ADMIN_IDS`.
+
+### `sender`
+
+Формат:
+
+```text
+sender <условие>
+<шаблон>
+```
+
+Условие идёт до первого перевода строки.
+
+Шаблон начинается со следующей строки.
+
+Пример:
+
+```text
+sender y26->met
+Привет, {nck}!
+```
+
+Пример с условием и шаблоном:
+
+```text
+sender met.y26.chk == 1
+$if (met.y26.bed) $then "Привет! Ты едешь в Ягодное, бельё учтено." $else "Привет! Проверь данные по белью." $end
+```
+
+Пример с переносами через `\`:
+
+```text
+sender y26->met
+Привет \
+$if (met.y26.chk) \
+$then "оплачен" \
+$else "не оплачен" \
+$end
+```
+
+### `query`
+
+Проверяет, кто подходит под условие, но ничего не отправляет.
+
+Формат:
+
+```text
+query <условие>
+```
+
+Пример:
+
+```text
+query met.y25.ugo == 2
+```
+
+### `db`
+
+Выполняет SQL-запрос.
+
+Формат:
+
+```text
+db <SQL>
+```
+
+Пример:
+
+```text
+db SELECT COUNT(*) FROM users
+```
+
+### `reload`
+
+Повторно инъектирует все активные ивенты.
+
+```text
+reload
+```
+
+### `migrate`
+
+Импортирует старый `users.txt`.
+
+Требует:
+
+```env
+ENABLE_MIGRATION=1
+```
+
+Формат:
+
+```text
+migrate [путь]
+```
+
+Путь разрешён только из:
+
+```text
+vkbot/bot/subscribers/
+```
+
+### `stop`
+
+Останавливает бота.
+
+```text
+stop
+```
+
+---
+
+## Синтаксис условий
+
+### Поля
+
+Базовые поля:
+
+```text
+isu
+uid
+fio
+grp
+nck
+```
+
+Поля ивентов:
+
+```text
+met.<ивент>.<поле>
+```
+
+Примеры:
+
+```text
+met.y26.chk
+met.e26.plc
+met.a24.lr1
+```
+
+### Операторы сравнения
+
+```text
+==
+!=
+>>
+>=
+<<
+<=
+```
+
+### Существование ивента
+
+Есть данные ивента:
+
+```text
+y26->met
+```
+
+Нет данных ивента:
+
+```text
+y26!>met
+```
+
+### Логика
+
+```text
+&
+|
+```
+
+Скобки:
+
+```text
+(...)
+```
+
+### Строки
+
+Строки с пробелами пишутся в кавычках:
+
+```text
+"пока пусто"
+'пока пусто'
+```
+
+Пример:
+
+```text
+met.y26.liv != "пока пусто"
+```
+
+---
+
+## Консольные утилиты
+
+### Миграция
+
+```bash
+python -m vkbot.cli.migrate --users-txt <путь к users.txt>
+```
+
+### Статистика
+
+```bash
+python -m vkbot.cli.stats
+```
+
+### Панель исправлений
+
+```bash
+python -m vkbot.cli.fix_panel
+```
+
+---
+
+## Схема БД
+
+Схема БД синхронизируется с декларациями ивентов автоматически при старте.
+
+Используется аддитивная синхронизация:
+
+- добавляются недостающие таблицы;
+- добавляются недостающие колонки;
+- существующие данные не удаляются.
+
+---
+
+## Деплой
+
+Используется Docker.
+
+Зависимости устанавливаются на этапе сборки образа.
+
+Запуск:
+
+```bash
+./entrypoint.sh
+```
+
+Внутри контейнера:
+
+```text
+python -u -m vkbot.bot.app
+```
+
+При первом старте бот:
+
+1. подключается к БД;
+2. синхронизирует схему;
+3. инъектирует активные ивенты;
+4. запускает longpoll.
+
+---
+
+## Гигиена репозитория
+
+В `.gitignore` должны быть как минимум:
+
+```gitignore
+.env
+vkbot/bot/subscribers/*
+!vkbot/bot/subscribers/.gitkeep
+project_bundle.py
+project_bundle.txt
+temp.py
+```
+
+Токен бота является секретом.
+
+При утечке токен нужно перевыпустить в настройках группы ВКонтакте.
