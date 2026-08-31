@@ -110,12 +110,6 @@ class BotApp:
             }])
             return
 
-        # 3. Welcome раз в 24 часа
-        if self.welcome_svc.should_show_welcome(uid):
-            if self._send_welcome(uid):
-                self.welcome_svc.mark_welcome_shown(uid)
-            return
-
         # Кнопки/слово АДМИН
         if ptype == "uncallmanager":
             self._toggle_admin_call(uid, force_off=True)
@@ -140,6 +134,12 @@ class BotApp:
         # Юзер ждёт админа — молчим
         if self._is_ignored(uid):
             logger.debug(f"Ignored silence: uid={uid}")
+            return
+
+        # Welcome раз в 24 часа
+        if self.welcome_svc.should_show_welcome(uid):
+            if self._send_welcome(uid):
+                self.welcome_svc.mark_welcome_shown(uid)
             return
 
         logger.debug(f"Silence: uid={uid}")
