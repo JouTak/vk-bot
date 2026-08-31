@@ -15,6 +15,7 @@ from vkbot.services.condition_parser import (
 )
 from vkbot.services.event_service import EventService
 from vkbot.services.template_renderer import TemplateRenderer
+from vkbot.config import settings
 
 
 class AdminService:
@@ -72,6 +73,15 @@ class AdminService:
                 "peer_id": user.uid,
                 "message": formatted,
             })
+
+        # Уведомление админам о начале рассылки
+        preview = self._truncate_preview(message)
+        self._notify_admins(
+            f"Началась массовая рассылка!\n"
+            f"Получателей: {len(actions)}\n"
+            f"Условие: {condition}\n"
+            f"Текст: \"{preview}\""
+        )
 
         results = self.vk.send_messages(actions)
 
@@ -280,3 +290,26 @@ class AdminService:
             return bool(mates), ", ".join(mates)
 
         return resolver
+
+    @staticmethod
+    def _truncate_preview(text: str, max_len: int = 120) -> str:
+        """Обрезает текст для превью в уведомлении."""
+        text = text.strip().replace("\n", " ")
+        if len(text) <= max_len:
+            return text
+        return text[:max_len] + "..."
+
+    def _notify_admins(self, text: str) -> None:
+        """Отправляет служебное уведомление всем админам."""
+        if not settings.admin_ids:
+            return
+
+        messages = [
+            {"peer_id": admin_uid, "message": text}
+            for admin_uid in settings.admin_ids
+        ]
+
+        try:
+            self.vk.send_messages(messages)
+        except Exception as e:
+            logger.warning(f"[sender] Failed to notify admins: {e}")
