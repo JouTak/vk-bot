@@ -96,23 +96,17 @@ class BotApp:
         uid = event.message.from_id
         msg = (event.message.text or "").strip()
         ptype = (self._extract_payload(event) or {}).get("type")
-        attachments = getattr(event.message, "attachments", None) or []
 
-        # 1. Гарантируем юзера
+        # Гарантируем юзера
         with session_scope() as s:
             UserService(UserRepository(s)).ensure_user_exists(uid)
 
-        # 2. Сначала проверяем подписку
+        # Сначала проверяем подписку
         if not self.vk.is_member(uid):
             self.vk.send_messages([{
                 "peer_id": uid,
                 "message": self.msg_svc.build_subscribe_message(),
             }])
-            return
-
-        # 3. Только потом игнорируем вложения
-        if attachments:
-            logger.debug(f"Attachment ignored: uid={uid}")
             return
 
         # Кнопки/слово АДМИН
