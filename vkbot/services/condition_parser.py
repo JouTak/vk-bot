@@ -45,6 +45,7 @@ BASE_FIELDS = ("isu", "uid", "fio", "grp", "nck")
 EXTRA_FIELDS = (
     "fmt.y26_mates",
 )
+ALL_CONDITION = "*"
 
 BOOL_ACCEPTED_VALUES = {
     "0",
@@ -525,9 +526,13 @@ def validate_value_type(raw: str, field_type: str) -> str | None:
 def validate_condition(condition: str) -> list[str]:
     """Полностью проверяет условие: синтаксис, парсинг и поля."""
     errors: list[str] = []
+    condition = condition.strip()
 
     if not condition.strip():
         return ["Условие пустое"]
+
+    if condition == ALL_CONDITION:
+        return []
 
     try:
         tokens = tokenize(condition)
@@ -693,6 +698,9 @@ def evaluate_node(user: User, node: ASTNode) -> bool:
 
 def evaluate_condition(user: User, condition: str) -> bool:
     """Вычисляет строку условия для пользователя; при ошибке возвращает False."""
+    if condition.strip() == ALL_CONDITION:
+        return True
+
     try:
         tokens = tokenize(condition)
         parser = Parser(tokens)
@@ -712,10 +720,19 @@ def check_and_evaluate(
         condition: str,
 ) -> tuple[list[User], list[str]]:
     """Проверяет условие и возвращает список подходящих пользователей и ошибки."""
-    errors = validate_condition(condition)
+    condition = condition.strip()
 
+    errors = validate_condition(condition)
     if errors:
         return [], errors
+
+    if condition == ALL_CONDITION:
+        matched = [
+            user
+            for user in users
+            if user.has_valid_uid
+        ]
+        return matched, []
 
     try:
         tokens = tokenize(condition)
@@ -725,7 +742,6 @@ def check_and_evaluate(
         return [], [str(e)]
 
     matched = []
-
     for user in users:
         if not user.has_valid_uid:
             continue
